@@ -97,7 +97,6 @@ def plot_weights(weights, path, iteration, title="", bins=25):
     :param bins: How many bin are used, defaults to 25
     """
     path.mkdir(exist_ok=True)
-    weights = weights / sum(weights)
     sns.histplot(x=weights, bins=bins).set_title(title)
     same_weights_positition = 1 / len(weights)
     plt.axvline(same_weights_positition, color="k")

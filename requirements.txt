@@ -1,2 +1,7 @@
-sklearn~=1.3.0
+scikit-learn~=1.3.0
 loguru~=0.7.0
+pandas~=2.1.0
+folktables~=0.0.12
+seaborn~=0.12.2
+tqdm~=4.66.1
+pathlib~=1.0.1

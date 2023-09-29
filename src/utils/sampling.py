@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 
+seed = 5
+sampling_random_generator = np.random.RandomState(seed)
+
 
 def sample(
     bias_type, df, bias_variable, bias_fraction=0.1, train_fraction=0.25, columns=None
@@ -15,7 +18,9 @@ def sample(
     :param columns: Columns that are used to compute the mean sample, defaults to None
     :return: A biased and a representative data set
     """
-    train = df.sample(frac=train_fraction, replace=False).copy()
+    train = df.sample(
+        frac=train_fraction, replace=False, random_state=sampling_random_generator
+    ).copy()
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]
     R = df.drop(train.index).copy().reset_index(drop=True)
@@ -45,7 +50,9 @@ def sample(
         )
         weight = -(1 / 20)
         sample_weights = np.exp(weight * differences)
-        N = train.sample(frac=0.9, weights=sample_weights)
+        N = train.sample(
+            frac=0.9, weights=sample_weights, random_state=sampling_random_generator
+        )
     else:
         N = train.reset_index(drop=True)
 
@@ -67,8 +74,12 @@ def sample_N(positive_samples, negative_samples, positive_fraction, negative_fra
     N = (
         pd.concat(
             [
-                positive_samples.sample(frac=positive_fraction),
-                negative_samples.sample(frac=negative_fraction),
+                positive_samples.sample(
+                    frac=positive_fraction, random_state=sampling_random_generator
+                ),
+                negative_samples.sample(
+                    frac=negative_fraction, random_state=sampling_random_generator
+                ),
             ]
         )
         .copy()

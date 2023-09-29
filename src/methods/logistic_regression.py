@@ -1,8 +1,9 @@
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+import numpy as np
 
 
-def propensity_score_adjustmen(N, R, columns, *args, **attributes):
+def logistic_regression(N, R, columns, *args, **attributes):
     """Propensity score adjustment
 
     :param N: Non-representative data set
@@ -14,13 +15,13 @@ def propensity_score_adjustmen(N, R, columns, *args, **attributes):
     x = train[columns].values
     y = train.label
     clf = train_logistic_regression(x, y)
-    predictions = clf.predict_proba(N[columns].values)[:, 1]
-    weights = (1 - predictions) / predictions
-    return weights / weights.sum()
+    weights = np.abs(clf.coef_)[0]
+    weights = (1 - weights) 
+    return weights
 
 
 def train_logistic_regression(X_train, y_train):
-    """Trains a logistic regression to distinguish N and R
+    """Trains a logistic regression to distinguish between N and R
 
     :param X_train: Training data
     :param y_train: Training target

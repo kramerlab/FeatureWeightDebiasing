@@ -1,6 +1,4 @@
 import argparse
-import functools
-
 
 from experiments import (
     gbs_allensbach_experiment,
@@ -9,11 +7,11 @@ from experiments import (
 )
 
 from methods import (
-    soft_mrs_weighting,
-    kernel_mean_matching,
-    propensity_score_adjustmen,
-    neural_network_mmd_loss_weighting,
-    repeated_MRS,
+    # soft_mrs_weighting,
+    # kernel_mean_matching,
+    logistic_regression,
+    # neural_network_mmd_loss_weighting,
+    # repeated_MRS,
     uniform_weighting,
 )
 
@@ -122,13 +120,11 @@ def get_weighting_function(method_name):
     if method_name == "uniform":
         return uniform_weighting
     elif method_name == "logistic_regression":
-        return propensity_score_adjustmen
+        return logistic_regression
     elif method_name == "neural_network_mmd_loss":
         return neural_network_mmd_loss_weighting
-    elif method_name == "soft-mrs": 
+    elif method_name == "soft-mrs":
         return soft_mrs_weighting
-    elif method_name == "soft-mrs-exponential":
-        return functools.partial(soft_mrs_weighting, exponential=True)
     elif method_name == "mrs":
         return repeated_MRS
     elif method_name == "kmm":

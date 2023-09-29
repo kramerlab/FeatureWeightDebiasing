@@ -56,18 +56,18 @@ def write_result_dict(
             "mean": np.nanmean(weighted_mmds_list),
             "sd": np.nanstd(weighted_mmds_list),
         },
-        "auroc": {
-            "mean": np.nanmean(auroc_list),
-            "sd": np.nanstd(auroc_list),
-        },
-        "auprc": {
-            "mean": np.nanmean(auprc_list),
-            "sd": np.nanstd(auprc_list),
-        },
-        "remaining samples": {
-            "mean": np.nanmean(remaining_samples_list),
-            "sd": np.nanstd(remaining_samples_list),
-        },
+        # "auroc": {
+        #     "mean": np.nanmean(auroc_list),
+        #     "sd": np.nanstd(auroc_list),
+        # },
+        # "auprc": {
+        #     "mean": np.nanmean(auprc_list),
+        #     "sd": np.nanstd(auprc_list),
+        # },
+        # "remaining samples": {
+        #    "mean": np.nanmean(remaining_samples_list),
+        #     "sd": np.nanstd(remaining_samples_list),
+        # },
         "all_samples": number_of_samples,
     }
 

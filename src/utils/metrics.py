@@ -25,7 +25,7 @@ def compute_weighted_means(N, weights):
     return np.average(N, weights=weights, axis=0)
 
 
-def compute_relative_bias(N, R, weights):
+def compute_relative_bias(N, R, feature_weights, columns):
     """Compute the relative bias
 
     :param N: Non-representative data set
@@ -33,7 +33,9 @@ def compute_relative_bias(N, R, weights):
     :param weights: Sample weights
     :return: Relative biases
     """
-    weighted_means = compute_weighted_means(N, weights)
+    N[columns] = N[columns] * feature_weights
+    R[columns] = R[columns] * feature_weights
+    weighted_means = np.mean(N, axis=0)
     population_means = np.mean(R, axis=0)
     return (abs(weighted_means - population_means) / population_means) * 100
 
@@ -64,7 +66,7 @@ def scale_df(df, columns):
 def weighted_maximum_mean_discrepancy(
     x,
     y,
-    weights,
+    feature_weights,
     gamma=None,
     x_x_rbf_matrix=None,
     y_y_rbf_matrix=None,
@@ -84,12 +86,18 @@ def weighted_maximum_mean_discrepancy(
     if gamma is None:
         gamma = calculate_rbf_gamma(np.append(x, y, axis=0))
     return compute_weighted_maximum_mean_discrepancy(
-        gamma, x, y, weights, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
+        gamma, x, y, feature_weights, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
     )
 
 
 def compute_weighted_maximum_mean_discrepancy(
-    gamma, x, y, weights, n_n_rbf_matrix=None, r_r_rbf_matrix=None, n_r_rbf_matrix=None
+    gamma,
+    n,
+    r,
+    feature_weights,
+    n_n_rbf_matrix=None,
+    r_r_rbf_matrix=None,
+    n_r_rbf_matrix=None,
 ):
     """_summary_
 
@@ -102,33 +110,31 @@ def compute_weighted_maximum_mean_discrepancy(
     :param n_r_rbf_matrix: Pre-computed pairwise rbf matrix to save computing time, defaults to None
     :return: The MMD between a weighted data set and a uniform weighted reference data set
     """
-    weights_r = np.ones(len(y)) / len(y)
-    weights_n = weights / np.sum(weights)
+    feature_weights = feature_weights
+
+    n = n * feature_weights
+    r = r * feature_weights
 
     if n_n_rbf_matrix is None:
-        n_n_rbf_matrix = rbf_kernel(x, x, gamma=gamma)
-    weights_n_n = np.matmul(np.expand_dims(weights_n, 1), np.expand_dims(weights_n, 0))
-    n_n_mean = (weights_n_n * n_n_rbf_matrix).sum()
+        n_n_rbf_matrix = rbf_kernel(n, n, gamma=gamma)
+    n_n_mean = n_n_rbf_matrix.mean()
 
-    if r_r_rbf_matrix is None:
-        r_r_rbf_matrix = rbf_kernel(y, y, gamma=gamma)
-    weight_matrix_r_r = np.matmul(
-        np.expand_dims(weights_r, 1), np.expand_dims(weights_r, 0)
+    r_r_rbf_matrix = (
+        rbf_kernel(r, r, gamma=gamma) if r_r_rbf_matrix is None else r_r_rbf_matrix
     )
-    r_r_mean = (weight_matrix_r_r * r_r_rbf_matrix).sum()
+    r_r_mean = r_r_rbf_matrix.mean()
 
     if n_r_rbf_matrix is None:
-        n_r_rbf_matrix = rbf_kernel(x, y, gamma=gamma)
-    weight_matrix_n_r = np.matmul(
-        np.expand_dims(weights_n, 1), np.expand_dims(weights_r, 0)
-    )
-    n_r_mean = (weight_matrix_n_r * n_r_rbf_matrix).sum()
+        n_r_rbf_matrix = rbf_kernel(n, r, gamma=gamma)
+    n_r_mean = n_r_rbf_matrix.mean()
 
-    mmd = n_n_mean + r_r_mean - 2 * n_r_mean
-    return np.sqrt(mmd)
+    mmd = np.sqrt(n_n_mean + r_r_mean - 2 * n_r_mean)
+    return mmd
 
 
-def compute_metrics(scaled_N, scaled_R, weights, scaler, scale_columns, columns, gamma):
+def compute_metrics(
+    scaled_N, scaled_R, feature_weights, scaler, scale_columns, columns, gamma
+):
     """Computes the metrics for an experiment
 
     :param scaled_N: Standardized non-representative data set
@@ -147,21 +153,22 @@ def compute_metrics(scaled_N, scaled_R, weights, scaler, scale_columns, columns,
     weighted_mmd = weighted_maximum_mean_discrepancy(
         scaled_N_dropped,
         scaled_R_dropped,
-        weights,
+        feature_weights,
         gamma,
     )
 
+    scaled_N_dropped = scaled_N_dropped * feature_weights
     for i in range(scaled_N.values.shape[1]):
         u_values = scaled_N.values[:, i]
         v_values = scaled_R.values[:, i]
 
-        wasserstein_distance_value = wasserstein_distance(u_values, v_values, weights)
+        wasserstein_distance_value = wasserstein_distance(u_values, v_values)
         wasserstein_distances.append(wasserstein_distance_value)
 
     scaled_N.loc[:, scale_columns] = scaler.inverse_transform(scaled_N[scale_columns])
     scaled_R.loc[:, scale_columns] = scaler.inverse_transform(scaled_R[scale_columns])
 
-    sample_biases = compute_relative_bias(scaled_N, scaled_R, weights)
+    sample_biases = compute_relative_bias(scaled_N, scaled_R, feature_weights, columns)
 
     return (
         weighted_mmd,
@@ -170,7 +177,7 @@ def compute_metrics(scaled_N, scaled_R, weights, scaler, scale_columns, columns,
     )
 
 
-def compute_classification_metrics(N, R, columns, weights, label):
+def compute_classification_metrics(N, R, columns, feature_weights, label):
     """Computes classification metrics for downstream tasks
 
     :param N: Non representative data set
@@ -181,7 +188,7 @@ def compute_classification_metrics(N, R, columns, weights, label):
     :return: Downstream classification metrics
     """
     y_true = R[label]
-    clf = train_classifier_auroc(N[columns], N[label], weights)
+    clf = train_classifier_auroc(N[columns], N[label], feature_weights)
     y_predictions = clf.predict_proba(R[columns])[:, 1]
     auroc_score = roc_auc_score(y_true, y_predictions)
     auprc = average_precision_score(y_true, y_predictions)
@@ -213,7 +220,7 @@ def compute_test_metrics_mrs(
         clf = train_classifier_auroc(
             train[columns],
             train.label,
-            weights=train_weights,
+            feature_weights=train_weights,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]
         auroc = roc_auc_score(test.label, y_predict)
@@ -264,7 +271,7 @@ def interpolate_roc(y_test, y_predict):
     return interpolated_fpr, interpolated_tpr
 
 
-def train_classifier_auroc(X_train, y_train, weights=None, speedup=True, cv=3):
+def train_classifier_auroc(X_train, y_train, feature_weights=None, speedup=True, cv=3):
     """Train a classifier to measure the auroc
 
     :param X_train: Training features
@@ -274,10 +281,10 @@ def train_classifier_auroc(X_train, y_train, weights=None, speedup=True, cv=3):
     :param cv: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-    if weights is None:
-        weights = np.ones(len(X_train)) / len(X_train)
+    if feature_weights is None:
+        feature_weights = np.ones(len(X_train)) / len(X_train)
     clf = DecisionTreeClassifier()
-    path = clf.cost_complexity_pruning_path(X_train, y_train, sample_weight=weights)
+    path = clf.cost_complexity_pruning_path(X_train, y_train, sample_weight=feature_weights)
     ccp_alphas = path.ccp_alphas
     ccp_alphas[ccp_alphas < 0] = 0
     ccp_alphas_unique = np.unique(ccp_alphas)
@@ -300,7 +307,7 @@ def train_classifier_auroc(X_train, y_train, weights=None, speedup=True, cv=3):
     return grid.fit(
         X_train,
         y_train,
-        sample_weight=weights,
+        sample_weight=feature_weights,
     )
 
 

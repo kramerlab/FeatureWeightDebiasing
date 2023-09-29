@@ -7,16 +7,12 @@ from sklearn.discriminant_analysis import StandardScaler
 
 from utils.statistics import write_result_dict
 from utils.sampling import sample
-from utils.visualization import plot_results_with_variance, plot_weights
+from utils.visualization import plot_weights
 from utils.metrics import (
     compute_classification_metrics,
     compute_metrics,
     calculate_rbf_gamma,
 )
-
-# Used to draw radom states
-max_int = 2**32 - 1
-seed = 5
 
 
 def downstream_experiment(
@@ -73,7 +69,7 @@ def downstream_experiment(
         )
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
-        weights = weighting_method(
+        feature_weights = weighting_method(
             N,
             R,
             columns,
@@ -87,31 +83,31 @@ def downstream_experiment(
             patience=25,
         )
 
-        auroc, auprc = compute_classification_metrics(N, R, columns, weights, target)
+        auroc, auprc = compute_classification_metrics(N, R, columns, None, target)
 
         (
             weighted_mmd,
-            sample_biases,
+            relative_bias,
             wasserstein_distances,
         ) = compute_metrics(
             N,
             R,
-            weights,
+            feature_weights,
             scaler,
             columns,
             columns,
             gamma,
         )
 
-        plot_weights(weights, result_path / "weights", i)
-        remaining_samples = np.count_nonzero(weights != 0)
+        plot_weights(feature_weights, result_path / "weights", i)
+        # remaining_samples = np.count_nonzero(feature_weights != 0)
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(sample_biases)
+        biases_list.append(relative_bias)
         wasserstein_parameter_list.append(wasserstein_distances)
-        remaining_samples_list.append(remaining_samples)
-        auroc_list.append(auroc)
-        auprc_list.append(auprc)
+        # remaining_samples_list.append(remaining_samples)
+        # auroc_list.append(auroc)
+        # auprc_list.append(auprc)
 
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,
@@ -126,13 +122,6 @@ def downstream_experiment(
 
     with open(result_path / "results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
-
-    if "neural_network_mmd_loss" in method:
-        plot_results_with_variance(
-            mmd_list,
-            result_path,
-            "all",
-        )
 
 
 def create_result_path(method_name, bias_type, data_set_name):

@@ -18,6 +18,10 @@ def sample(
     :param columns: Columns that are used to compute the mean sample, defaults to None
     :return: A biased and a representative data set
     """
+
+    # Sample from the data set because the complete one is too big.
+    if len(df) > 5000:
+        df = df.sample(5000, random_state=sampling_random_generator).copy()
     train = df.sample(
         frac=train_fraction, replace=False, random_state=sampling_random_generator
     ).copy()

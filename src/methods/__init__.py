@@ -1,2 +1,4 @@
 from .logistic_regression import logistic_regression
 from .uniform_weighting import uniform_weighting
+from .random_feature_weights import random_weighting
+from .random_forest import random_forest_weighting

@@ -5,3 +5,4 @@ folktables~=0.0.12
 seaborn~=0.12.2
 tqdm~=4.66.1
 pathlib~=1.0.1
+shap~=0.42.1 

@@ -1,10 +1,6 @@
 import argparse
 
-from experiments import (
-    gbs_allensbach_experiment,
-    gbs_gesis_experiment,
-    downstream_experiment,
-)
+from experiments import downstream_experiment
 
 from methods import (
     # soft_mrs_weighting,
@@ -13,6 +9,8 @@ from methods import (
     # neural_network_mmd_loss_weighting,
     # repeated_MRS,
     uniform_weighting,
+    random_weighting,
+    random_forest_weighting,
 )
 
 # Possible weighting methods
@@ -21,9 +19,10 @@ method_list = [
     "neural_network_mmd_loss",
     "uniform",
     "soft-mrs",
-    "soft-mrs-exponential",
     "mrs",
     "kmm",
+    "random",
+    "random_forest",
 ]
 
 # Possible bias types
@@ -121,14 +120,10 @@ def get_weighting_function(method_name):
         return uniform_weighting
     elif method_name == "logistic_regression":
         return logistic_regression
-    elif method_name == "neural_network_mmd_loss":
-        return neural_network_mmd_loss_weighting
-    elif method_name == "soft-mrs":
-        return soft_mrs_weighting
-    elif method_name == "mrs":
-        return repeated_MRS
-    elif method_name == "kmm":
-        return kernel_mean_matching
+    elif method_name == "random":
+        return random_weighting
+    elif method_name == "random_forest":
+        return random_forest_weighting
 
 
 def get_experiment_function(dataset_name):

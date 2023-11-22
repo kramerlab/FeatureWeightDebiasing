@@ -12,12 +12,14 @@ def logistic_regression(N, R, columns, *args, **attributes):
     :return: Sample weights
     """
     train = pd.concat([N, R])
-    x = train[columns].values
+    X = train[columns].values
     y = train.label
-    clf = train_logistic_regression(x, y)
-    weights = np.abs(clf.coef_)[0]
-    weights = (1 - weights) 
-    return weights
+    clf = train_logistic_regression(X, y)
+    coefficients = np.abs(clf.coef_)[0]
+    coefficients[coefficients < 0] = 0
+    feature_weights = (1 - coefficients) 
+
+    return feature_weights
 
 
 def train_logistic_regression(X_train, y_train):

@@ -98,8 +98,6 @@ def plot_weights(weights, path, iteration, title="", bins=25):
     """
     path.mkdir(exist_ok=True)
     sns.histplot(x=weights, bins=bins).set_title(title)
-    same_weights_positition = 1 / len(weights)
-    plt.axvline(same_weights_positition, color="k")
     plt.savefig(f"{path}/weights_{iteration}.pdf", bbox_inches="tight")
     plt.clf()
 

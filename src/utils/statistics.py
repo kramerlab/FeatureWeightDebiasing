@@ -34,9 +34,10 @@ def write_result_dict(
     weighted_mmds_list,
     biases_list,
     wasserstein_parameter_list,
-    remaining_samples_list,
     auroc_list,
     auprc_list,
+    auroc_list_svm,
+    auprc_list_svm,
     number_of_samples,
 ):
     """Creates the result dictionary
@@ -56,18 +57,22 @@ def write_result_dict(
             "mean": np.nanmean(weighted_mmds_list),
             "sd": np.nanstd(weighted_mmds_list),
         },
-        # "auroc": {
-        #     "mean": np.nanmean(auroc_list),
-        #     "sd": np.nanstd(auroc_list),
-        # },
-        # "auprc": {
-        #     "mean": np.nanmean(auprc_list),
-        #     "sd": np.nanstd(auprc_list),
-        # },
-        # "remaining samples": {
-        #    "mean": np.nanmean(remaining_samples_list),
-        #     "sd": np.nanstd(remaining_samples_list),
-        # },
+        "auroc": {
+            "mean": np.nanmean(auroc_list),
+            "sd": np.nanstd(auroc_list),
+        },
+        "auprc": {
+            "mean": np.nanmean(auprc_list),
+            "sd": np.nanstd(auprc_list),
+        },
+        "auroc_svm": {
+            "mean": np.nanmean(auroc_list_svm),
+            "sd": np.nanstd(auroc_list_svm),
+        },
+        "auprc_svm": {
+            "mean": np.nanmean(auprc_list_svm),
+            "sd": np.nanstd(auprc_list_svm),
+        },
         "all_samples": number_of_samples,
     }
 

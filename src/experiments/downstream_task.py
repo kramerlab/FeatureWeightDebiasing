@@ -10,6 +10,7 @@ from utils.sampling import sample
 from utils.visualization import plot_weights
 from utils.metrics import (
     compute_classification_metrics,
+    compute_classification_metrics_svm,
     compute_metrics,
     calculate_rbf_gamma,
 )
@@ -44,10 +45,12 @@ def downstream_experiment(
     biases_list = []
     wasserstein_parameter_list = []
     mmd_list = []
-    remaining_samples_list = []
     mean_list = []
     auroc_list = []
     auprc_list = []
+
+    auroc_list_svm = []
+    auprc_list_svm = []
 
     result_path = create_result_path(method, bias_type, data_set_name)
     scaler = StandardScaler()
@@ -56,9 +59,6 @@ def downstream_experiment(
     sample_df = df.copy()
 
     for i in trange(number_of_repetitions):
-        # Sample from the data set because the complete one is too big.
-        if len(df) > 5000:
-            sample_df = df.sample(5000).copy()
         N, R = sample(
             bias_type,
             sample_df,
@@ -82,8 +82,15 @@ def downstream_experiment(
             random_generator=random_generator,
             patience=25,
         )
+        N[columns] = N[columns] * feature_weights
+        R[columns] = R[columns] * feature_weights
 
-        auroc, auprc = compute_classification_metrics(N, R, columns, None, target)
+        auroc, auprc = compute_classification_metrics(
+            N, R, columns, target, random_state=5
+        )
+        auroc_svm, auprc_svm = compute_classification_metrics_svm(
+            N, R, columns, target, random_state=5
+        )
 
         (
             weighted_mmd,
@@ -92,7 +99,6 @@ def downstream_experiment(
         ) = compute_metrics(
             N,
             R,
-            feature_weights,
             scaler,
             columns,
             columns,
@@ -100,23 +106,25 @@ def downstream_experiment(
         )
 
         plot_weights(feature_weights, result_path / "weights", i)
-        # remaining_samples = np.count_nonzero(feature_weights != 0)
 
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_parameter_list.append(wasserstein_distances)
-        # remaining_samples_list.append(remaining_samples)
-        # auroc_list.append(auroc)
-        # auprc_list.append(auprc)
+        auroc_list.append(auroc)
+        auprc_list.append(auprc)
+
+        auroc_list_svm.append(auroc_svm)
+        auprc_list_svm.append(auprc_svm)
 
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
         wasserstein_parameter_list,
-        remaining_samples_list,
         auroc_list,
         auprc_list,
+        auroc_list_svm,
+        auprc_list_svm,
         len(N),
     )
 

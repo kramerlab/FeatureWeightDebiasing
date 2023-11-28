@@ -163,3 +163,4 @@ data
 launch.json
 *.pt
 *results
+nohup.out

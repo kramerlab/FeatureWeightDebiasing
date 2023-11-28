@@ -86,7 +86,7 @@ def weighted_maximum_mean_discrepancy(
     if gamma is None:
         gamma = calculate_rbf_gamma(np.append(x, y, axis=0))
     return compute_weighted_maximum_mean_discrepancy(
-        gamma, x, y, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
+        gamma, x, y, feature_weights, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
     )
 
 
@@ -94,6 +94,7 @@ def compute_weighted_maximum_mean_discrepancy(
     gamma,
     n,
     r,
+    feature_weights, 
     n_n_rbf_matrix=None,
     r_r_rbf_matrix=None,
     n_r_rbf_matrix=None,

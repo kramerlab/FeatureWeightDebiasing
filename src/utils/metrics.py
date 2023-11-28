@@ -86,7 +86,7 @@ def weighted_maximum_mean_discrepancy(
     if gamma is None:
         gamma = calculate_rbf_gamma(np.append(x, y, axis=0))
     return compute_weighted_maximum_mean_discrepancy(
-        gamma, x, y, feature_weights, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
+        gamma, x, y, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
     )
 
 
@@ -94,7 +94,6 @@ def compute_weighted_maximum_mean_discrepancy(
     gamma,
     n,
     r,
-    feature_weights,
     n_n_rbf_matrix=None,
     r_r_rbf_matrix=None,
     n_r_rbf_matrix=None,
@@ -220,6 +219,32 @@ def compute_classification_metrics(N, R, columns, label, random_state=None):
 
 
 def compute_classification_metrics_svm(N, R, columns, label, random_state=None):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    y_true = R[label]
+    clf = train_classifier_svm(
+        N[columns],
+        N[label],
+        random_state=random_state,
+        n_splits=5,
+    )
+    y_predictions = clf.decision_function(R[columns])
+    auroc_score = roc_auc_score(y_true, y_predictions)
+    auprc = average_precision_score(y_true, y_predictions)
+
+    return auroc_score, auprc
+
+
+def compute_classification_metrics_svm(
+    N, R, columns, label, random_state=None
+):
     """Computes classification metrics for downstream tasks
 
     :param N: Non representative data set

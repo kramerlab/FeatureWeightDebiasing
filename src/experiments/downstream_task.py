@@ -82,6 +82,8 @@ def downstream_experiment(
             random_generator=random_generator,
             patience=25,
         )
+        N[columns] = N[columns] * feature_weights
+        R[columns] = R[columns] * feature_weights
 
         unique_list_n = []
         unique_list_r = []

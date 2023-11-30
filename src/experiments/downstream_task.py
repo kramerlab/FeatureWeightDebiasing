@@ -64,7 +64,7 @@ def downstream_experiment(
             sample_df,
             target,
             train_fraction=0.5,
-            bias_fraction=0.1,
+            bias_fraction=0.75,
             columns=columns,
         )
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))

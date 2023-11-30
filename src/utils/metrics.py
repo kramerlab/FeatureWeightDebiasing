@@ -138,8 +138,8 @@ def weighted_rbf_kernel(X, Y, gamma, feature_weights=None):
     if feature_weights is None:
         feature_weights = np.ones(len(X))
     difference = (X[..., np.newaxis] - Y[..., np.newaxis].T)
-    w_difference = difference * feature_weights[..., np.newaxis]
-    K = (w_difference*difference).sum(1)
+    K = (difference*difference) * feature_weights[..., np.newaxis]
+    K = K.sum(1)
     K *= -gamma
     np.exp(K, K)
     return K

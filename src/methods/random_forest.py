@@ -3,8 +3,10 @@ import numpy as np
 import shap
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.tree import DecisionTreeClassifier
 
-param_grid = {"min_samples_split": [5], "min_samples_leaf": [5], "n_estimators": [5]}
+
+param_grid = {"min_samples_split": [3, 5, 10], "min_samples_leaf": [3, 5, 10], "n_estimators": [5, 10, 25]}
 
 
 def random_forest_weighting(N, R, columns, *args, **attributes):
@@ -22,7 +24,9 @@ def random_forest_weighting(N, R, columns, *args, **attributes):
     explainer = shap.TreeExplainer(clf)
     shap_values = explainer(X)
     feature_importance = np.abs(shap_values.values[:, :, 1]).mean(0)
-    feature_weights = 1 - (feature_importance * 5)
+    feature_weights = 1 - (feature_importance * 10)
+    feature_weights[feature_weights < 0] = 0
+    feature_weights = (feature_weights / sum(feature_weights)) * len(columns)
     return feature_weights
 
 
@@ -33,11 +37,6 @@ def train_random_forest(X_train, y_train):
     :param y_train: Training target
     :return: Trained logistic regression
     """
-    grid_search = GridSearchCV(
-        RandomForestClassifier(random_state=5),
-        param_grid=param_grid,
-        refit=True,
-        n_jobs=-1,
-    )
+    grid_search = DecisionTreeClassifier(random_state=5)
     grid_search.fit(X_train, y_train)
-    return grid_search.best_estimator_
+    return grid_search

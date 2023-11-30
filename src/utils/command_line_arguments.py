@@ -11,6 +11,8 @@ from methods import (
     uniform_weighting,
     random_weighting,
     random_forest_weighting,
+    mutual_information
+
 )
 
 # Possible weighting methods
@@ -23,6 +25,7 @@ method_list = [
     "kmm",
     "random",
     "random_forest",
+    "mutual_information"
 ]
 
 # Possible bias types
@@ -124,6 +127,9 @@ def get_weighting_function(method_name):
         return random_weighting
     elif method_name == "random_forest":
         return random_forest_weighting
+    elif method_name == "mutual_information":
+        return mutual_information
+
 
 
 def get_experiment_function(dataset_name):

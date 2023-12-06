@@ -33,7 +33,6 @@ def write_result_dict(
     columns,
     weighted_mmds_list,
     biases_list,
-    wasserstein_parameter_list,
     auroc_list,
     auprc_list,
     auroc_list_svm,
@@ -78,14 +77,11 @@ def write_result_dict(
 
     mean_biases = np.nanmean(biases_list, axis=0)
     sd_biases = np.nanstd(biases_list, axis=0)
-    mean_wasserstein = np.nanmean(wasserstein_parameter_list, axis=0)
-    sd_wasserstein = np.nanstd(wasserstein_parameter_list, axis=0)
+
     for index, column in enumerate(columns):
         result_dict[f"{column}_relative_bias"] = {
             "bias mean": mean_biases[index],
             "bias sd": sd_biases[index],
-            "wasserstein mean": mean_wasserstein[index],
-            "wasserstein sd": sd_wasserstein[index],
         }
 
     return result_dict

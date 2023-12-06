@@ -15,13 +15,15 @@ from utils.metrics import (
     calculate_rbf_gamma,
 )
 
+seed = 5
+
 
 def downstream_experiment(
     df,
     columns,
-    weighting_method,
+    sample_weighting_method,
+    feature_weighting_method,
     target: str,
-    method: str = "",
     number_of_repetitions: int = 100,
     bias_type: str = None,
     data_set_name: str = "",
@@ -43,7 +45,6 @@ def downstream_experiment(
     """
     weighted_mmds_list = []
     biases_list = []
-    wasserstein_parameter_list = []
     mmd_list = []
     mean_list = []
     auroc_list = []
@@ -52,7 +53,18 @@ def downstream_experiment(
     auroc_list_svm = []
     auprc_list_svm = []
 
-    result_path = create_result_path(method, bias_type, data_set_name)
+    result_path = create_result_path(
+        sample_weighting_method, feature_weighting_method, bias_type, data_set_name
+    )
+    sample_weights_save_path = result_path.parent / "sample_weights"
+    feature_weights_save_path = result_path / "feature_weights"
+
+    sample_weights_save_path.mkdir(exist_ok=True)
+    feature_weights_save_path.mkdir(exist_ok=True)
+
+    sample_weight_list = load_weights(sample_weights_save_path)
+    feature_weight_list = load_weights(feature_weights_save_path)
+
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
@@ -69,57 +81,74 @@ def downstream_experiment(
         )
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
-        feature_weights = weighting_method(
-            N,
-            R,
-            columns,
-            save_path=result_path,
-            bias_variable=target,
-            mean_list=mean_list,
-            mmd_list=mmd_list,
-            drop=1,
-            early_stopping=True,
-            random_generator=random_generator,
-            patience=25,
-        )
-        N[columns] = N[columns] * feature_weights
-        R[columns] = R[columns] * feature_weights
+        if len(sample_weight_list) > i:
+            sample_weights = np.array(sample_weight_list[i])
+        else:
+            sample_weights = sample_weighting_method(
+                N,
+                R,
+                columns,
+                save_path=result_path,
+                bias_variable=target,
+                mean_list=mean_list,
+                mmd_list=mmd_list,
+                drop=1,
+                early_stopping=True,
+                random_generator=random_generator,
+                patience=25,
+            )
+            sample_weight_list.append(sample_weights.tolist())
+            save_weights(sample_weights_save_path, sample_weight_list)
 
-        unique_list_n = []
-        unique_list_r = []
-        for column in N.columns:
-            unique_list_n.append(N[column].sort_values().unique())
-            unique_list_r.append(R[column].sort_values().unique())
-
-        # tmp = [unique_r - unique_n for unique_r, unique_n in zip(unique_list_r, unique_list_n)]
-        # auroc, auprc= compute_classification_metrics(
-        #    N, R, columns, target, random_state=5
-        # )
-        auroc = auprc = auroc_svm = auprc_svm = 0
-
-        # auroc_svm, auprc_svm = compute_classification_metrics_svm(
-        #     N, R, columns, target, random_state=5
-        # )
+        if len(feature_weight_list) > i:
+            feature_weights = np.array(feature_weight_list[i])
+        else:
+            feature_weights = feature_weighting_method(
+                N=N,
+                R=R,
+                sample_weights=sample_weights,
+                columns=columns,
+                bias_variable=target,
+                early_stopping=True,
+                random_generator=random_generator,
+            )
+            feature_weight_list.append(feature_weights.tolist())
+            save_weights(feature_weights_save_path, feature_weight_list)
 
         (
             weighted_mmd,
             relative_bias,
-            wasserstein_distances,
         ) = compute_metrics(
             N,
             R,
             scaler,
             columns,
             columns,
-            gamma,
+            sample_weights,
             feature_weights,
+            gamma,
         )
 
-        plot_weights(feature_weights, result_path / "weights", i)
+        # auroc, auprc = compute_classification_metrics(
+        #     N, R, columns, target, random_state=seed
+        # )
+        auroc = auprc = 0
+        auroc_svm, auprc_svm = compute_classification_metrics_svm(
+            N,
+            R,
+            sample_weights,
+            feature_weights,
+            gamma,
+            columns,
+            target,
+            random_state=seed,
+        )
+
+        plot_weights(sample_weights, sample_weights_save_path, i)
+        plot_weights(feature_weights, feature_weights_save_path, i)
 
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
-        wasserstein_parameter_list.append(wasserstein_distances)
         auroc_list.append(auroc)
         auprc_list.append(auprc)
 
@@ -130,7 +159,6 @@ def downstream_experiment(
         N.drop(["label"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
-        wasserstein_parameter_list,
         auroc_list,
         auprc_list,
         auroc_list_svm,
@@ -142,11 +170,28 @@ def downstream_experiment(
         result_file.write(json.dumps(result_dict))
 
 
-def trunc(values, decs=0):
-    return np.trunc(values * 10**decs) / (10**decs)
+def save_weights(path, weights_list):
+
+    with open(path / "weights.json", "w") as file:
+        json.dump(weights_list, file, indent=4)
 
 
-def create_result_path(method_name, bias_type, data_set_name):
+def load_weights(path):
+    weight_file = path / "weights.json"
+    if weight_file.is_file():
+        with open(weight_file, "r") as file:
+            weights = json.load(file)
+    else:
+        weights = []
+    return weights
+
+
+def create_result_path(
+    sample_weighting_method,
+    feature_weighting_method,
+    bias_type,
+    data_set_name,
+):
     """The function creates the save path and makes the directory.
 
     :param method: Method name
@@ -156,6 +201,13 @@ def create_result_path(method_name, bias_type, data_set_name):
     """
     file_directory = Path(__file__).parent
     result_path = Path(file_directory, "../../results")
-    result_path = result_path / method_name / "downstream" / data_set_name / bias_type
+    result_path = (
+        result_path
+        / "downstream"
+        / data_set_name
+        / bias_type
+        / sample_weighting_method.__name__
+        / feature_weighting_method.__name__
+    )
     result_path.mkdir(exist_ok=True, parents=True)
     return result_path

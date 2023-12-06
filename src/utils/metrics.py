@@ -1,20 +1,21 @@
-import numpy as np
+import json
 
-from scipy.spatial.distance import pdist, sqeuclidean
+import numpy as np
+import pandas as pd
+
+from scipy.spatial.distance import pdist
 from scipy.stats import wasserstein_distance
 
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
     average_precision_score,
 )
-from sklearn.svm import SVC, LinearSVC
-from numpy.linalg import norm
+from sklearn.svm import SVC
 
 
 def compute_weighted_means(N, weights):
@@ -27,7 +28,7 @@ def compute_weighted_means(N, weights):
     return np.average(N, weights=weights, axis=0)
 
 
-def compute_relative_bias(N, R, columns):
+def compute_relative_bias(N, R, sample_weights):
     """Compute the relative bias
 
     :param N: Non-representative data set
@@ -35,7 +36,7 @@ def compute_relative_bias(N, R, columns):
     :param weights: Sample weights
     :return: Relative biases
     """
-    weighted_means = np.mean(N, axis=0)
+    weighted_means = compute_weighted_means(N, sample_weights)
     population_means = np.mean(R, axis=0)
     return (abs(weighted_means - population_means) / population_means) * 100
 
@@ -66,8 +67,9 @@ def scale_df(df, columns):
 def weighted_maximum_mean_discrepancy(
     x,
     y,
+    sample_weights,
+    feature_weights,
     gamma=None,
-    feature_weights=None,
     x_x_rbf_matrix=None,
     y_y_rbf_matrix=None,
     x_y_rbf_matrix=None,
@@ -86,15 +88,23 @@ def weighted_maximum_mean_discrepancy(
     if gamma is None:
         gamma = calculate_rbf_gamma(np.append(x, y, axis=0))
     return compute_weighted_maximum_mean_discrepancy(
-        gamma, x, y, feature_weights, x_x_rbf_matrix, y_y_rbf_matrix, x_y_rbf_matrix
+        x,
+        y,
+        sample_weights,
+        feature_weights,
+        gamma,
+        x_x_rbf_matrix,
+        y_y_rbf_matrix,
+        x_y_rbf_matrix,
     )
 
 
 def compute_weighted_maximum_mean_discrepancy(
-    gamma,
     n,
     r,
-    feature_weights, 
+    sample_weights,
+    feature_weights,
+    gamma,
     n_n_rbf_matrix=None,
     r_r_rbf_matrix=None,
     n_r_rbf_matrix=None,
@@ -110,35 +120,61 @@ def compute_weighted_maximum_mean_discrepancy(
     :param n_r_rbf_matrix: Pre-computed pairwise rbf matrix to save computing time, defaults to None
     :return: The MMD between a weighted data set and a uniform weighted reference data set
     """
+    uniform_weights = np.ones(len(r)) / len(r)
+    sample_weights = sample_weights / np.sum(sample_weights)
 
     if n_n_rbf_matrix is None:
         n_n_rbf_matrix = weighted_rbf_kernel(
-            n, n, feature_weights=feature_weights, gamma=gamma
+            n, feature_weights=feature_weights, gamma=gamma
         )
-    n_n_mean = n_n_rbf_matrix.mean()
+    weights_n_n = np.matmul(
+        np.expand_dims(sample_weights, 1), np.expand_dims(sample_weights, 0)
+    )
+    n_n_mean = (weights_n_n * n_n_rbf_matrix).sum()
 
     r_r_rbf_matrix = (
-        weighted_rbf_kernel(r, r,  gamma=gamma, feature_weights=feature_weights)
+        weighted_rbf_kernel(
+            r,
+            feature_weights=feature_weights,
+            gamma=gamma,
+        )
         if r_r_rbf_matrix is None
         else r_r_rbf_matrix
     )
-    r_r_mean = r_r_rbf_matrix.mean()
+    weight_matrix_r_r = np.matmul(
+        np.expand_dims(uniform_weights, 1), np.expand_dims(uniform_weights, 0)
+    )
+    r_r_mean = (weight_matrix_r_r * r_r_rbf_matrix).sum()
 
     if n_r_rbf_matrix is None:
         n_r_rbf_matrix = weighted_rbf_kernel(
             n, r, feature_weights=feature_weights, gamma=gamma
         )
-    n_r_mean = n_r_rbf_matrix.mean()
+    weight_matrix_n_r = np.matmul(
+        np.expand_dims(sample_weights, 1), np.expand_dims(uniform_weights, 0)
+    )
+    n_r_mean = (weight_matrix_n_r * n_r_rbf_matrix).sum()
 
     mmd = np.sqrt(n_n_mean + r_r_mean - 2 * n_r_mean)
     return mmd
 
 
-def weighted_rbf_kernel(X, Y, gamma, feature_weights=None):
+def weighted_rbf_kernel(
+    X,
+    Y=None,
+    feature_weights=None,
+    gamma=None,
+):
     if feature_weights is None:
-        feature_weights = np.ones(len(X))
-    difference = (X[..., np.newaxis] - Y[..., np.newaxis].T)
-    K = (difference*difference) * feature_weights[..., np.newaxis]
+        feature_weights = np.ones(X.shape[1])
+    if isinstance(X, pd.DataFrame):
+        X = X.values
+    if isinstance(Y, pd.DataFrame):
+        Y = Y.values
+    if Y is None:
+        Y = X
+    difference = X[..., np.newaxis] - Y[..., np.newaxis].T
+    K = (difference * difference) * feature_weights[..., np.newaxis]
     K = K.sum(1)
     K *= -gamma
     np.exp(K, K)
@@ -146,7 +182,14 @@ def weighted_rbf_kernel(X, Y, gamma, feature_weights=None):
 
 
 def compute_metrics(
-    scaled_N, scaled_R, scaler, scale_columns, columns, gamma, feature_weights
+    scaled_N,
+    scaled_R,
+    scaler,
+    scale_columns,
+    columns,
+    sample_weights,
+    feature_weights,
+    gamma,
 ):
     """Computes the metrics for an experiment
 
@@ -159,38 +202,26 @@ def compute_metrics(
     :param gamma: Gamma for the rbf kernel
     :return: Result metrics
     """
-    wasserstein_distances = []
     scaled_N_dropped = scaled_N[columns].values
     scaled_R_dropped = scaled_R[columns].values
 
     weighted_mmd = weighted_maximum_mean_discrepancy(
         scaled_N_dropped,
         scaled_R_dropped,
-        gamma,
+        sample_weights,
         feature_weights,
+        gamma,
     )
-
-    for i in range(scaled_N.values.shape[1]):
-        u_values = scaled_N.values[:, i]
-        v_values = scaled_R.values[:, i]
-
-        wasserstein_distance_value = wasserstein_distance(u_values, v_values)
-        wasserstein_distances.append(wasserstein_distance_value)
 
     scaled_N.loc[:, scale_columns] = scaler.inverse_transform(scaled_N[scale_columns])
     scaled_R.loc[:, scale_columns] = scaler.inverse_transform(scaled_R[scale_columns])
 
-    sample_biases = compute_relative_bias(scaled_N, scaled_R, columns)
+    sample_biases = compute_relative_bias(scaled_N, scaled_R, sample_weights)
 
     return (
         weighted_mmd,
         sample_biases,
-        wasserstein_distances,
     )
-
-
-from sklearn import tree
-from matplotlib import pyplot as plt
 
 
 def compute_classification_metrics(N, R, columns, label, random_state=None):
@@ -213,8 +244,6 @@ def compute_classification_metrics(N, R, columns, label, random_state=None):
     y_predictions = clf.predict_proba(R[columns])[:, 1]
     auroc_score = roc_auc_score(R[label], y_predictions)
     auprc = average_precision_score(R[label], y_predictions)
-    tree.plot_tree(clf.best_estimator_, precision=20)
-    plt.savefig("random_tree")
 
     return auroc_score, auprc
 
@@ -244,7 +273,7 @@ def compute_classification_metrics_svm(N, R, columns, label, random_state=None):
 
 
 def compute_classification_metrics_svm(
-    N, R, columns, label, random_state=None
+    N, R, sample_weights, feature_weights, gamma, columns, label, random_state=None
 ):
     """Computes classification metrics for downstream tasks
 
@@ -259,9 +288,13 @@ def compute_classification_metrics_svm(
     clf = train_classifier_svm(
         N[columns],
         N[label],
+        sample_weights,
+        feature_weights,
+        gamma,
         random_state=random_state,
-        n_splits=5,
+        n_splits=10,
     )
+
     y_predictions = clf.decision_function(R[columns])
     auroc_score = roc_auc_score(y_true, y_predictions)
     auprc = average_precision_score(y_true, y_predictions)
@@ -293,7 +326,7 @@ def compute_test_metrics_mrs(
         clf = train_classifier_auroc(
             train[columns],
             train.label,
-            feature_weights=train_weights,
+            weights=train_weights,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]
         auroc = roc_auc_score(test.label, y_predict)
@@ -345,7 +378,7 @@ def interpolate_roc(y_test, y_predict):
 
 
 def train_classifier_auroc(
-    X_train, y_train, speedup=True, n_splits=3, random_state=None
+    X_train, y_train, weights=None, speedup=True, n_splits=3, random_state=None
 ):
     """Train a classifier to measure the auroc
 
@@ -356,8 +389,10 @@ def train_classifier_auroc(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
+    if weights is None:
+        weights = np.ones(len(X_train)) / len(X_train)
     clf = DecisionTreeClassifier(random_state=random_state)
-    path = clf.cost_complexity_pruning_path(X_train, y_train)
+    path = clf.cost_complexity_pruning_path(X_train, y_train, sample_weight=weights)
     ccp_alphas = path.ccp_alphas
     ccp_alphas[ccp_alphas < 0] = 0
     ccp_alphas_unique = np.unique(ccp_alphas)
@@ -385,10 +420,19 @@ def train_classifier_auroc(
     return grid.fit(
         X_train,
         y_train,
+        sample_weight=weights,
     )
 
 
-def train_classifier_svm(X_train, y_train, n_splits=3, random_state=None):
+def train_classifier_svm(
+    X_train,
+    y_train,
+    sample_weights,
+    feature_weights,
+    gamma,
+    n_splits=3,
+    random_state=None,
+):
     """Train a classifier to measure the auroc
 
     :param X_train: Training features
@@ -398,16 +442,18 @@ def train_classifier_svm(X_train, y_train, n_splits=3, random_state=None):
     :param cv: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
+    weighted_kernel = lambda X, Y: weighted_rbf_kernel(
+        X, Y, feature_weights=feature_weights, gamma=gamma
+    )
     clf = SVC(
         random_state=np.random.RandomState(random_state),
         max_iter=int(1e6),
-        kernel="linear",
+        kernel=weighted_kernel,
+        gamma=gamma,
     )
 
     param_grid = {
-        "C": [0.1, 1, 10, 100, 1000],
-        # "gamma": [1, 0.1, 0.01, 0.001, 0.0001, "scale"],
-        # "kernel": ["rbf", "linear", "poly"],
+        "C": [0.001, 0.1, 1, 10, 100, 1000],
     }
 
     cv = StratifiedKFold(
@@ -424,10 +470,7 @@ def train_classifier_svm(X_train, y_train, n_splits=3, random_state=None):
         refit=True,
     )
 
-    return grid.fit(
-        X_train,
-        y_train,
-    )
+    return grid.fit(X_train, y_train, sample_weight=sample_weights)
 
 
 def calculate_mean_rocs(rocs):

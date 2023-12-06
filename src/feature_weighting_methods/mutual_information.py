@@ -18,4 +18,3 @@ def mutual_information(N, R, columns, *args, **attributes):
     feature_weights[feature_weights < 0] = 0
     feature_weights = (feature_weights / sum(feature_weights)) * len(columns)
     return feature_weights
-

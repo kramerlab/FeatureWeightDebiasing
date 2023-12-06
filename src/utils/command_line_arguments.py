@@ -2,35 +2,42 @@ import argparse
 
 from experiments import downstream_experiment
 
-from methods import (
-    # soft_mrs_weighting,
-    # kernel_mean_matching,
-    logistic_regression,
-    # neural_network_mmd_loss_weighting,
-    # repeated_MRS,
-    uniform_weighting,
+from feature_weighting_methods import (
+    logistic_regression_sample_weights,
+    uniform_feature_weighting,
     random_weighting,
     random_forest_weighting,
-    mutual_information
-
+    mutual_information,
 )
 
+from sample_weighting_methods import (
+    soft_mrs_weighting,
+    kernel_mean_matching,
+    propensity_score_adjustment,
+    repeated_MRS,
+    uniform_sample_weighting,
+)
+
+
 # Possible weighting methods
-method_list = [
-    "logistic_regression",
-    "neural_network_mmd_loss",
+sample_weighting_method_list = [
+    "psa",
     "uniform",
     "soft-mrs",
     "mrs",
     "kmm",
+]
+
+feature_weighting_method_list = [
+    "logistic_regression",
+    "uniform",
     "random",
     "random_forest",
-    "mutual_information"
+    "mutual_information",
 ]
 
 # Possible bias types
 bias_choice = [
-    "none",
     "less_negative_class",
     "less_positive_class",
     "mean_difference",
@@ -68,9 +75,16 @@ def parse_command_line_arguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", choices=dataset_list, required=True)
-    parser.add_argument("--method", choices=method_list, required=True)
+    parser.add_argument(
+        "--feature_weighting_method",
+        choices=feature_weighting_method_list,
+        required=True,
+    )
+    parser.add_argument(
+        "--sample_weighting_method", choices=sample_weighting_method_list, required=True
+    )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
-    parser.add_argument("--number_of_repetitions", default=100, type=int)
+    parser.add_argument("--number_of_repetitions", default=50, type=int)
     return parser.parse_args()
 
 
@@ -102,27 +116,34 @@ def parse_mrs_analysis_command_line_arguments():
     return parser.parse_args()
 
 
-def parse_command_line_arguments_statistical_analysis():
-    """Parses the command line arguments for the statistical experiment.
-
-    :return: Parsed command line arguments for the statistical experiment.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--method_one", choices=method_list, required=True)
-    parser.add_argument("--method_two", choices=method_list, required=True)
-    return parser.parse_args()
-
-
-def get_weighting_function(method_name):
+def get_sample_weighting_function(method_name):
     """Returns the function to the function name.
 
     :param method_name: Method name
     :return: corresponding weighting function
     """
     if method_name == "uniform":
-        return uniform_weighting
+        return uniform_sample_weighting
     elif method_name == "logistic_regression":
-        return logistic_regression
+        return propensity_score_adjustment
+    elif method_name == "soft-mrs":
+        return soft_mrs_weighting
+    elif method_name == "mrs":
+        return repeated_MRS
+    elif method_name == "kmm":
+        return kernel_mean_matching
+
+
+def get_feature_weighting_function(method_name):
+    """Returns the function to the function name.
+
+    :param method_name: Method name
+    :return: corresponding weighting function
+    """
+    if method_name == "uniform":
+        return uniform_feature_weighting
+    elif method_name == "logistic_regression":
+        return logistic_regression_sample_weights
     elif method_name == "random":
         return random_weighting
     elif method_name == "random_forest":
@@ -131,16 +152,10 @@ def get_weighting_function(method_name):
         return mutual_information
 
 
-
-def get_experiment_function(dataset_name):
+def get_experiment_function():
     """Returns the experiment function to a name.
 
     :param dataset_name: Data set name
     :return: Experiment function
     """
-    if dataset_name == "gbs_gesis":
-        return gbs_gesis_experiment
-    elif dataset_name in down_stream_data_sets:
-        return downstream_experiment
-    else:
-        return gbs_allensbach_experiment
+    return downstream_experiment

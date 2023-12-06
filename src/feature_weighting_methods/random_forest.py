@@ -1,12 +1,17 @@
+import shap
+
 import pandas as pd
 import numpy as np
-import shap
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.tree import DecisionTreeClassifier
 
 
-param_grid = {"min_samples_split": [3, 5, 10], "min_samples_leaf": [3, 5, 10], "n_estimators": [5, 10, 25]}
+param_grid = {
+    "min_samples_split": [3, 5, 10],
+    "min_samples_leaf": [3, 5, 10],
+    "n_estimators": [5, 10, 25, 50],
+}
 
 
 def random_forest_weighting(N, R, columns, *args, **attributes):
@@ -37,6 +42,11 @@ def train_random_forest(X_train, y_train):
     :param y_train: Training target
     :return: Trained logistic regression
     """
-    grid_search = DecisionTreeClassifier(random_state=5)
+    grid_search = GridSearchCV(
+        RandomForestClassifier(random_state=5),
+        param_grid=param_grid,
+        refit=True,
+        n_jobs=-1,
+    )
     grid_search.fit(X_train, y_train)
-    return grid_search
+    return grid_search.best_estimator_

@@ -38,6 +38,7 @@ def write_result_dict(
     auroc_list_svm,
     auprc_list_svm,
     number_of_samples,
+    explicit_weights,
 ):
     """Creates the result dictionary
 
@@ -75,13 +76,14 @@ def write_result_dict(
         "all_samples": number_of_samples,
     }
 
-    mean_biases = np.nanmean(biases_list, axis=0)
-    sd_biases = np.nanstd(biases_list, axis=0)
+    if explicit_weights:
+        mean_biases = np.nanmean(biases_list, axis=0)
+        sd_biases = np.nanstd(biases_list, axis=0)
 
-    for index, column in enumerate(columns):
-        result_dict[f"{column}_relative_bias"] = {
-            "bias mean": mean_biases[index],
-            "bias sd": sd_biases[index],
-        }
+        for index, column in enumerate(columns):
+            result_dict[f"{column}_relative_bias"] = {
+                "bias mean": mean_biases[index],
+                "bias sd": sd_biases[index],
+            }
 
     return result_dict

@@ -10,6 +10,10 @@ from utils.command_line_arguments import (
 )
 
 seed = 5
+no_weights_function = [
+    "train_domain_adversarial_network",
+    "train_correction_weights_network",
+]
 
 
 def weighting_experiment(
@@ -31,9 +35,19 @@ def weighting_experiment(
     random.seed(seed)
     random_generator = np.random.RandomState(seed)
     data, columns, target = load_dataset(data_set_name)
-    compute_feature_weights_function = get_feature_weighting_function(feature_weighting_method_name)
-    compute_sample_weights_function = get_sample_weighting_function(sample_weighting_method_name)
+    compute_feature_weights_function = get_feature_weighting_function(
+        feature_weighting_method_name
+    )
+    compute_sample_weights_function = get_sample_weighting_function(
+        sample_weighting_method_name
+    )
     experiment_function = get_experiment_function()
+
+    explicit_weights = (
+        False
+        if compute_sample_weights_function.__name__ in no_weights_function
+        else True
+    )
 
     experiment_function(
         data,
@@ -45,6 +59,7 @@ def weighting_experiment(
         data_set_name=data_set_name,
         target=target,
         random_generator=random_generator,
+        explicit_weights=explicit_weights,
     )
 
 

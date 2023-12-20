@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 
 from scipy.spatial.distance import pdist
-from scipy.stats import wasserstein_distance
 
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
@@ -38,7 +37,9 @@ def compute_relative_bias(N, R, sample_weights):
     """
     weighted_means = compute_weighted_means(N, sample_weights)
     population_means = np.mean(R, axis=0)
-    return (abs(weighted_means - population_means) / population_means) * 100
+    relative_bias = (abs(weighted_means - population_means) / population_means) * 100
+
+    return relative_bias
 
 
 def calculate_rbf_gamma(aggregate_set):
@@ -224,7 +225,7 @@ def compute_metrics(
     )
 
 
-def compute_classification_metrics(N, R, columns, label, random_state=None):
+def compute_classification_metrics(N, R, columns, sample_weights, label, random_state=None):
     """Computes classification metrics for downstream tasks
 
     :param N: Non representative data set
@@ -237,6 +238,7 @@ def compute_classification_metrics(N, R, columns, label, random_state=None):
     clf = train_classifier_auroc(
         N[columns],
         N[label],
+        sample_weights,
         random_state=random_state,
         n_splits=5,
         speedup=False,
@@ -466,7 +468,7 @@ def train_classifier_svm(
         clf,
         param_grid=param_grid,
         cv=cv,
-        n_jobs=-1,
+        n_jobs=5,
         refit=True,
     )
 

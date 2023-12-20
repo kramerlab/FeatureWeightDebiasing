@@ -99,18 +99,14 @@ def repeated_MRS(
     columns,
     delta=0.001,
     early_stopping=False,
-    mrs_function=mrs,
     return_metrics=False,
-    use_bias_mean=True,
-    bias_variable=None,
     cv=5,
-    class_weights="balanced",
     drop=1,
     random_generator=None,
     *args,
     **attributes
 ):
-    """Performs the whole mrs
+    """Performs MRS
 
     :param N: Non-representative data set
     :param R: Representative data set
@@ -133,11 +129,11 @@ def repeated_MRS(
     roc_list = []
     number_of_iterations = len(N) // drop
     mrs_iteration = 0
-    roc_iteration = (len(N) // drop // 3.5) + 1
-    dropping_N = N.copy()
+    dropped_N = N.copy()
     weights = np.ones(len(N))
-    dropping_N = dropping_N.reset_index(drop=True)
+    dropped_N = dropped_N.reset_index(drop=True)
     best_difference = np.inf
+    best_mmd = 1
 
     # Compute and save mmd inputs to save time
     gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
@@ -158,77 +154,69 @@ def repeated_MRS(
             y_y_rbf_matrix=y_y_rbf_matrix,
         )
     )
-    auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-        pd.concat([dropping_N, R]),
+    auroc = compute_test_metrics_mrs(
+        pd.concat([dropped_N, R]),
         columns,
-        calculate_roc=True,
         random_state=random_generator.randint(max_int),
     )
-    roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, 0])
-
-    if use_bias_mean and bias_variable is not None:
-        relative_bias = compute_relative_bias(
-            N[bias_variable], R[bias_variable], weights
-        )
-        relative_bias_list.append(relative_bias)
+    patience = 0
 
     auc_list.append(auroc)
 
     for i in trange(number_of_iterations):
-        dropping_N, drop_ids = mrs_function(
-            N=dropping_N,
+        # TODO something with feature weights
+
+        dropped_N, drop_ids = mrs(
+            N=dropped_N,
             R=R,
             columns=columns,
             n_drop=drop,
-            class_weights=class_weights,
             cv=cv,
             random_state=random_generator.randint(max_int),
         )
         weights[drop_ids] = 0
 
-        if (i + 1) % roc_iteration == 0:
-            auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-                pd.concat([dropping_N, R]), columns, calculate_roc=True
-            )
-            roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
-        else:
-            auroc = compute_test_metrics_mrs(
-                pd.concat([dropping_N, R]),
-                columns,
-                random_state=random_generator.randint(max_int),
-            )
+        #auroc = compute_test_metrics_mrs(
+        #    pd.concat([dropped_N, R]),
+        #    columns,
+        #    random_state=random_generator.randint(max_int),
+        #)
+        # auc_list.append(auroc)
 
-        auc_list.append(auroc)
+        feature_weights = feature_weights_stuff(dropped_N, R, columns)
 
-        mmd_list.append(
-            weighted_maximum_mean_discrepancy(
+        mmd = weighted_maximum_mean_discrepancy(
                 N[columns],
                 R[columns],
                 weights,
-                feature_weights=None,
+                feature_weights=feature_weights,
                 gamma=gamma,
                 x_x_rbf_matrix=x_x_rbf_matrix,
                 x_y_rbf_matrix=x_y_rbf_matrix,
                 y_y_rbf_matrix=y_y_rbf_matrix,
             )
-        )
+        mmd_list.append(mmd)
+        
 
-        if use_bias_mean and bias_variable is not None:
-            relative_bias = compute_relative_bias(
-                N[bias_variable], R[bias_variable], weights
-            )
-            relative_bias_list.append(relative_bias)
-
-        auc_difference = abs(auroc - 0.5)
-        if (auc_difference + delta) <= best_difference:
+        if mmd < best_mmd:
             best_weights = weights.copy()
             mrs_iteration = (i + 1) * drop
-            best_difference = auc_difference
+            best_mmd = mmd
+            patience = 0
+        else:
+            patience += 1
+
+        # auc_difference = abs(auroc - 0.5)
+        # if (auc_difference + delta) <= best_difference:
+        #     best_weights = weights.copy()
+        #     mrs_iteration = (i + 1) * drop
+        #     best_difference = auc_difference
 
         if (
-            len(dropping_N) <= cv
+            len(dropped_N) <= cv
             or ((best_difference <= delta) and early_stopping)
-            or len(dropping_N) <= drop
+            or len(dropped_N) <= drop
+            or patience >= 25
         ):
             break
 
@@ -240,12 +228,9 @@ def repeated_MRS(
         return best_weights / best_weights.sum()
 
 
-def random_drops(N, n_drop: int = 1, *args, **attributes):
-    """MRS variant that drops sample randomly
-
-    :param N: Non-representative data set
-    :param n_drop: Defines how many samples are dropped per iteration, defaults to 1
-    :return: Index of the samples to drop
-    """
-    drop_ids = random.sample(range(0, len(N)), n_drop)
-    return N.drop(N.index[drop_ids]), N.index[drop_ids]
+from sklearn.feature_selection import mutual_info_classif
+def feature_weights_stuff(dropped_N, R, columns):
+    data = pd.concat([dropped_N[columns], R[columns]])
+    targets = np.concatenate([np.ones(len(dropped_N)), np.zeros(len(R))])
+    feature_weights = mutual_info_classif(data, targets)
+    return feature_weights

@@ -20,34 +20,39 @@ class WeightedMMDLoss(nn.Module):
         :param device: Device to whom the data is copied
         """
         super(WeightedMMDLoss, self).__init__()
-        self.weights_R = (torch.ones(len(R), dtype=torch.float64) / len(R)).to(device)
+        self.weights_R = (torch.ones(len(R)) / len(R)).to(device)
         self.weights_R = self.weights_R / torch.sum(self.weights_R)
         self.n_n_rbf_matrix = torch.FloatTensor(rbf_kernel(N, N, gamma)).to(device)
         self.n_r_rbf_matrix = torch.FloatTensor(rbf_kernel(N, R, gamma)).to(device)
         self.gamma = gamma
+        self.R = R
 
         r_r_rbf_matrix = torch.matmul(
             torch.unsqueeze(self.weights_R, 1), torch.unsqueeze(self.weights_R, 0)
         ) * torch.FloatTensor(rbf_kernel(R, R, gamma)).to(device)
         self.r_r_mean = r_r_rbf_matrix.sum()
 
-    def forward(self, weights):
+    def forward(self, weights, n_batch):
         """Computes the loss
 
         :param weights: Current weights
         :return: Loss value
         """
         if not torch.is_tensor(weights):
-            weights = torch.DoubleTensor(weights)
+            weights = torch.FloatTensor(weights)
+        n_n_rbf_matrix = torch.FloatTensor(
+            rbf_kernel(n_batch, n_batch, self.gamma)
+        ).to(weights)
+        n_r_rbf_matrix = torch.FloatTensor(rbf_kernel(n_batch, self.R, self.gamma)).to(weights)
         n_n_mean = (
             torch.matmul(torch.unsqueeze(weights, 1), torch.unsqueeze(weights, 0))
-            * self.n_n_rbf_matrix
+            * n_n_rbf_matrix
         ).sum()
         n_r_mean = (
             torch.matmul(
                 torch.unsqueeze(weights, 1), torch.unsqueeze(self.weights_R, 0)
             )
-            * self.n_r_rbf_matrix
+            * n_r_rbf_matrix
         ).sum()
 
         return torch.sqrt(n_n_mean + self.r_r_mean - 2 * n_r_mean)

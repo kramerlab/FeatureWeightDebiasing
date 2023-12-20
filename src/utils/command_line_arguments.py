@@ -16,6 +16,9 @@ from sample_weighting_methods import (
     propensity_score_adjustment,
     repeated_MRS,
     uniform_sample_weighting,
+    train_domain_adversarial_network,
+    neural_network_mmd_loss_weighting,
+    train_correction_weights_network
 )
 
 
@@ -26,6 +29,9 @@ sample_weighting_method_list = [
     "soft-mrs",
     "mrs",
     "kmm",
+    "dann",
+    "mmd_loss",
+    "correction_weights"
 ]
 
 feature_weighting_method_list = [
@@ -124,7 +130,7 @@ def get_sample_weighting_function(method_name):
     """
     if method_name == "uniform":
         return uniform_sample_weighting
-    elif method_name == "logistic_regression":
+    elif method_name == "psa":
         return propensity_score_adjustment
     elif method_name == "soft-mrs":
         return soft_mrs_weighting
@@ -132,6 +138,12 @@ def get_sample_weighting_function(method_name):
         return repeated_MRS
     elif method_name == "kmm":
         return kernel_mean_matching
+    elif method_name == "dann":
+        return train_domain_adversarial_network
+    elif method_name == "mmd_loss":
+        return neural_network_mmd_loss_weighting
+    elif method_name == "correction_weights":
+        return train_correction_weights_network
 
 
 def get_feature_weighting_function(method_name):

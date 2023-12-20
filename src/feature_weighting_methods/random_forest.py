@@ -14,7 +14,7 @@ param_grid = {
 }
 
 
-def random_forest_weighting(N, R, columns, *args, **attributes):
+def random_forest_weighting(N, R, sample_weights, columns, *args, **attributes):
     """Propensity score adjustment
 
     :param N: Non-representative data set
@@ -22,10 +22,13 @@ def random_forest_weighting(N, R, columns, *args, **attributes):
     :param columns: Training columns
     :return: Sample weights
     """
+    sample_weights_n = sample_weights / np.sum(sample_weights)
+    sample_weights_r = np.ones(len(R)) / len(R)
+    sample_weights = np.concatenate([sample_weights_n, sample_weights_r])
     train = pd.concat([N, R])
     X = train[columns].values
     y = train.label
-    clf = train_random_forest(X, y)
+    clf = train_random_forest(X, y, sample_weights)
     explainer = shap.TreeExplainer(clf)
     shap_values = explainer(X)
     feature_importance = np.abs(shap_values.values[:, :, 1]).mean(0)
@@ -35,7 +38,7 @@ def random_forest_weighting(N, R, columns, *args, **attributes):
     return feature_weights
 
 
-def train_random_forest(X_train, y_train):
+def train_random_forest(X_train, y_train, sample_weights):
     """Trains a logistic regression to distinguish between N and R
 
     :param X_train: Training data
@@ -48,5 +51,5 @@ def train_random_forest(X_train, y_train):
         refit=True,
         n_jobs=-1,
     )
-    grid_search.fit(X_train, y_train)
+    grid_search.fit(X_train, y_train, sample_weight=sample_weights)
     return grid_search.best_estimator_

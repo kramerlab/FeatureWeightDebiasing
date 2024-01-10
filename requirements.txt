@@ -8,3 +8,6 @@ scikit-learn~=1.3.2
 seaborn~=0.13.0
 shap~=0.43.0
 tqdm~=4.66.1
+statsmodels
+adapt
+torch

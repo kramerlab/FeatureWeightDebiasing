@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import pandas as pd
-
+import json
 from tqdm import trange
 
 from sklearn.metrics.pairwise import rbf_kernel
@@ -130,7 +130,7 @@ def repeated_MRS(
     number_of_iterations = len(N) // drop
     mrs_iteration = 0
     dropped_N = N.copy()
-    weights = np.ones(len(N))
+    sample_weights = np.ones(len(N))
     dropped_N = dropped_N.reset_index(drop=True)
     best_difference = np.inf
     best_mmd = 1
@@ -146,7 +146,7 @@ def repeated_MRS(
         weighted_maximum_mean_discrepancy(
             N[columns],
             R[columns],
-            weights,
+            sample_weights,
             feature_weights=None,
             gamma=gamma,
             x_x_rbf_matrix=x_x_rbf_matrix,
@@ -162,7 +162,7 @@ def repeated_MRS(
     patience = 0
 
     auc_list.append(auroc)
-
+    mutual_information_list = []
     for i in trange(number_of_iterations):
         # TODO something with feature weights
 
@@ -174,37 +174,41 @@ def repeated_MRS(
             cv=cv,
             random_state=random_generator.randint(max_int),
         )
-        weights[drop_ids] = 0
+        sample_weights[drop_ids] = 0
 
-        #auroc = compute_test_metrics_mrs(
+        # auroc = compute_test_metrics_mrs(
         #    pd.concat([dropped_N, R]),
         #    columns,
         #    random_state=random_generator.randint(max_int),
-        #)
+        # )
         # auc_list.append(auroc)
 
-        feature_weights = feature_weights_stuff(dropped_N, R, columns)
+        mutual_information = compute_feature_weights(dropped_N, R, columns)
+        feature_weights = 1 - (mutual_information * 50)
+        feature_weights[feature_weights < 0] = 0
+        feature_weights = (feature_weights / np.sum(feature_weights)) * dropped_N.shape[1]
+        mutual_information_sum = np.sum(mutual_information)
+        mutual_information_list.append(mutual_information_sum)
 
         mmd = weighted_maximum_mean_discrepancy(
-                N[columns],
-                R[columns],
-                weights,
-                feature_weights=feature_weights,
-                gamma=gamma,
-                x_x_rbf_matrix=x_x_rbf_matrix,
-                x_y_rbf_matrix=x_y_rbf_matrix,
-                y_y_rbf_matrix=y_y_rbf_matrix,
-            )
+            N[columns],
+            R[columns],
+            sample_weights,
+            feature_weights=feature_weights,
+            gamma=gamma,
+            #x_x_rbf_matrix=x_x_rbf_matrix,
+            #x_y_rbf_matrix=x_y_rbf_matrix,
+            #y_y_rbf_matrix=y_y_rbf_matrix,
+        )
         mmd_list.append(mmd)
-        
 
-        if mmd < best_mmd:
-            best_weights = weights.copy()
-            mrs_iteration = (i + 1) * drop
-            best_mmd = mmd
-            patience = 0
-        else:
-            patience += 1
+        # if mmd < best_mmd:
+        #   best_weights = weights.copy()
+        #   mrs_iteration = (i + 1) * drop
+        #    best_mmd = mmd
+        #    patience = 0
+        # else:
+        #    patience += 1
 
         # auc_difference = abs(auroc - 0.5)
         # if (auc_difference + delta) <= best_difference:
@@ -214,13 +218,20 @@ def repeated_MRS(
 
         if (
             len(dropped_N) <= cv
-            or ((best_difference <= delta) and early_stopping)
+            #   or ((best_difference <= delta) and early_stopping)
             or len(dropped_N) <= drop
-            or patience >= 25
+            #   or patience >= 25
         ):
             break
 
+    best_weights = sample_weights
     best_weights = best_weights.astype(np.float64)
+
+    with open("mutual_information_sum.json", "w") as file:
+        json.dump(mutual_information_list, file)
+
+    with open("mmd_without_feature_weights.json", "w") as file:
+        json.dump(mmd_list, file)
 
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
@@ -229,8 +240,10 @@ def repeated_MRS(
 
 
 from sklearn.feature_selection import mutual_info_classif
-def feature_weights_stuff(dropped_N, R, columns):
+
+
+def compute_feature_weights(dropped_N, R, columns):
     data = pd.concat([dropped_N[columns], R[columns]])
     targets = np.concatenate([np.ones(len(dropped_N)), np.zeros(len(R))])
-    feature_weights = mutual_info_classif(data, targets)
-    return feature_weights
+    mutual_information = mutual_info_classif(data, targets, n_neighbors=5)
+    return mutual_information 

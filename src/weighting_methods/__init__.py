@@ -1,8 +1,11 @@
 from .propensity_score_adjustment import propensity_score_adjustment
 from .uniform_sample_weighting import uniform_sample_weighting
 from .soft_mrs import soft_mrs_weighting
-from .maximum_representative_subsampling import repeated_MRS
+from .feature_weighted_maximum_representative_subsampling import (
+    feature_weighted_repeated_MRS,
+)
 from .kernel_mean_matching import kernel_mean_matching
 from .domain_adversarial_neural_network import train_domain_adversarial_network
 from .neural_network_mmd_loss import neural_network_mmd_loss_weighting
 from .correction_weights import train_correction_weights_network
+from .maximum_representative_subsampling import repeated_MRS

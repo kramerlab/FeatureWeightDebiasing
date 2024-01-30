@@ -35,8 +35,6 @@ def write_result_dict(
     biases_list,
     auroc_list,
     auprc_list,
-    auroc_list_svm,
-    auprc_list_svm,
     number_of_samples,
     explicit_weights,
 ):
@@ -64,14 +62,6 @@ def write_result_dict(
         "auprc": {
             "mean": np.mean(auprc_list),
             "sd": np.std(auprc_list),
-        },
-        "auroc_svm": {
-            "mean": np.mean(auroc_list_svm),
-            "sd": np.std(auroc_list_svm),
-        },
-        "auprc_svm": {
-            "mean": np.mean(auprc_list_svm),
-            "sd": np.std(auprc_list_svm),
         },
         "all_samples": number_of_samples,
     }

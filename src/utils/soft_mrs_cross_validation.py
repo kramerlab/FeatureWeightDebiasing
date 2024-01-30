@@ -39,7 +39,7 @@ class FullSample:
         """
         self.n_splits = n_splits
 
-    def get_n_splits(self, x, y, group=None):
+    def get_n_splits(self, x, y, groups):
         """Return the number of splits
 
         :param x: Not used
@@ -49,12 +49,11 @@ class FullSample:
         """
         return self.n_splits
 
-    def split(self, X, y, group=None):
+    def split(self, X, y, groups):
         """Returns all input indices
 
         :param X: All samples
         :param y: Not used
-        :param group: Not used, defaults to None
         :yield: All indices
         """
         for _ in range(self.n_splits):

@@ -2,23 +2,16 @@ import argparse
 
 from experiments import downstream_experiment
 
-from feature_weighting_methods import (
-    logistic_regression_sample_weights,
-    uniform_feature_weighting,
-    random_weighting,
-    random_forest_weighting,
-    mutual_information,
-)
-
-from sample_weighting_methods import (
+from weighting_methods import (
     soft_mrs_weighting,
     kernel_mean_matching,
     propensity_score_adjustment,
-    repeated_MRS,
+    feature_weighted_repeated_MRS,
     uniform_sample_weighting,
     train_domain_adversarial_network,
     neural_network_mmd_loss_weighting,
-    train_correction_weights_network
+    train_correction_weights_network,
+    repeated_MRS,
 )
 
 
@@ -28,19 +21,13 @@ sample_weighting_method_list = [
     "uniform",
     "soft-mrs",
     "mrs",
+    "fw-mrs",
     "kmm",
     "dann",
     "mmd_loss",
-    "correction_weights"
+    "correction_weights",
 ]
 
-feature_weighting_method_list = [
-    "logistic_regression",
-    "uniform",
-    "random",
-    "random_forest",
-    "mutual_information",
-]
 
 # Possible bias types
 bias_choice = [
@@ -82,15 +69,12 @@ def parse_command_line_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", choices=dataset_list, required=True)
     parser.add_argument(
-        "--feature_weighting_method",
-        choices=feature_weighting_method_list,
-        required=True,
-    )
-    parser.add_argument(
         "--sample_weighting_method", choices=sample_weighting_method_list, required=True
     )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--number_of_repetitions", default=50, type=int)
+    parser.add_argument("--load_previous_results", default=False, action="store_true")
+
     return parser.parse_args()
 
 
@@ -134,6 +118,8 @@ def get_sample_weighting_function(method_name):
         return propensity_score_adjustment
     elif method_name == "soft-mrs":
         return soft_mrs_weighting
+    elif method_name == "fw-mrs":
+        return feature_weighted_repeated_MRS
     elif method_name == "mrs":
         return repeated_MRS
     elif method_name == "kmm":
@@ -144,24 +130,6 @@ def get_sample_weighting_function(method_name):
         return neural_network_mmd_loss_weighting
     elif method_name == "correction_weights":
         return train_correction_weights_network
-
-
-def get_feature_weighting_function(method_name):
-    """Returns the function to the function name.
-
-    :param method_name: Method name
-    :return: corresponding weighting function
-    """
-    if method_name == "uniform":
-        return uniform_feature_weighting
-    elif method_name == "logistic_regression":
-        return logistic_regression_sample_weights
-    elif method_name == "random":
-        return random_weighting
-    elif method_name == "random_forest":
-        return random_forest_weighting
-    elif method_name == "mutual_information":
-        return mutual_information
 
 
 def get_experiment_function():

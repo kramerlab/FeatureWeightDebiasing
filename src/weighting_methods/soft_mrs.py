@@ -77,7 +77,7 @@ def soft_mrs_weighting(
         predictions_N = predictions[: len(N), 1]
         weights_N = update_weights(weights_N, predictions_N, exponential=exponential)
 
-    return best_weights
+    return best_weights, np.ones(len(columns))
 
 
 def train_weighted_random_forest(
@@ -98,17 +98,19 @@ def train_weighted_random_forest(
             exponential=exponential,
         ),
         greater_is_better=False,
-        needs_proba=True,
+        response_method="predict_proba"
     )
     tree = DecisionTreeClassifier(
-        max_features="sqrt", splitter="random", random_state=np.random.RandomState(random_state)
+        max_features="sqrt",
+        splitter="random",
+        random_state=np.random.RandomState(random_state),
     )
 
     grid_cv = GridSearchCV(
         tree,
         param_grid,
         cv=FullSample(1),
-        n_jobs=-1,
+        n_jobs=5,
         scoring=scorer,
     )
     grid_cv = grid_cv.fit(x, label, sample_weight=weights)

@@ -187,7 +187,7 @@ def load_loan_prediction():
         "Property_Area",
     ]
     target = "Loan_Status"
-    dependent_replacing = {"3+": 3}
+    dependent_replacing = {"0": 0, "1": 1, "2": 2, "3+": 3}
     target_replacing = {"Y": 1, "N": 0}
     loan_predictions = pd.read_csv(
         f"{file_path}/../../data/loan_prediction.csv", engine="python"
@@ -200,9 +200,12 @@ def load_loan_prediction():
     loan_predictions["Dependents"] = loan_predictions["Dependents"].replace(
         dependent_replacing
     )
+
     loan_predictions[target] = loan_predictions[target].replace(target_replacing)
     loan_predictions = loan_predictions.drop(columns=[])
     columns = loan_predictions.drop(columns=[target]).columns
+
+    loan_predictions.replace({False: 0, True: 1}, inplace=True)
     return loan_predictions, columns, target
 
 

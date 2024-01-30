@@ -10,7 +10,6 @@ from utils.sampling import sample
 from utils.visualization import plot_weights
 from utils.metrics import (
     compute_classification_metrics,
-    compute_classification_metrics_svm,
     compute_metrics,
     calculate_rbf_gamma,
 )
@@ -22,13 +21,13 @@ def downstream_experiment(
     df,
     columns,
     sample_weighting_method,
-    feature_weighting_method,
     target: str,
-    number_of_repetitions: int = 100,
+    number_of_repetitions: int = 50,
     bias_type: str = None,
     data_set_name: str = "",
     random_generator=None,
     explicit_weights=True,
+    load_previous_results=False,
     **args
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -50,13 +49,8 @@ def downstream_experiment(
     auroc_list = []
     auprc_list = []
 
-    auroc_list_svm = []
-    auprc_list_svm = []
-
-    result_path = create_result_path(
-        sample_weighting_method, feature_weighting_method, bias_type, data_set_name
-    )
-    sample_weights_save_path = result_path.parent / "sample_weights"
+    result_path = create_result_path(sample_weighting_method, bias_type, data_set_name)
+    sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
 
     sample_weights_save_path.mkdir(exist_ok=True)
@@ -70,6 +64,12 @@ def downstream_experiment(
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
 
+    splitter = (
+        "feature_weighted"
+        if sample_weighting_method.__name__ == "feature_weighted_repeated_MRS"
+        else "best"
+    )
+
     for i in trange(number_of_repetitions):
         N, R = sample(
             bias_type,
@@ -79,15 +79,20 @@ def downstream_experiment(
             bias_fraction=0.75,
             columns=columns,
         )
+        unscaled_N = N.copy()
+        unscaled_R = R.copy()
+        unscaled_N.loc[:, columns] = scaler.inverse_transform(N[columns]).astype(int)
+        unscaled_R.loc[:, columns] = scaler.inverse_transform(R[columns]).astype(int)
+
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
-        if len(sample_weight_list) > i and explicit_weights:
+        if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
         else:
-            sample_weights = sample_weighting_method(
-                N,
-                R,
-                columns,
+            sample_weights, feature_weights = sample_weighting_method(
+                N=N,
+                R=R,
+                columns=columns,
                 save_path=result_path,
                 bias_variable=target,
                 mean_list=mean_list,
@@ -98,23 +103,12 @@ def downstream_experiment(
                 random_generator=random_generator,
                 patience=25,
                 target=target,
+                unscaled_N=unscaled_N,
+                unscaled_R=unscaled_R,
             )
             sample_weight_list.append(sample_weights.tolist())
             save_weights(sample_weights_save_path, sample_weight_list)
 
-        if len(feature_weight_list) > i and explicit_weights:
-            feature_weights = np.array(feature_weight_list[i])
-        else:
-            feature_weights = feature_weighting_method(
-                N=N,
-                R=R,
-                sample_weights=sample_weights,
-                columns=columns,
-                bias_variable=target,
-                early_stopping=True,
-                random_generator=random_generator,
-                gamma=gamma,
-            )
             feature_weight_list.append(feature_weights.tolist())
             save_weights(feature_weights_save_path, feature_weight_list)
 
@@ -133,20 +127,16 @@ def downstream_experiment(
                 gamma,
             )
 
-            auroc_svm = auprc_svm = auroc = auprc = 0
             auroc, auprc = compute_classification_metrics(
-                N, R, columns, sample_weights, target, random_state=seed
+                N,
+                R,
+                columns,
+                sample_weights,
+                feature_weights,
+                target,
+                random_state=seed,
+                splitter=splitter,
             )
-            # auroc_svm, auprc_svm = compute_classification_metrics_svm(
-            #   N,
-            #   R,
-            #   sample_weights,
-            #   feature_weights,
-            #   gamma,
-            #   columns,
-            #   target,
-            #   random_state=seed,
-            # )
 
             plot_weights(sample_weights, sample_weights_save_path, i)
             plot_weights(feature_weights, feature_weights_save_path, i)
@@ -158,19 +148,14 @@ def downstream_experiment(
             auroc_list.append(auroc)
             auprc_list.append(auprc)
 
-            auroc_list_svm.append(auroc_svm)
-            auprc_list_svm.append(auprc_svm)
-
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
         auroc_list,
         auprc_list,
-        auroc_list_svm,
-        auprc_list_svm,
         len(N),
-        explicit_weights=explicit_weights
+        explicit_weights=explicit_weights,
     )
 
     with open(result_path / "results.json", "w") as result_file:
@@ -194,7 +179,6 @@ def load_weights(path):
 
 def create_result_path(
     sample_weighting_method,
-    feature_weighting_method,
     bias_type,
     data_set_name,
 ):
@@ -213,7 +197,6 @@ def create_result_path(
         / data_set_name
         / bias_type
         / sample_weighting_method.__name__
-        / feature_weighting_method.__name__
     )
     result_path.mkdir(exist_ok=True, parents=True)
     return result_path

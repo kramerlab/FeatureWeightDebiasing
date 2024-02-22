@@ -1,6 +1,7 @@
 import argparse
 
-from experiments import downstream_experiment
+from experiments import downstream_experiment, downstream_experiment_with_test_set, feature_weight_budget_comparison_experiment
+
 
 from weighting_methods import (
     soft_mrs_weighting,
@@ -21,7 +22,7 @@ sample_weighting_method_list = [
     "uniform",
     "soft-mrs",
     "mrs",
-    "fw-mrs",
+    "fw-sampling-mrs",
     "kmm",
     "dann",
     "mmd_loss",
@@ -73,7 +74,9 @@ def parse_command_line_arguments():
     )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--number_of_repetitions", default=50, type=int)
+    parser.add_argument("--budget", default=0.0, type=float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
+    parser.add_argument("--experiment_name", default="downstream")
 
     return parser.parse_args()
 
@@ -118,24 +121,27 @@ def get_sample_weighting_function(method_name):
         return propensity_score_adjustment
     elif method_name == "soft-mrs":
         return soft_mrs_weighting
-    elif method_name == "fw-mrs":
+    elif method_name == "fw-sampling-mrs":
         return feature_weighted_repeated_MRS
     elif method_name == "mrs":
         return repeated_MRS
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "dann":
-        return train_domain_adversarial_network
+       return train_domain_adversarial_network
     elif method_name == "mmd_loss":
-        return neural_network_mmd_loss_weighting
-    elif method_name == "correction_weights":
-        return train_correction_weights_network
+       return neural_network_mmd_loss_weighting
 
 
-def get_experiment_function():
+def get_experiment_function(experiment_name=""):
     """Returns the experiment function to a name.
 
     :param dataset_name: Data set name
     :return: Experiment function
     """
-    return downstream_experiment
+    if experiment_name == "test_set":
+        return downstream_experiment_with_test_set
+    elif experiment_name == "feature_weight_budget_comparison":
+        return feature_weight_budget_comparison_experiment
+    else:
+        return downstream_experiment

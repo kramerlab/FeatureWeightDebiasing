@@ -27,7 +27,7 @@ def load_dataset(dataset_name):
     elif dataset_name == "folktables_employment":
         return load_folktables_employment_data()
     elif dataset_name == "breast_cancer":
-        return load_brast_cancer_data()
+        return load_breast_cancer_data()
     elif dataset_name == "gbs_gesis":
         return load_gbs_gesis()
     elif dataset_name == "hr_analytics":
@@ -128,18 +128,19 @@ def load_folktables_income_data():
         features=ACSIncomeNew.features, definition_df=definition_df
     )
 
-    usa_features, us_labels, _ = ACSIncomeNew.df_to_pandas(
+    features, us_labels, _ = ACSIncomeNew.df_to_pandas(
         usa_data, categories=categories, dummies=True
     )
 
-    columns = usa_features.columns
-    usa_features["Income"] = us_labels
-    usa_features["Binary Income"] = [
+    columns = features.columns
+    features["Income"] = us_labels
+    features["Binary Income"] = [
         1 if us_label >= 50000 else 0 for us_label in us_labels.values
     ]
-    usa_features = usa_features.dropna()
+    features = features.dropna()
+    features.replace({False: 0, True: 1}, inplace=True)
 
-    return usa_features, columns, "Binary Income"
+    return features, columns, "Binary Income"
 
 
 def load_hr_analytics():
@@ -230,6 +231,7 @@ def load_folktables_employment_data():
         1 if us_label == True else 0 for us_label in us_labels.values
     ]
     features = features.dropna()
+    features.replace({False: 0, True: 1}, inplace=True)
 
     return features, columns, "Employment"
 
@@ -249,7 +251,7 @@ breast_cancer_names = [
 ]
 
 
-def load_brast_cancer_data():
+def load_breast_cancer_data():
     """Load Wisconsin Breast cancer
 
     :return: Wisconsin Breast cancer data

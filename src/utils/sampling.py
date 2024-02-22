@@ -18,7 +18,6 @@ def sample(
     :param columns: Columns that are used to compute the mean sample, defaults to None
     :return: A biased and a representative data set
     """
-
     # Sample from the data set because the complete one is too big.
     if len(df) > 5000:
         df = df.sample(5000, random_state=sampling_random_generator).copy()
@@ -64,6 +63,76 @@ def sample(
     R["label"] = 0
 
     return N, R
+
+
+def sample_with_test_set(
+    bias_type,
+    df,
+    bias_variable,
+    bias_fraction=0.1,
+    train_fraction=0.25,
+    test_fraction=0.1,
+    columns=None,
+):
+    """Samples a biased and a representative data set.
+
+    :param bias_type: Defines how the data should be biased
+    :param df: Data set as pandas.DataFrame
+    :param bias_variable: The target variable
+    :param bias_fraction: Defines which fraction of the biased class is samples, defaults to 0.1
+    :param train_fraction: Defines the size of the train set, defaults to 0.25
+    :param columns: Columns that are used to compute the mean sample, defaults to None
+    :return: A biased and a representative data set
+    """
+    # Sample from the data set because the complete one is too big.
+    if len(df) > 7500:
+        df = df.sample(7500, random_state=sampling_random_generator).copy()
+    test = df.sample(
+        frac=test_fraction, replace=False, random_state=sampling_random_generator
+    ).copy()
+    tmp_df = df.drop(test.index).copy().reset_index(drop=True)
+    train = tmp_df.sample(
+        frac=train_fraction, replace=False, random_state=sampling_random_generator
+    ).copy()
+    positive_samples = train[train[bias_variable] == 1]
+    negative_samples = train[train[bias_variable] == 0]
+    R = tmp_df.drop(train.index).copy().reset_index(drop=True)
+
+    if bias_type == "less_positive_class":
+        N = sample_N(
+            positive_samples,
+            negative_samples,
+            positive_fraction=bias_fraction,
+            negative_fraction=1,
+        )
+    elif bias_type == "less_negative_class":
+        N = sample_N(
+            positive_samples,
+            negative_samples,
+            positive_fraction=1,
+            negative_fraction=bias_fraction,
+        )
+    elif bias_type == "mean_difference":
+        mean_sample = df[columns].mean().values
+        differences = (
+            np.linalg.norm(
+                train[columns].values - mean_sample,
+                axis=1,
+            )
+            ** 3
+        )
+        weight = -(1 / 20)
+        sample_weights = np.exp(weight * differences)
+        N = train.sample(
+            frac=0.9, weights=sample_weights, random_state=sampling_random_generator
+        )
+    else:
+        N = train.reset_index(drop=True)
+
+    N["label"] = 1
+    R["label"] = 0
+
+    return N, R, test
 
 
 def sample_N(positive_samples, negative_samples, positive_fraction, negative_fraction):

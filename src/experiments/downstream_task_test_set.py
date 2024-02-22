@@ -1,23 +1,22 @@
 import json
 import numpy as np
 
+from pathlib import Path
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
-from utils.statistics import create_result_path, write_result_dict
-from utils.sampling import sample
+from utils.statistics import create_result_path, write_result_dict_test_set
+from utils.sampling import sample_with_test_set
 from utils.visualization import plot_weights
 from utils.metrics import (
     compute_classification_metrics_random_forest,
     compute_classification_metrics_tree,
-    compute_metrics,
-    calculate_rbf_gamma,
 )
 
 seed = 5
 
 
-def downstream_experiment(
+def downstream_experiment_with_test_set(
     df,
     columns,
     sample_weighting_method,
@@ -28,7 +27,6 @@ def downstream_experiment(
     random_generator=None,
     explicit_weights=True,
     load_previous_results=False,
-    method_name=None,
     budget=0.0,
     **args
 ):
@@ -45,8 +43,6 @@ def downstream_experiment(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    weighted_mmds_list = []
-    biases_list = []
     mean_list = []
     rf_auroc_list = []
     rf_auprc_list = []
@@ -54,7 +50,9 @@ def downstream_experiment(
     tree_auroc_list = []
     tree_auprc_list = []
 
-    result_path = create_result_path(method_name, bias_type, data_set_name)
+    result_path = create_result_path(
+        sample_weighting_method, bias_type, data_set_name, experiment_name="test_set"
+    )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
 
@@ -76,16 +74,15 @@ def downstream_experiment(
     )
 
     for i in trange(number_of_repetitions):
-        N, R = sample(
+        N, R, T = sample_with_test_set(
             bias_type,
             sample_df,
             target,
             train_fraction=0.5,
             bias_fraction=0.75,
+            test_fraction=0.1,
             columns=columns,
         )
-
-        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
@@ -99,12 +96,12 @@ def downstream_experiment(
                 mean_list=mean_list,
                 auroc_list=rf_auroc_list,
                 auprc_list=rf_auprc_list,
-                drop=2,
-                early_stopping=False,
+                drop=1,
+                early_stopping=True,
                 random_generator=random_generator,
-                max_patience=100,
+                patience=25,
                 target=target,
-                budgets=budget,
+                budget=budget,
             )
             sample_weight_list.append(sample_weights.tolist())
             save_weights(sample_weights_save_path, sample_weight_list)
@@ -113,23 +110,9 @@ def downstream_experiment(
             save_weights(feature_weights_save_path, feature_weight_list)
 
         if explicit_weights:
-            (
-                weighted_mmd,
-                relative_bias,
-            ) = compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                columns,
-                sample_weights,
-                feature_weights,
-                gamma,
-            )
-
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
-                R,
+                T,
                 columns,
                 sample_weights,
                 feature_weights,
@@ -140,7 +123,7 @@ def downstream_experiment(
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
                 N,
-                R,
+                T,
                 columns,
                 sample_weights,
                 feature_weights,
@@ -152,23 +135,17 @@ def downstream_experiment(
             plot_weights(sample_weights, sample_weights_save_path, i)
             plot_weights(feature_weights, feature_weights_save_path, i)
 
-            weighted_mmds_list.append(weighted_mmd)
-            biases_list.append(relative_bias)
             rf_auroc_list.append(rf_auroc)
             rf_auprc_list.append(rf_auprc)
             tree_auroc_list.append(tree_auroc)
             tree_auprc_list.append(tree_auprc)
 
-    result_dict = write_result_dict(
-        N.drop(["label"], axis="columns").columns,
-        weighted_mmds_list,
-        biases_list,
+    result_dict = write_result_dict_test_set(
         rf_auroc_list,
         rf_auprc_list,
         tree_auroc_list,
         tree_auprc_list,
         len(N),
-        explicit_weights=explicit_weights,
     )
 
     with open(result_path / "results.json", "w") as result_file:

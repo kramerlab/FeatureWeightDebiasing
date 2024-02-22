@@ -21,6 +21,8 @@ def weighting_experiment(
     bias_type: str,
     number_of_repetitions: int,
     load_previous_results: bool,
+    experiment_name: str,
+    budget: float,
 ) -> None:
     """_summary_
 
@@ -37,7 +39,7 @@ def weighting_experiment(
     compute_sample_weights_function = get_sample_weighting_function(
         sample_weighting_method_name
     )
-    experiment_function = get_experiment_function()
+    experiment_function = get_experiment_function(experiment_name)
 
     explicit_weights = (
         False
@@ -46,9 +48,9 @@ def weighting_experiment(
     )
 
     experiment_function(
-        data,
-        columns,
-        compute_sample_weights_function,
+        df=data,
+        columns=columns,
+        sample_weighting_method=compute_sample_weights_function,
         bias_type=bias_type,
         number_of_repetitions=number_of_repetitions,
         data_set_name=data_set_name,
@@ -56,6 +58,8 @@ def weighting_experiment(
         random_generator=random_generator,
         explicit_weights=explicit_weights,
         load_previous_results=load_previous_results,
+        method_name=sample_weighting_method_name,
+        budget=budget,
     )
 
 
@@ -67,4 +71,6 @@ if __name__ == "__main__":
         args.bias_type,
         args.number_of_repetitions,
         args.load_previous_results,
+        args.experiment_name,
+        args.budget,
     )

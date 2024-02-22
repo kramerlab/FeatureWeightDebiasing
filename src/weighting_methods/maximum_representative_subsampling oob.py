@@ -27,7 +27,7 @@ def mrs(
     columns,
     n_drop: int = 1,
     cv=5,
-    class_weights="balanced_subsample",
+    class_weights="balanced",
     random_state=None,
     *args,
     **attributes
@@ -110,6 +110,7 @@ def repeated_MRS(
 
     feature_weights = np.ones(len(columns))
     # Start values
+    val_cv = 5
     if return_metrics:
         # Compute and save mmd inputs to save time
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
@@ -134,7 +135,7 @@ def repeated_MRS(
         columns,
         calculate_roc=True,
         random_state=random_generator.randint(max_int),
-        cv=cv,
+        cv=val_cv,
         class_weight=class_weights,
         method=train_classifier_auroc_feature_weighted,
     )
@@ -161,17 +162,15 @@ def repeated_MRS(
         weights[drop_ids] = 0
 
         if (i + 1) % roc_iteration == 0:
-            auroc, mean_ifpr_list, mean_itpr_list, std_tpr = (
-                compute_test_metrics_mrs_cv(
-                    dropping_N,
-                    R,
-                    columns,
-                    calculate_roc=True,
-                    cv=cv,
-                    class_weight=class_weights,
-                    random_state=random_generator.randint(max_int),
-                    method=train_classifier_auroc_feature_weighted,
-                )
+            auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
+                dropping_N,
+                R,
+                columns,
+                calculate_roc=True,
+                cv=val_cv,
+                class_weight=class_weights,
+                random_state=random_generator.randint(max_int),
+                method=train_classifier_auroc_feature_weighted,
             )
             roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
         else:
@@ -180,7 +179,7 @@ def repeated_MRS(
                 R,
                 columns,
                 random_state=random_generator.randint(max_int),
-                cv=cv,
+                cv=val_cv,
                 class_weight=class_weights,
                 method=train_classifier_auroc_feature_weighted,
             )
@@ -214,7 +213,8 @@ def repeated_MRS(
             best_difference = auc_difference
 
         if (
-            len(dropping_N) <= cv**2
+            len(dropping_N) <= cv
+            or len(dropping_N) <= val_cv
             or ((best_difference <= delta) and early_stopping)
             or len(dropping_N) <= drop
         ):

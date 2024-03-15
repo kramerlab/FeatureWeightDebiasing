@@ -1,4 +1,3 @@
-import random
 import numpy as np
 import pandas as pd
 from sklearn.inspection import permutation_importance
@@ -6,14 +5,10 @@ from tqdm import trange
 
 from sklearn.model_selection import KFold
 from utils.metrics import (
-    calculate_rbf_gamma,
-    compute_relative_bias,
-    compute_test_metrics_mrs,
+    compute_test_metrics_fw_mrs,
     train_pu_classifier,
-    weighted_maximum_mean_discrepancy,
-    train_classifier_auroc_feature_weighted,
-    train_classifier_auroc_feature_weighted_cv,
-    train_classifier_auroc,
+    train_feature_weighted_classifier_forest,
+    train_feature_weighted_classifier_tree,
 )
 import json
 
@@ -50,7 +45,7 @@ def mrs(
     for train_index, test_index in kf.split(N):
         N_train, N_test = N.iloc[train_index], N.iloc[test_index]
         data = pd.concat([N_train, R])
-        clf, _ = train_pu_classifier(
+        clf = train_pu_classifier(
             data[columns],
             data.label,
             class_weight=class_weights,
@@ -84,6 +79,7 @@ def mrs_without_cv(
     n_drop: int = 1,
     class_weight="balanced",
     random_state=None,
+    n_repeats=5,
     *args,
     **attributes,
 ):
@@ -98,10 +94,9 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf, auroc = train_classifier_auroc_feature_weighted(
-        N,
-        R,
-        columns,
+    clf = train_feature_weighted_classifier_forest(
+        data[columns],
+        data.label,
         class_weight=class_weight,
         random_state=random_state,
         splitter="best",
@@ -109,12 +104,11 @@ def mrs_without_cv(
         max_features=None,
     )
     predictions = clf.predict_proba(N[columns])[:, 1]
-    # feature_importance = clf.feature_importances_
     feature_importance = permutation_importance(
         clf,
         data[columns],
         data.label,
-        n_repeats=5,
+        n_repeats=n_repeats,
         random_state=random_state,
         n_jobs=-1,
         scoring="roc_auc",
@@ -133,12 +127,14 @@ def feature_weighted_repeated_MRS(
     delta=0.005,
     early_stopping=False,
     drop=1,
-    budgets=0.0,
+    budgets=[0.0],
     random_generator=None,
     max_patience=10,
-    class_weight="balanced_subsample",
+    class_weight="balanced",
     return_auroc=False,
     save_path=None,
+    n_test_splits=5,
+    n_pu_splits=5, 
     *args,
     **attributes,
 ):
@@ -160,43 +156,39 @@ def feature_weighted_repeated_MRS(
     :return: Sample weights or test metrics
     """
     number_of_iterations = len(N) // drop
-    dropped_N = N.copy()
+    dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
-    dropped_N = dropped_N.reset_index(drop=True)
     best_difference = np.inf
     feature_weights = np.ones(len(columns))
     current_patience = 0
     draw_with_feature_weights = True
     feature_weighted_aurocs = {}
     feature_importance_list = []
-    if return_auroc:
-        for budget in budgets:
-            feature_weighted_aurocs[budget] = []
-    else:
-        feature_weighted_aurocs[budgets] = []
+    for budget in budgets:
+        feature_weighted_aurocs[budget] = []
 
+    auroc_method = train_feature_weighted_classifier_tree
     rand_int = random_generator.randint(max_int)
-    auroc = compute_test_metrics_mrs(
+    auroc = compute_test_metrics_fw_mrs(
         dropped_N,
         R,
         columns,
         random_state=rand_int,
         feature_weights=feature_weights,
-        method=train_classifier_auroc_feature_weighted,
+        method=auroc_method,
         draw_with_feature_weights=draw_with_feature_weights,
         class_weight=class_weight,
-        faster=False,
+        speedup=True,
+        max_features="sqrt",
+        splitter="feature_weighted_best",
+        n_splits_test=n_test_splits,
     )
-    if return_auroc:
-        for budget in budgets:
-            feature_weighted_aurocs[budget].append(auroc)
-    else:
-        feature_weighted_aurocs[budgets].append(auroc)
+    for budget in budgets:
+        feature_weighted_aurocs[budget].append(auroc)
 
-    # auc_list.append(auroc)
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        drop_ids, feature_importance = mrs(
+        drop_ids, feature_importance = mrs_without_cv(
             N=dropped_N,
             R=R,
             columns=columns,
@@ -205,53 +197,40 @@ def feature_weighted_repeated_MRS(
             feature_weights=feature_weights,
             draw_with_feature_weights=draw_with_feature_weights,
             class_weight=class_weight,
-            n_repeats=1,
-            n_splits=5,
+            n_repeats=2,
+            n_splits=n_pu_splits,
         )
         dropped_N = dropped_N.drop(drop_ids)
 
-        if return_auroc:
-            feature_importance_list.append(feature_importance)
-            dir = save_path / "feature_weights"
-            dir.mkdir(exist_ok=True)
-            with open(f"{dir}/feature_weights_{i}.json", "w", encoding="utf-8") as file:
-                json.dump(list(feature_importance), file, indent=4)
-            for budget in budgets:
-                feature_weights = compute_feature_weights(budget, feature_importance)
-                # max_index = np.argmax(feature_weights)
-                # feature_weights = np.zeros(len(feature_weights))
-                # feature_weights[max_index] = 1
-                auroc = compute_test_metrics_mrs(
-                    dropped_N,
-                    R,
-                    columns,
-                    random_state=rand_int,
-                    feature_weights=feature_weights,
-                    method=train_classifier_auroc_feature_weighted,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    class_weight=class_weight,
-                    faster=False,
-                    max_features="sqrt",
-                    splitter="feature_weighted_best",
-                )
-                feature_weighted_aurocs[budget].append(auroc)
+        feature_importance_list.append(feature_importance)
+        dir = save_path / "feature_weights"
+        dir.mkdir(exist_ok=True)
+        with open(f"{dir}/feature_weights_{i}.json", "w", encoding="utf-8") as file:
+            json.dump(list(feature_importance), file, indent=4)
 
-        else:
-            feature_weights = compute_feature_weights(budgets, feature_importance)
-            auroc = compute_test_metrics_mrs(
+        feature_weights_list = []
+        for budget in budgets:
+            feature_weights = compute_feature_weights(budget, feature_importance)
+            feature_weights_list.append(feature_weights)
+            # max_index = np.argmax(feature_weights)
+            # feature_weights = np.zeros(len(feature_weights))
+            # feature_weights[max_index] = 1
+            max_featues = "sqrt" if budget == 0 else "sqrt"
+            auroc = compute_test_metrics_fw_mrs(
                 dropped_N,
                 R,
                 columns,
                 random_state=rand_int,
                 feature_weights=feature_weights,
-                method=train_classifier_auroc_feature_weighted,
+                method=auroc_method,
                 draw_with_feature_weights=draw_with_feature_weights,
                 class_weight=class_weight,
-                faster=False,
-                max_features="sqrt",
+                speedup=True,
+                max_features=max_featues,
                 splitter="feature_weighted_best",
+                n_splits_test=n_test_splits,
             )
-            feature_weighted_aurocs[budgets].append(auroc)
+            feature_weighted_aurocs[budget].append(auroc)
 
         auc_difference = abs(auroc - 0.5)
         if (auc_difference + delta) <= best_difference:
@@ -279,6 +258,7 @@ def feature_weighted_repeated_MRS(
         return (
             feature_weighted_aurocs,
             feature_importance_list,
+            mrs_iteration,
         )
 
     else:
@@ -286,12 +266,28 @@ def feature_weighted_repeated_MRS(
 
 
 def compute_feature_weights(budget, feature_importances):
+    """_summary_
+
+    :param budget: _description_
+    :param feature_importances: _description_
+    :return: _description_
+    """
     max_importance = np.max(np.abs(feature_importances))
-    if max_importance == 0:
+    feature_importances = feature_importances / max_importance
+    if max_importance == 0 or budget == 0:
         return np.ones(len(feature_importances)) / len(feature_importances)
-    budget_feature_importances = (feature_importances / max_importance) * budget
-    budget_feature_importances = 1 - budget_feature_importances
+    budget_feature_importances = 1 - (feature_importances * budget)
     budget_feature_importances = budget_feature_importances / np.sum(
         budget_feature_importances
     )
     return budget_feature_importances
+
+
+def softmax(x):
+    """_summary_
+
+    :param x: _description_
+    :return: _description_
+    """
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0)

@@ -205,7 +205,9 @@ def plot_auc_average(
         colors="black",
         linestyles="solid",
     )
-    x_ticks = list(range(number_of_samples, stop, -(number_of_samples // 5))) + [4]
+    x_ticks = list(
+        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+    ) + [stop + drop]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
     plt.xlabel("Number of Remaining Samples")
@@ -244,7 +246,9 @@ def plot_mmds_average(
     plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
-    x_ticks = list(range(number_of_samples, stop, -(number_of_samples // 5))) + [4]
+    x_ticks = list(
+        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+    ) + [stop + drop]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
     xlim = plt.gca().get_xlim()
@@ -308,7 +312,7 @@ def plot_experiment_comparison_auc(
 
     plt.ylabel("AUROC")
     plt.xlabel("Number of Remaining Samples")
-    plt.xticks(list(range(number_of_samples, 0, -100)) + [4])
+    plt.xticks(list(range(number_of_samples, 0, -100)))
     plt.legend()
     plt.gca().invert_xaxis()
     plt.savefig(f"{file_name}.pdf")
@@ -362,7 +366,7 @@ def plot_experiment_comparison_mmd(
 
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
-    plt.xticks(list(range(number_of_samples, 0, -100)) + [4])
+    plt.xticks(list(range(number_of_samples, 0, -100)))
     plt.legend()
     plt.gca().invert_xaxis()
     plt.savefig(f"{file_name}.pdf")
@@ -440,9 +444,9 @@ def plot_relative_bias(
     plt.margins(0.05, 0)
     mrs_iterations = number_of_samples - np.array(mrs_iterations)
     plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
-    x_ticks = list(range(number_of_samples, stop, -(number_of_samples // 5))) + [
-        stop + drop
-    ]
+    x_ticks = list(
+        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+    ) + [stop + drop]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
     xlim = plt.gca().get_xlim()

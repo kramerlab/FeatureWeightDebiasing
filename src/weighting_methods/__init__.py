@@ -7,5 +7,4 @@ from .feature_weighted_maximum_representative_subsampling import (
 from .kernel_mean_matching import kernel_mean_matching
 from .domain_adversarial_neural_network import train_domain_adversarial_network
 from .neural_network_mmd_loss import neural_network_mmd_loss_weighting
-from .correction_weights import train_correction_weights_network
 from .maximum_representative_subsampling import repeated_MRS

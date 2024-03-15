@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import trange
 
-from methods import maximum_representative_subsampling
+from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_ablation_command_line_arguments
 from utils.data_loader import load_dataset
 from utils.metrics import scale_df
@@ -38,9 +38,7 @@ def compare_mrs_variants(number_of_repetitions, ablation_experiment, drop):
     scaled_N, scaled_R = preprocess_data(data, columns)
     number_of_samples = len(scaled_N)
 
-    class_weights, mrs_function, sampling, experiment_label = choose_hyperparameter(
-        ablation_experiment
-    )
+    mrs_function, experiment_label = choose_hyperparameter(ablation_experiment)
 
     for _ in trange(number_of_repetitions):
         # First the normal variant
@@ -57,8 +55,8 @@ def compare_mrs_variants(number_of_repetitions, ablation_experiment, drop):
             drop=drop,
             save_path=result_path,
             return_metrics=True,
-            sampling="max",
             random_generator=random_generator,
+            early_stopping=False,
         )
         aucs_complete.append(auc_list)
         mmds_complete.append(mmd_list)
@@ -74,12 +72,11 @@ def compare_mrs_variants(number_of_repetitions, ablation_experiment, drop):
             scaled_R,
             columns,
             drop=drop,
-            sampling=sampling,
             mrs_function=mrs_function,
             save_path=result_path,
             return_metrics=True,
-            class_weights=class_weights,
             random_generator=random_generator,
+            early_stopping=False,
         )
         aucs_comparison.append(comparison_auc_list)
         mmds_comparison.append(comparison_mmd_list)
@@ -195,16 +192,13 @@ def choose_hyperparameter(ablation_experiment):
     :param ablation_experiment: Name of the MRS variant
     :return: The corresponding hyperparameter
     """
-    class_weights = "balanced"
     if ablation_experiment == "random":
         mrs_function = maximum_representative_subsampling.random_drops
-        sampling = "max"
         experiment_label = "Random Drop"
     elif ablation_experiment == "cross-validation":
-        sampling = "max"
         experiment_label = "MRS without cross-validation"
         mrs_function = maximum_representative_subsampling.mrs_without_cv
-    return class_weights, mrs_function, sampling, experiment_label
+    return mrs_function, experiment_label
 
 
 if __name__ == "__main__":

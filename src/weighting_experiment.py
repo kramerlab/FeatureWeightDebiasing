@@ -11,7 +11,6 @@ from utils.command_line_arguments import (
 seed = 5
 no_weights_function = [
     "train_domain_adversarial_network",
-    "train_correction_weights_network",
 ]
 
 
@@ -23,6 +22,7 @@ def weighting_experiment(
     load_previous_results: bool,
     experiment_name: str,
     budget: float,
+    drop: int,
 ) -> None:
     """_summary_
 
@@ -60,6 +60,7 @@ def weighting_experiment(
         load_previous_results=load_previous_results,
         method_name=sample_weighting_method_name,
         budget=budget,
+        drop=drop,
     )
 
 
@@ -73,4 +74,5 @@ if __name__ == "__main__":
         args.load_previous_results,
         args.experiment_name,
         args.budget,
+        args.drop,
     )

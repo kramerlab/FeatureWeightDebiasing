@@ -10,12 +10,9 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_relative_bias,
     compute_test_metrics_mrs,
-    compute_test_metrics_mrs_cv,
     train_pu_classifier,
     weighted_maximum_mean_discrepancy,
-    train_classifier_auroc_feature_weighted,
 )
-import json
 
 # Used to draw radom states
 max_int = 2**32 - 1
@@ -27,7 +24,7 @@ def mrs(
     columns,
     n_drop: int = 1,
     cv=5,
-    class_weights="balanced_subsample",
+    class_weights="balanced",
     random_state=None,
     *args,
     **attributes
@@ -62,18 +59,53 @@ def mrs(
     return N.drop(N.index[drop_ids]), drop_index
 
 
+def mrs_without_cv(
+    N,
+    R,
+    columns,
+    n_drop: int = 1,
+    class_weights="balanced",
+    random_state=None,
+    *args,
+    **attributes
+):
+    """Performs one iteration of maximum representative sampling without cross-validation
+
+    :param N: Non-representative data set
+    :param R: Representative data set
+    :param columns: Name of columns used for training
+    :param n_drop: Number of samples to drop every iteration, defaults to 1
+    :param class_weights: Type of class weights, defaults to "balanced"
+    :param random_state: Random state to make the experiment reproducible, defaults to None
+    :return: The index of the element to drop
+    """
+    data = pd.concat([N, R])
+    clf = train_pu_classifier(
+        data[columns],
+        data.label,
+        class_weight=class_weights,
+        random_state=random_state,
+    )
+    predictions = clf.predict_proba(N[columns])[:, 1]
+    drop_ids = np.argpartition(predictions, -n_drop)[-n_drop:]
+
+    drop_index = N.index[drop_ids]
+    return N.drop(N.index[drop_ids]), drop_index
+
+
 def repeated_MRS(
     N,
     R,
     columns,
-    delta=0.001,
-    early_stopping=True,
+    delta=0.005,
+    early_stopping=False,
     mrs_function=mrs,
     return_metrics=False,
-    use_bias_mean=True,
+    compute_bias=True,
     bias_variable=None,
-    cv=5,
-    class_weights="balanced_subsample",
+    n_pu_cv=5,
+    n_test_splits=10,
+    class_weights="balanced",
     drop=1,
     random_generator=None,
     *args,
@@ -88,7 +120,7 @@ def repeated_MRS(
     :param early_stopping: If true, stops before dropping all samples, defaults to False
     :param mrs_function: Function that is used in evers mrs iteration, defaults to mrs
     :param return_metrics: If true, return test metrics, defaults to False
-    :param use_bias_mean: If true, compute relative bias, defaults to True
+    :param compute_bias: If true, compute relative bias, defaults to True
     :param bias_variable: Name of the biased variable, defaults to None
     :param cv: Number of cross-validation iterations, defaults to 5
     :param class_weights: Type of class weights, defaults to "balanced"
@@ -100,7 +132,7 @@ def repeated_MRS(
     relative_bias_list = []
     mmd_list = []
     roc_list = []
-    number_of_iterations = len(N) // drop
+    number_of_iterations = (len(N) - n_test_splits) // drop
     mrs_iteration = 0
     roc_iteration = (len(N) // drop // 3.5) + 1
     dropping_N = N.copy()
@@ -108,7 +140,7 @@ def repeated_MRS(
     dropping_N = dropping_N.reset_index(drop=True)
     best_difference = np.inf
 
-    feature_weights = np.ones(len(columns))
+    # Compute and save mmd inputs to save time
     # Start values
     if return_metrics:
         # Compute and save mmd inputs to save time
@@ -121,7 +153,6 @@ def repeated_MRS(
                 N[columns],
                 R[columns],
                 weights,
-                feature_weights=feature_weights,
                 gamma=gamma,
                 x_x_rbf_matrix=x_x_rbf_matrix,
                 x_y_rbf_matrix=x_y_rbf_matrix,
@@ -129,18 +160,15 @@ def repeated_MRS(
             )
         )
     auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-        dropping_N,
-        R,
+        pd.concat([dropping_N, R]),
         columns,
         calculate_roc=True,
         random_state=random_generator.randint(max_int),
-        cv=cv,
-        class_weight=class_weights,
-        method=train_classifier_auroc_feature_weighted,
+        n_test_splits=n_test_splits,
     )
     roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, 0])
 
-    if use_bias_mean and bias_variable is not None:
+    if compute_bias and bias_variable is not None:
         relative_bias = compute_relative_bias(
             N[bias_variable], R[bias_variable], weights
         )
@@ -155,34 +183,25 @@ def repeated_MRS(
             columns=columns,
             n_drop=drop,
             class_weights=class_weights,
-            cv=cv,
+            cv=n_pu_cv,
             random_state=random_generator.randint(max_int),
         )
         weights[drop_ids] = 0
 
         if (i + 1) % roc_iteration == 0:
-            auroc, mean_ifpr_list, mean_itpr_list, std_tpr = (
-                compute_test_metrics_mrs_cv(
-                    dropping_N,
-                    R,
-                    columns,
-                    calculate_roc=True,
-                    cv=cv,
-                    class_weight=class_weights,
-                    random_state=random_generator.randint(max_int),
-                    method=train_classifier_auroc_feature_weighted,
-                )
+            auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
+                pd.concat([dropping_N, R]),
+                columns,
+                calculate_roc=True,
+                n_test_splits=n_test_splits,
             )
             roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
         else:
             auroc = compute_test_metrics_mrs(
-                dropping_N,
-                R,
+                pd.concat([dropping_N, R]),
                 columns,
                 random_state=random_generator.randint(max_int),
-                cv=cv,
-                class_weight=class_weights,
-                method=train_classifier_auroc_feature_weighted,
+                n_test_splits=n_test_splits,
             )
 
         auc_list.append(auroc)
@@ -197,11 +216,10 @@ def repeated_MRS(
                     x_x_rbf_matrix=x_x_rbf_matrix,
                     x_y_rbf_matrix=x_y_rbf_matrix,
                     y_y_rbf_matrix=y_y_rbf_matrix,
-                    feature_weights=feature_weights,
                 )
             )
 
-        if use_bias_mean and bias_variable is not None:
+        if compute_bias and bias_variable is not None:
             relative_bias = compute_relative_bias(
                 N[bias_variable], R[bias_variable], weights
             )
@@ -214,19 +232,18 @@ def repeated_MRS(
             best_difference = auc_difference
 
         if (
-            len(dropping_N) <= cv**2
+            (len(dropping_N) - n_test_splits) <= n_test_splits
             or ((best_difference <= delta) and early_stopping)
             or len(dropping_N) <= drop
         ):
             break
 
-    with open("feature_weighted_auroc.json", "w", encoding="utf-8") as file:
-        json.dump(auc_list, file, indent=4)
+    best_weights = best_weights.astype(np.float64)
 
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return best_weights / best_weights.sum(), feature_weights
+        return best_weights / best_weights.sum()
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

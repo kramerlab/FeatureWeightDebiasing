@@ -9,7 +9,7 @@ from weighting_methods.feature_weighted_maximum_representative_subsampling impor
 
 
 seed = 5
-budgets = [0.0, 0.1, 0.5, 1.0]
+budgets = [0.0, 0.5, 0.9, 1]
 
 
 def feature_weight_budget_comparison_experiment(
@@ -21,6 +21,7 @@ def feature_weight_budget_comparison_experiment(
     data_set_name: str = "",
     random_generator=None,
     method_name=None,
+    drop=1,
     **args,
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -52,7 +53,7 @@ def feature_weight_budget_comparison_experiment(
             sample_df,
             target,
             train_fraction=0.5,
-            bias_fraction=0.75,
+            bias_fraction=0.1,
             columns=columns,
         )
 
@@ -62,7 +63,7 @@ def feature_weight_budget_comparison_experiment(
             columns=columns,
             save_path=result_path,
             bias_variable=target,
-            drop=10,
+            drop=drop,
             early_stopping=False,
             random_generator=random_generator,
             max_patience=len(N),

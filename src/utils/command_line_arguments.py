@@ -11,7 +11,6 @@ from weighting_methods import (
     uniform_sample_weighting,
     train_domain_adversarial_network,
     neural_network_mmd_loss_weighting,
-    train_correction_weights_network,
     repeated_MRS,
 )
 
@@ -26,7 +25,6 @@ sample_weighting_method_list = [
     "kmm",
     "dann",
     "mmd_loss",
-    "correction_weights",
 ]
 
 
@@ -35,6 +33,7 @@ bias_choice = [
     "less_negative_class",
     "less_positive_class",
     "mean_difference",
+    "none",
 ]
 
 # Possible data sets
@@ -77,6 +76,7 @@ def parse_command_line_arguments():
     parser.add_argument("--budget", default=0.0, type=float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
+    parser.add_argument("--drop", default=1, type=int)
 
     return parser.parse_args()
 

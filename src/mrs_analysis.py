@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import trange
 
-from methods import maximum_representative_subsampling
+from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
 from utils.sampling import sample
@@ -34,20 +34,17 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
     mrs_iteration_list = []
     rocs_list_list = []
     relative_bias_list_list = []
-    data, columns, _ = load_dataset(data_set_name)
+    data, columns, bias_variable = load_dataset(data_set_name)
     data = data.sample(frac=1)
     result_path = create_save_path(data_set_name, bias_type)
     mmd_list = []
-    bias_variable = ""
-    use_bias_mean = False
 
-    if data_set_name == "folktables_income":
+    if data_set_name in ["folktables_income", "breast_cancer"]:
         scaled_df, _ = scale_df(data, columns)
-        bias_variable = "Binary Income"
         scaled_N, scaled_R = sample(
             bias_type,
             scaled_df,
-            "Binary Income",
+            bias_variable,
             train_fraction=0.5,
             bias_fraction=0.1,
             columns=columns,
@@ -57,6 +54,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
         scaled_df, _ = scale_df(data, columns)
         scaled_N = scaled_df[scaled_df["label"] == 1]
         scaled_R = scaled_df[scaled_df["label"] == 0]
+        use_bias_mean = False
     number_of_samples = len(scaled_N)
 
     for _ in trange(number_of_repetitions):
@@ -73,9 +71,10 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
             drop=drop,
             save_path=result_path,
             return_metrics=True,
-            use_bias_mean=use_bias_mean,
+            compute_bias=use_bias_mean,
             bias_variable=bias_variable,
             random_generator=random_generator,
+            early_stopping=False,
         )
         aucs_complete.append(auc_list)
         mmds_complete.append(mmd_list)

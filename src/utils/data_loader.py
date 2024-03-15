@@ -138,7 +138,7 @@ def load_folktables_income_data():
         1 if us_label >= 50000 else 0 for us_label in us_labels.values
     ]
     features = features.dropna()
-    features.replace({False: 0, True: 1}, inplace=True)
+    features = features.replace({False: 0, True: 1}).infer_objects(copy=False)
 
     return features, columns, "Binary Income"
 
@@ -231,7 +231,7 @@ def load_folktables_employment_data():
         1 if us_label == True else 0 for us_label in us_labels.values
     ]
     features = features.dropna()
-    features.replace({False: 0, True: 1}, inplace=True)
+    features = features.replace({False: 0, True: 1}).infer_objects(copy=False)
 
     return features, columns, "Employment"
 

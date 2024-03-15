@@ -3,7 +3,7 @@ NUMBER_OF_REPETETIONS=10
 # for BIAS_TYPE in mean_difference less_negative_class less_positive_class 
 for BIAS_TYPE in mean_difference
 do
-    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs fw-switching-mrs soft-mrs mrs
+    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs soft-mrs mrs
     do
         for DATASET in breast_cancer loan_prediction hr_analytics folktables_income folktables_employment
         do

@@ -1,5 +1,5 @@
-NUMBER_OF_REPETETIONS=1
-DROP=5
+NUMBER_OF_REPETETIONS=10
+DROP=1
 
 for BIAS_VARIABLE in cross-validation random
 do

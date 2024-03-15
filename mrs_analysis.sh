@@ -1,5 +1,5 @@
-NUMBER_OF_REPETETIONS=1
-DROP=2
+NUMBER_OF_REPETETIONS=10
+DROP=1
 
 python src/mrs_analysis.py --data_set_name gbs_gesis --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP
 python src/mrs_analysis.py --data_set_name gbs_allensbach --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP

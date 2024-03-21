@@ -289,6 +289,7 @@ def train_feature_weighted_classifier_forest(
     max_features="sqrt",
     speedup=True,
     cv=5,
+    max_depth=None,
 ):
     """Train a classifier to measure the auroc
 
@@ -299,19 +300,22 @@ def train_feature_weighted_classifier_forest(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-    weights = short_min_weights_fraction_leaf if speedup else min_weights_fraction_leaf
+    weights_fraction_leaf = (
+        short_min_weights_fraction_leaf if speedup else min_weights_fraction_leaf
+    )
     clf = RandomForestClassifier(
-        n_estimators=100,
+        n_estimators=250,
         random_state=random_state,
         splitter=splitter,
         class_weight=class_weight,
         max_features=max_features,
         n_jobs=-1,
+        max_depth=max_depth,
     )
-    param_grid = {"min_weight_fraction_leaf": weights}
+    parameter_grid = {"min_weight_fraction_leaf": weights_fraction_leaf}
     grid = GridSearchCV(
+        param_grid=parameter_grid,
         estimator=clf,
-        param_grid=param_grid,
         cv=cv,
         refit=True,
         scoring="roc_auc",
@@ -354,6 +358,7 @@ def train_classifier_auroc(
             ccp_alphas_unique = np.append(
                 ccp_alphas_unique[-10:], shortened_ccp_alphas_unique
             )
+            ccp_alphas_unique = np.unique(ccp_alphas_unique)
 
     param_grid = {"ccp_alpha": ccp_alphas_unique}
     cv = StratifiedKFold(
@@ -426,7 +431,7 @@ def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=
     """
     clf = RandomForestClassifier(
         class_weight=class_weight,
-        n_estimators=100,
+        n_estimators=250,
         n_jobs=-1,
         random_state=random_state,
     )
@@ -597,8 +602,7 @@ def calculate_mean_roc(interpolated_fpr, interpolated_tpr):
 
 
 def compute_test_metrics_fw_mrs(
-    N,
-    R,
+    data,
     columns,
     calculate_roc=False,
     random_state=None,
@@ -610,6 +614,7 @@ def compute_test_metrics_fw_mrs(
     splitter="feature_weighted_best",
     max_features="sqrt",
     n_splits_test=5,
+    max_depth=None,
 ):
     """Compute test metrics for mrs
 
@@ -620,7 +625,6 @@ def compute_test_metrics_fw_mrs(
     :param cv: Number of cross-validation iterations, defaults to 3
     :return: Test metrics for mrs
     """
-    data = pd.concat([N, R])
     auroc_scores = []
     ifpr_list = []
     itpr_list = []
@@ -639,6 +643,8 @@ def compute_test_metrics_fw_mrs(
             speedup=speedup,
             splitter=splitter,
             max_features=max_features,
+            cv=3,
+            max_depth=max_depth,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]
         auroc = roc_auc_score(test.label, y_predict)
@@ -665,9 +671,10 @@ def train_feature_weighted_classifier_tree(
     class_weight="balanced",
     splitter="feature_weighted_best",
     max_features="sqrt",
-    n_skip=10, 
+    n_skip=10,
     speedup=True,
     cv=5,
+    max_depth=None,
 ):
     """Train a classifier to measure the auroc
 
@@ -683,6 +690,7 @@ def train_feature_weighted_classifier_tree(
         class_weight=class_weight,
         splitter=splitter,
         max_features=max_features,
+        max_depth=max_depth,
     )
     ccp_alphas = clf.cost_complexity_pruning_path(
         X,
@@ -696,11 +704,11 @@ def train_feature_weighted_classifier_tree(
     if speedup:
         if len(ccp_alphas_unique) > n_skip:
             shortened_ccp_alphas_unique = ccp_alphas_unique[0::n_skip]
-            ccp_alphas_unique = np.append(
+            shortened_ccp_alphas_unique = np.append(
                 shortened_ccp_alphas_unique,
                 ccp_alphas_unique[-n_skip:],
             )
-            ccp_alphas_unique = np.unique(ccp_alphas)
+            ccp_alphas_unique = np.unique(shortened_ccp_alphas_unique)
 
     param_grid = {"ccp_alpha": ccp_alphas_unique}
 

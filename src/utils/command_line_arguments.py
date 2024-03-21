@@ -108,6 +108,10 @@ def parse_mrs_analysis_command_line_arguments():
 
     return parser.parse_args()
 
+def parse_command_line_arguments_statistical_analysis():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--drop", default=1, type=int)
+
 
 def get_sample_weighting_function(method_name):
     """Returns the function to the function name.

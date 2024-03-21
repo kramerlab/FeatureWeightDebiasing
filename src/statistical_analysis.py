@@ -3,6 +3,8 @@ import random
 import numpy as np
 
 from pathlib import Path
+from tqdm import trange
+
 from utils.command_line_arguments import (
     get_weighting_function,
     parse_command_line_arguments_statistical_analysis,
@@ -11,6 +13,8 @@ from utils.data_loader import load_dataset
 from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
 from utils.statistics import logistic_regression
 from utils.visualization import plot_statistical_analysis
+from weighting_methods import maximum_representative_subsampling, soft_mrs
+
 
 bins = 25
 seed = 5
@@ -21,7 +25,9 @@ max_int = 2**32 - 1
 def statistical_analysis(
     method_one,
     method_two,
-    **args,
+    n_repeats=1000,
+    drop=1,
+    patience=25,
 ):
     """Analyze GBS corrected with Allensbach with two methods.
 
@@ -30,7 +36,6 @@ def statistical_analysis(
     """
     np.random.seed(seed)
     random.seed(seed)
-    random_generator = np.random.RandomState(seed)
     file_directory = Path(__file__).parent
     result_path = Path(file_directory, "../results")
     visualisation_path = (
@@ -39,35 +44,34 @@ def statistical_analysis(
     visualisation_path.mkdir(exist_ok=True, parents=True)
     df, scale_columns, _ = load_dataset("gbs_allensbach")
     scaled_df, scaler = scale_df(df, scale_columns)
+    first_random_generator = np.random.RandomState(seed)
+    second_random_generator = np.random.RandomState(seed)
 
     weighting_function_one = get_weighting_function(method_one)
     weighting_function_two = get_weighting_function(method_two)
-
     gamma = calculate_rbf_gamma(scaled_df[scale_columns])
-
     scaled_N = scaled_df[scaled_df["label"] == 1]
     scaled_R = scaled_df[scaled_df["label"] == 0]
 
-    weights_one = weighting_function_one(
+
+    for i in trange(n_repeats):
+    weights_mrs = maximum_representative_subsampling(
         scaled_N,
         scaled_R,
         scale_columns,
-        save_path=visualisation_path,
-        drop=1,
+        drop=drop,
         early_stopping=True,
-        random_generator=random_generator,
-        patience=25,
+        random_generator=first_random_generator,
+        patience=patience,
     )
 
-    random_generator = np.random.RandomState(seed)
-    weights_two = weighting_function_two(
+    weights_soft_mrs = soft_mrs(
         scaled_N,
         scaled_R,
         scale_columns,
-        save_path=visualisation_path,
-        drop=1,
+        drop=drop,
         early_stopping=True,
-        random_generator=random_generator,
+        random_generator=second_random_generator,
     )
 
     weights_uniform = np.ones(len(scaled_N)) / len(scaled_N)
@@ -79,7 +83,7 @@ def statistical_analysis(
     ) = compute_metrics(
         scaled_N[scale_columns].copy(),
         scaled_R[scale_columns].copy(),
-        weights_one,
+        weights_mrs,
         scaler,
         scale_columns,
         scale_columns,
@@ -93,7 +97,7 @@ def statistical_analysis(
     ) = compute_metrics(
         scaled_N[scale_columns].copy(),
         scaled_R[scale_columns].copy(),
-        weights_two,
+        weights_soft_mrs,
         scaler,
         scale_columns,
         scale_columns,
@@ -136,11 +140,11 @@ def statistical_analysis(
         }
 
     lr_pvalue_gbs, lr_pvalue_weighted_one = logistic_regression(
-        scaled_N[scale_columns + ["Wahlteilnahme"]], weights_one
+        scaled_N[scale_columns + ["Wahlteilnahme"]], weights_mrs
     )
 
     _, lr_pvalue_weighted_two = logistic_regression(
-        scaled_N[scale_columns + ["Wahlteilnahme"]], weights_two
+        scaled_N[scale_columns + ["Wahlteilnahme"]], weights_soft_mrs
     )
 
     result_dict = {
@@ -171,8 +175,8 @@ def statistical_analysis(
         scaled_N[scale_columns],
         scaled_R[scale_columns],
         visualisation_path,
-        weights_one,
-        weights_two,
+        weights_mrs,
+        weights_soft_mrs,
         method_one,
         method_two,
     )

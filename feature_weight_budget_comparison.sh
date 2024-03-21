@@ -1,6 +1,6 @@
 NUMBER_OF_REPETETIONS=1
 SAMPLE_WEIGHTING_METHOD=fw-sampling-mrs
-DROP=10
+DROP=20
 
 # for BIAS_TYPE in mean_difference less_negative_class less_positive_class 
 for BIAS_TYPE in less_negative_class 

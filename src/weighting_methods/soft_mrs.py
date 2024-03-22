@@ -27,7 +27,7 @@ min_weight_fraction_leaf = [
 
 
 def soft_mrs_weighting(
-    N, R, columns, random_generator, exponential=False, patience=None, *args, **kwargs
+    N, R, columns, random_generator, exponential=False, patience=50, *args, **kwargs
 ):
     """Soft MRS method
 
@@ -71,7 +71,7 @@ def soft_mrs_weighting(
         predictions_N = predictions[: len(N), 1]
         weights_N = update_weights(weights_N, predictions_N, exponential=exponential)
 
-    return best_weights, np.ones(len(columns))
+    return best_weights
 
 
 def train_weighted_random_forest(

@@ -134,7 +134,7 @@ def feature_weighted_repeated_MRS(
     max_patience=10,
     class_weight="balanced",
     return_auroc=False,
-    n_test_splits=10,
+    n_test_splits=5,
     n_pu_splits=5,
     n_repeats=5,
     *args,
@@ -206,7 +206,9 @@ def feature_weighted_repeated_MRS(
         feature_importance_list.append(feature_importance.tolist())
 
         for budget in budgets:
-            feature_weights = compute_feature_weights_with_temperature(budget, -feature_importance)
+            feature_weights = compute_feature_weights_with_temperature(
+                budget, -feature_importance
+            )
 
             # max_index = np.argmax(feature_weights)
             # feature_weights = np.zeros(len(feature_weights))
@@ -228,6 +230,7 @@ def feature_weighted_repeated_MRS(
                 n_splits_test=n_test_splits,
                 max_depth=max_depth,
             )
+
             feature_weighted_aurocs_dict[budget].append(auroc)
             feature_weights_dict[budget].append(feature_weights.tolist())
 
@@ -244,6 +247,7 @@ def feature_weighted_repeated_MRS(
         if (
             ((best_difference <= delta) and early_stopping)
             or len(dropped_N) <= drop
+            or len(dropped_N) <= n_test_splits
             or current_patience >= max_patience
         ):
             break
@@ -270,6 +274,7 @@ def compute_feature_weights(budget, feature_importances):
     :param feature_importances: _description_
     :return: _description_
     """
+    feature_importances = np.exp(feature_importances)
     max_importance = np.max(np.abs(feature_importances))
     if max_importance == 0:
         budget_feature_importances = np.ones(len(feature_importances))
@@ -281,6 +286,12 @@ def compute_feature_weights(budget, feature_importances):
 
 
 def compute_feature_weights_with_temperature(temperature, feature_importance):
+    """_summary_
+
+    :param temperature: _description_
+    :param feature_importance: _description_
+    :return: _description_
+    """
     temperature_softmax_weights = softmax_with_temperature(
         temperature, -feature_importance
     )
@@ -288,6 +299,12 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
 
 
 def softmax_with_temperature(temperature, weights):
+    """_summary_
+
+    :param temperature: _description_
+    :param weights: _description_
+    :return: _description_
+    """
     individual_exp = np.exp(weights / temperature)
     sum_exp = np.sum(individual_exp)
     return individual_exp / sum_exp

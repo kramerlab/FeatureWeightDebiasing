@@ -9,7 +9,14 @@ sns.set_theme(style="ticks")
 
 
 def plot_cumulative_distribution_function(
-    N, R, file_name: str, weights_one, weights_two, method_one, method_two, wide=True
+    N,
+    R,
+    file_name: str,
+    weights_one_list,
+    weights_two_list,
+    method_one,
+    method_two,
+    wide=True,
 ):
     """Plots the cumulative distribution functions of two methods.
 
@@ -30,10 +37,18 @@ def plot_cumulative_distribution_function(
         sns.ecdfplot(N, x=column_name, label="GBS")
         sns.ecdfplot(R, x=column_name, label="Allensbach", linestyle="dashed")
         sns.ecdfplot(
-            N, x=column_name, weights=weights_one, label=method_one, linestyle="dotted"
+            N,
+            x=column_name,
+            weights=weights_one_list,
+            label=method_one,
+            linestyle="dotted",
         )
         sns.ecdfplot(
-            N, x=column_name, weights=weights_two, label=method_two, linestyle="dashdot"
+            N,
+            x=column_name,
+            weights=weights_two_list,
+            label=method_two,
+            linestyle="dashdot",
         )
         plt.legend()
         plt.savefig(plot_directory / f"{column_name}.pdf")
@@ -456,44 +471,3 @@ def plot_relative_bias(
     [tick.set_color("blue") for tick in plt.gca().get_xticklabels()]
     plt.savefig(f"{file_name}.pdf")
     plt.close()
-
-
-def plot_budget_comparison_auroc(
-    auroc_dictionary,
-    number_of_samples,
-    drop,
-    file_name,
-):
-    n_auroc_values = len(auroc_dictionary[list(auroc_dictionary.keys())[0]])
-    stop = number_of_samples - (n_auroc_values * drop)
-    x_labels = list(range(number_of_samples, stop, -drop))
-    for budget, aurocs in auroc_dictionary.items():
-        sns.lineplot(x=x_labels, y=aurocs, label=str(budget))
-    plt.plot(n_auroc_values * drop * [0.5], color="black", linestyle="--")
-    plt.ylabel("Feature Weighted AUROC")
-    plt.xlabel("Number of Remaining Samples")
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
-    plt.xticks(x_ticks)
-    plt.gca().invert_xaxis()
-
-    plt.savefig(f"{file_name}.pdf")
-    plt.close()
-
-
-def plot_feature_weights(feature_weights_list, save_path):
-    for budget, feature_weights in feature_weights_list.items():
-        budget_path = save_path / str(budget)
-        budget_path.mkdir(parents=True, exist_ok=True)
-        for i, feature_weight in enumerate(feature_weights):
-            sns.barplot(feature_weight)
-            plt.savefig(budget_path / f"feature_weights_{i}.pdf")
-            plt.close()
-
-
-def plot_feature_importance(feature_importance_list, save_path):
-    for i, feature_importance in enumerate(feature_importance_list):
-        sns.barplot(feature_importance)
-        plt.savefig(save_path / f"feature_importance_{i}.pdf")
-        plt.close()

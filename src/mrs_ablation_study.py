@@ -11,12 +11,14 @@ from utils.visualization import (
     plot_experiment_comparison_auc,
     plot_experiment_comparison_mmd,
 )
-
+from utils.sampling import sample
 
 seed = 5
 
 
-def compare_mrs_variants(number_of_repetitions, ablation_experiment, drop):
+def compare_mrs_variants(
+    number_of_repetitions, ablation_experiment, dataset_name, bias_type, drop
+):
     """Compare different mrs variants
 
     :param number_of_repetitions: Number of repetitions
@@ -34,9 +36,26 @@ def compare_mrs_variants(number_of_repetitions, ablation_experiment, drop):
 
     file_directory = Path(__file__).parent
     result_path = create_result_path(ablation_experiment, file_directory)
-    data, columns, _ = load_dataset("gbs_gesis")
-    scaled_N, scaled_R = preprocess_data(data, columns)
+    data, columns, bias_variable = load_dataset(dataset_name)
+    data = data.sample(frac=1)
     number_of_samples = len(scaled_N)
+
+    if dataset_name in ["folktables_income", "breast_cancer"]:
+        scaled_df, _ = scale_df(data, columns)
+        scaled_N, scaled_R = sample(
+            bias_type,
+            scaled_df,
+            bias_variable,
+            train_fraction=0.5,
+            bias_fraction=0.1,
+            columns=columns,
+        )
+        use_bias_mean = True
+    else:
+        scaled_df, _ = scale_df(data, columns)
+        scaled_N = scaled_df[scaled_df["label"] == 1]
+        scaled_R = scaled_df[scaled_df["label"] == 0]
+        use_bias_mean = False
 
     mrs_function, experiment_label = choose_hyperparameter(ablation_experiment)
 
@@ -204,5 +223,9 @@ def choose_hyperparameter(ablation_experiment):
 if __name__ == "__main__":
     args = parse_mrs_ablation_command_line_arguments()
     compare_mrs_variants(
-        args.number_of_repetitions, args.ablation_experiment, args.drop
+        args.number_of_repetitions,
+        args.ablation_experiment,
+        args.dataset_name,
+        args.bias_type,
+        args.drop,
     )

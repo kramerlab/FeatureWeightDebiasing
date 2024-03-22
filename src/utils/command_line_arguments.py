@@ -1,6 +1,10 @@
 import argparse
 
-from experiments import downstream_experiment, downstream_experiment_with_test_set, feature_weight_budget_comparison_experiment
+from experiments import (
+    downstream_experiment,
+    downstream_experiment_with_test_set,
+    feature_weight_budget_comparison_experiment,
+)
 
 
 from weighting_methods import (
@@ -90,6 +94,8 @@ def parse_mrs_ablation_command_line_arguments():
     parser.add_argument(
         "--ablation_experiment", choices=mrs_ablation_experiments, required=True
     )
+    parser.add_argument("--dataset_name", choices=dataset_list, required=True)
+    parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--number_of_repetitions", default=100, type=int)
     parser.add_argument("--drop", default=1, type=int)
     return parser.parse_args()
@@ -108,9 +114,14 @@ def parse_mrs_analysis_command_line_arguments():
 
     return parser.parse_args()
 
+
 def parse_command_line_arguments_statistical_analysis():
     parser = argparse.ArgumentParser()
     parser.add_argument("--drop", default=1, type=int)
+    parser.add_argument("--patience", default=25, type=int)
+    parser.add_argument("--n_repeats", default=1000, type=int)
+
+    return parser.parse_args()
 
 
 def get_sample_weighting_function(method_name):
@@ -132,9 +143,9 @@ def get_sample_weighting_function(method_name):
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "dann":
-       return train_domain_adversarial_network
+        return train_domain_adversarial_network
     elif method_name == "mmd_loss":
-       return neural_network_mmd_loss_weighting
+        return neural_network_mmd_loss_weighting
 
 
 def get_experiment_function(experiment_name=""):

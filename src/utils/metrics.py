@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import pdist
 from sklearn.metrics.pairwise import rbf_kernel
 
@@ -169,7 +169,6 @@ def compute_metrics(
     scale_columns,
     columns,
     sample_weights,
-    feature_weights,
     gamma,
 ):
     """Computes the metrics for an experiment
@@ -183,6 +182,7 @@ def compute_metrics(
     :param gamma: Gamma for the rbf kernel
     :return: Result metrics
     """
+    wasserstein_distances = []
     scaled_N_dropped = scaled_N[columns].values
     scaled_R_dropped = scaled_R[columns].values
 
@@ -190,9 +190,14 @@ def compute_metrics(
         scaled_N_dropped,
         scaled_R_dropped,
         sample_weights,
-        feature_weights,
         gamma,
     )
+
+    for i in range(scaled_N.values.shape[1]):
+        u_values = scaled_N.values[:, i]
+        v_values = scaled_R.values[:, i]
+        wasserstein_distance_value = wasserstein_distance(u_values, v_values, sample_weights)
+        wasserstein_distances.append(wasserstein_distance_value)
 
     unscaled_N = scaled_N.copy()
     unscaled_R = scaled_R.copy()
@@ -204,6 +209,7 @@ def compute_metrics(
     return (
         weighted_mmd,
         sample_biases,
+        wasserstein_distances,
     )
 
 

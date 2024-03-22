@@ -6,10 +6,11 @@ from utils.sampling import sample
 from weighting_methods.feature_weighted_maximum_representative_subsampling import (
     feature_weighted_repeated_MRS,
 )
-from utils.visualization import (
+from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
     plot_feature_importance,
     plot_feature_weights,
+    plot_budget_comparison_auroc_mean,
 )
 
 seed = 5
@@ -55,17 +56,16 @@ def feature_weight_budget_comparison_experiment(
     feature_weighted_aurocs_list = []
     feature_importances_list = []
     feature_weights_list = []
+    N, R = sample(
+        bias_type,
+        sample_df,
+        target,
+        train_fraction=0.5,
+        bias_fraction=0.1,
+        columns=columns,
+    )
 
     for i in trange(number_of_repetitions):
-        N, R = sample(
-            bias_type,
-            sample_df,
-            target,
-            train_fraction=0.5,
-            bias_fraction=0.1,
-            columns=columns,
-        )
-
         feature_weighted_aurocs, feature_importances, feature_weights, mrs_iteration = (
             feature_weighted_repeated_MRS(
                 N=N,
@@ -89,7 +89,6 @@ def feature_weight_budget_comparison_experiment(
         feature_weights_list.append(feature_weights)
 
         # Visualize individual run results
-
         plot_budget_comparison_auroc(
             feature_weighted_aurocs,
             number_of_samples,
@@ -105,16 +104,17 @@ def feature_weight_budget_comparison_experiment(
         plot_feature_importance(feature_importances, feature_importance_path)
 
     # Visualize mean results
-    # plot_budget_comparison_auroc(feature_weighted_aurocs_list)
-    # plot_feature_weights(feature_weights_list, result_path / "mean_feature_weights")
-    # plot_feature_importance(
-    #    feature_importances_list, result_path / "mean_feature_importance"
-    # )
+    plot_budget_comparison_auroc_mean(
+        feature_weighted_aurocs_list,
+        number_of_samples,
+        drop,
+        result_path / "mean_auroc_comparison",
+    )
 
     with open(
         result_path / f"feature_weighted_aurocs.json", "w", encoding="utf-8"
     ) as file:
-        json.dump(feature_weighted_aurocs, file, indent=4)
+        json.dump(feature_weighted_aurocs_list, file, indent=4)
 
     with open(result_path / f"feature_importances.json", "w", encoding="utf-8") as file:
         json.dump(feature_importances_list, file, indent=4)

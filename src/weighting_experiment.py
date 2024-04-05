@@ -23,6 +23,7 @@ def weighting_experiment(
     experiment_name: str,
     budget: float,
     drop: int,
+    transformation_method,
 ) -> None:
     """_summary_
 
@@ -61,6 +62,7 @@ def weighting_experiment(
         method_name=sample_weighting_method_name,
         budget=budget,
         drop=drop,
+        transformation_method=transformation_method,
     )
 
 
@@ -75,4 +77,5 @@ if __name__ == "__main__":
         args.experiment_name,
         args.budget,
         args.drop,
+        args.transformation_method,
     )

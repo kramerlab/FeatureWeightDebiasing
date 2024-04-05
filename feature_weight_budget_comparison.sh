@@ -1,14 +1,17 @@
-NUMBER_OF_REPETETIONS=1
+NUMBER_OF_REPETETIONS=3
 SAMPLE_WEIGHTING_METHOD=fw-sampling-mrs
-DROP=10
+DROP=15
 
-# for BIAS_TYPE in mean_difference less_negative_class less_positive_class 
-for BIAS_TYPE in less_negative_class 
+for TRANSFORMATION_METHOD in temperature budget 
 do
-    for DATASET in breast_cancer loan_prediction hr_analytics folktables_income folktables_employment
-    #for DATASET in breast_cancer
+    # for BIAS_TYPE in less_negative_class less_positive_class mean_difference 
+    for BIAS_TYPE in less_negative_class less_positive_class  
     do
-        python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
-        --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS --experiment_name feature_weight_budget_comparison --drop $DROP
+        for DATASET in breast_cancer loan_prediction hr_analytics folktables_income folktables_employment
+        do
+            python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+            --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS --experiment_name feature_weight_budget_comparison --drop $DROP \
+            --transformation_method $TRANSFORMATION_METHOD
+        done
     done
 done

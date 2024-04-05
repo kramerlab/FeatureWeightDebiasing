@@ -130,7 +130,7 @@ def write_result_dict_test_set(
 
 
 def create_result_path(
-    method_name, bias_type, data_set_name, experiment_name="downstream"
+    method_name, bias_type, data_set_name, experiment_name="downstream", bias_fraction=""
 ):
     """The function creates the save path and makes the directory.
 
@@ -142,7 +142,12 @@ def create_result_path(
     file_directory = Path(__file__).parent
     result_path = Path(file_directory, "../../results")
     result_path = (
-        result_path / experiment_name / data_set_name / bias_type / method_name
+        result_path
+        / experiment_name
+        / data_set_name
+        / bias_type
+        / str(bias_fraction)
+        / method_name
     )
     result_path.mkdir(exist_ok=True, parents=True)
     return result_path

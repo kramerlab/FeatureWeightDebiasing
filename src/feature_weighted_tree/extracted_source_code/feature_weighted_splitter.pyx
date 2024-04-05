@@ -165,6 +165,7 @@ cdef inline int node_split_feature_weighted_random(
                     possible_weights[i] = 0.0
             for i in range(n_features):
                 possible_weights[i] /= weight_sum
+                
             drawn_probability = rand_uniform(0, 1, random_state)
             weight_sum = 0.0
             for i in range(n_features):

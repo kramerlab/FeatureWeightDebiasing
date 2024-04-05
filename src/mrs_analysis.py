@@ -46,7 +46,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
             scaled_df,
             bias_variable,
             train_fraction=0.5,
-            bias_fraction=0.1,
+            bias_fraction=0.25,
             columns=columns,
         )
         use_bias_mean = True

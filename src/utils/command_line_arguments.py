@@ -14,7 +14,6 @@ from weighting_methods import (
     feature_weighted_repeated_MRS,
     uniform_sample_weighting,
     train_domain_adversarial_network,
-    neural_network_mmd_loss_weighting,
     repeated_MRS,
 )
 
@@ -28,7 +27,6 @@ sample_weighting_method_list = [
     "fw-sampling-mrs",
     "kmm",
     "dann",
-    "mmd_loss",
 ]
 
 
@@ -81,6 +79,7 @@ def parse_command_line_arguments():
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
     parser.add_argument("--drop", default=1, type=int)
+    parser.add_argument("--transformation_method", default="temperature")
 
     return parser.parse_args()
 
@@ -144,8 +143,6 @@ def get_sample_weighting_function(method_name):
         return kernel_mean_matching
     elif method_name == "dann":
         return train_domain_adversarial_network
-    elif method_name == "mmd_loss":
-        return neural_network_mmd_loss_weighting
 
 
 def get_experiment_function(experiment_name=""):

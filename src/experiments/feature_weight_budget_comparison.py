@@ -14,7 +14,6 @@ from utils.visualization_fw_mrs import (
 )
 
 seed = 5
-budgets = [1.0, 0.1, 0.01, 0.001]
 
 
 def feature_weight_budget_comparison_experiment(
@@ -27,6 +26,8 @@ def feature_weight_budget_comparison_experiment(
     random_generator=None,
     method_name=None,
     drop=1,
+    bias_fraction=0.25,
+    transformation_method="temperature",
     **args,
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -43,9 +44,21 @@ def feature_weight_budget_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    result_path = create_result_path(
-        method_name, bias_type, data_set_name, experiment_name="budget_comparison"
+    budgets = (
+        [1.0, 0.1, 0.01, 0.005]
+        if transformation_method == "temperature"
+        else [0, 0.25, 0.5, 0.9]
     )
+    result_path = create_result_path(
+        method_name,
+        bias_type,
+        data_set_name,
+        experiment_name="budget_comparison",
+        bias_fraction=bias_fraction,
+    )
+    result_path = result_path / transformation_method
+    result_path.mkdir(parents=True, exist_ok=True)
+
     auroc_path = result_path / "aurocs"
     auroc_path.mkdir(exist_ok=True, parents=True)
 
@@ -61,7 +74,7 @@ def feature_weight_budget_comparison_experiment(
         sample_df,
         target,
         train_fraction=0.5,
-        bias_fraction=0.1,
+        bias_fraction=bias_fraction,
         columns=columns,
     )
 
@@ -80,6 +93,7 @@ def feature_weight_budget_comparison_experiment(
                 target=target,
                 budgets=budgets,
                 return_auroc=True,
+                feature_weight_method=transformation_method,
             )
         )
 
@@ -95,11 +109,11 @@ def feature_weight_budget_comparison_experiment(
             drop,
             auroc_path / f"iteration_{i}",
         )
-        feature_weights_path = result_path / f"feature_weights_{i}/"
+        feature_weights_path = result_path / f"feature_weights" / str(i)
         feature_weights_path.mkdir(exist_ok=True, parents=True)
-        plot_feature_weights(feature_weights, result_path / f"feature_weights_{i}/")
+        plot_feature_weights(feature_weights, feature_weights_path)
 
-        feature_importance_path = result_path / f"feature_importance_{i}/"
+        feature_importance_path = result_path / f"feature_importance" / str(i)
         feature_importance_path.mkdir(exist_ok=True, parents=True)
         plot_feature_importance(feature_importances, feature_importance_path)
 

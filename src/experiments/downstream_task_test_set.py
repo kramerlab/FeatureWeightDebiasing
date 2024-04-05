@@ -1,7 +1,6 @@
 import json
 import numpy as np
 
-from pathlib import Path
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
@@ -28,6 +27,7 @@ def downstream_experiment_with_test_set(
     explicit_weights=True,
     load_previous_results=False,
     budget=0.0,
+    bias_fraction=0.75,
     **args
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -51,7 +51,11 @@ def downstream_experiment_with_test_set(
     tree_auprc_list = []
 
     result_path = create_result_path(
-        sample_weighting_method, bias_type, data_set_name, experiment_name="test_set"
+        sample_weighting_method,
+        bias_type,
+        data_set_name,
+        experiment_name="test_set",
+        bias_fraction=bias_fraction,
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
@@ -79,7 +83,7 @@ def downstream_experiment_with_test_set(
             sample_df,
             target,
             train_fraction=0.5,
-            bias_fraction=0.75,
+            bias_fraction=bias_fraction,
             test_fraction=0.1,
             columns=columns,
         )

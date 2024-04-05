@@ -327,7 +327,10 @@ def plot_experiment_comparison_auc(
 
     plt.ylabel("AUROC")
     plt.xlabel("Number of Remaining Samples")
-    plt.xticks(list(range(number_of_samples, 0, -100)))
+    x_ticks = list(
+        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+    ) + [stop + drop]
+    plt.xticks(x_ticks)
     plt.legend()
     plt.gca().invert_xaxis()
     plt.savefig(f"{file_name}.pdf")
@@ -381,7 +384,10 @@ def plot_experiment_comparison_mmd(
 
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
-    plt.xticks(list(range(number_of_samples, 0, -100)))
+    x_ticks = list(
+        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+    ) + [stop + drop]
+    plt.xticks(x_ticks)
     plt.legend()
     plt.gca().invert_xaxis()
     plt.savefig(f"{file_name}.pdf")

@@ -27,7 +27,8 @@ def compare_mrs_variants(
     """
     np.random.seed(seed)
     random.seed(seed)
-    random_generator = np.random.RandomState(seed)
+    random_generator_one = np.random.RandomState(seed)
+    random_generator_two = np.random.RandomState(seed)
     aucs_complete = []
     mmds_complete = []
     aucs_comparison = []
@@ -35,10 +36,11 @@ def compare_mrs_variants(
     mmd_list = []
 
     file_directory = Path(__file__).parent
-    result_path = create_result_path(ablation_experiment, file_directory)
+    result_path = create_result_path(
+        ablation_experiment, dataset_name, bias_type, file_directory
+    )
     data, columns, bias_variable = load_dataset(dataset_name)
     data = data.sample(frac=1)
-    number_of_samples = len(scaled_N)
 
     if dataset_name in ["folktables_income", "breast_cancer"]:
         scaled_df, _ = scale_df(data, columns)
@@ -47,16 +49,15 @@ def compare_mrs_variants(
             scaled_df,
             bias_variable,
             train_fraction=0.5,
-            bias_fraction=0.1,
+            bias_fraction=0.25,
             columns=columns,
         )
-        use_bias_mean = True
     else:
         scaled_df, _ = scale_df(data, columns)
         scaled_N = scaled_df[scaled_df["label"] == 1]
         scaled_R = scaled_df[scaled_df["label"] == 0]
-        use_bias_mean = False
 
+    number_of_samples = len(scaled_N)
     mrs_function, experiment_label = choose_hyperparameter(ablation_experiment)
 
     for _ in trange(number_of_repetitions):
@@ -74,11 +75,12 @@ def compare_mrs_variants(
             drop=drop,
             save_path=result_path,
             return_metrics=True,
-            random_generator=random_generator,
+            random_generator=random_generator_one,
             early_stopping=False,
         )
         aucs_complete.append(auc_list)
         mmds_complete.append(mmd_list)
+
         # Than comparison variant
         (
             comparison_auc_list,
@@ -94,7 +96,7 @@ def compare_mrs_variants(
             mrs_function=mrs_function,
             save_path=result_path,
             return_metrics=True,
-            random_generator=random_generator,
+            random_generator=random_generator_two,
             early_stopping=False,
         )
         aucs_comparison.append(comparison_auc_list)
@@ -140,7 +142,7 @@ def preprocess_data(data, columns):
     return scaled_N, scaled_R
 
 
-def create_result_path(ablation_experiment, file_directory):
+def create_result_path(ablation_experiment, dataset_name, bias_type, file_directory):
     """Creates the result path
 
     :param ablation_experiment: Experiment name
@@ -148,7 +150,9 @@ def create_result_path(ablation_experiment, file_directory):
     :return: The created path
     """
     result_path = Path(file_directory, "../results")
-    result_path = result_path / "ablation_study" / ablation_experiment
+    result_path = (
+        result_path / "ablation_study" / dataset_name / bias_type / ablation_experiment
+    )
     result_path.mkdir(exist_ok=True, parents=True)
     return result_path
 

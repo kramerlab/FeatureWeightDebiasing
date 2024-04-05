@@ -51,10 +51,12 @@ def sample(
             )
             ** 3
         )
-        weight = -(1 / 20)
-        sample_weights = np.exp(weight * differences)
+        temperature = -(1 / 20)
+        sample_weights = np.exp(temperature * differences)
         N = train.sample(
-            frac=0.9, weights=sample_weights, random_state=sampling_random_generator
+            frac=bias_fraction,
+            weights=sample_weights,
+            random_state=sampling_random_generator,
         )
     else:
         N = train.reset_index(drop=True)

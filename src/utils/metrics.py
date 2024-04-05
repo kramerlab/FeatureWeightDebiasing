@@ -14,19 +14,6 @@ from sklearn.metrics import (
 )
 
 
-min_weights_fraction_leaf = [
-    0.0,
-    0.01,
-    0.025,
-    0.1,
-    0.2,
-    0.3,
-    0.4,
-]
-
-short_min_weights_fraction_leaf = [0.0, 0.01, 0.4]
-
-
 def compute_weighted_means(N, weights):
     """Compute the weighted mean
 
@@ -196,7 +183,9 @@ def compute_metrics(
     for i in range(scaled_N.values.shape[1]):
         u_values = scaled_N.values[:, i]
         v_values = scaled_R.values[:, i]
-        wasserstein_distance_value = wasserstein_distance(u_values, v_values, sample_weights)
+        wasserstein_distance_value = wasserstein_distance(
+            u_values, v_values, sample_weights
+        )
         wasserstein_distances.append(wasserstein_distance_value)
 
     unscaled_N = scaled_N.copy()
@@ -284,16 +273,15 @@ def compute_classification_metrics_random_forest(
     return auroc_score, auprc
 
 
-def train_feature_weighted_classifier_forest(
+def train_feature_weighted_random_forest(
     X,
     y,
     feature_weights=None,
     draw_with_feature_weights=False,
     random_state=None,
-    class_weight="balanced",
+    class_weight=None,
     splitter="feature_weighted_best",
     max_features="sqrt",
-    speedup=True,
     cv=5,
     max_depth=None,
 ):
@@ -306,9 +294,6 @@ def train_feature_weighted_classifier_forest(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-    weights_fraction_leaf = (
-        short_min_weights_fraction_leaf if speedup else min_weights_fraction_leaf
-    )
     clf = RandomForestClassifier(
         n_estimators=250,
         random_state=random_state,
@@ -318,7 +303,7 @@ def train_feature_weighted_classifier_forest(
         n_jobs=-1,
         max_depth=max_depth,
     )
-    parameter_grid = {"min_weight_fraction_leaf": weights_fraction_leaf}
+    parameter_grid = {"min_impurity_decrease": [0.001, 0.01, 0.05, 0.1]}
     grid = GridSearchCV(
         param_grid=parameter_grid,
         estimator=clf,
@@ -335,6 +320,48 @@ def train_feature_weighted_classifier_forest(
     )
 
     return grid
+
+
+def train_feature_weighted_classifier_forest(
+    X,
+    y,
+    feature_weights=None,
+    draw_with_feature_weights=False,
+    random_state=None,
+    class_weight="balanced",
+    splitter="feature_weighted_best",
+    max_features="sqrt",
+    max_depth=None,
+    **args,
+):
+    """Train a classifier to measure the auroc
+
+    :param X_train: Training features
+    :param y_train: Training targets
+    :param weights: Sample weights, defaults to None
+    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param n_splits: Number of cross-validation iterations, defaults to 3
+    :return: Trained classifier
+    """
+    clf = RandomForestClassifier(
+        n_estimators=250,
+        random_state=random_state,
+        splitter=splitter,
+        class_weight=class_weight,
+        max_features=max_features,
+        n_jobs=-1,
+        max_depth=max_depth,
+        min_samples_leaf=10,
+        min_samples_split=5,
+    )
+    clf.fit(
+        X,
+        y,
+        feature_weights=feature_weights,
+        draw_with_feature_weights=draw_with_feature_weights,
+    )
+
+    return clf
 
 
 def train_classifier_auroc(
@@ -440,6 +467,8 @@ def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=
         n_estimators=250,
         n_jobs=-1,
         random_state=random_state,
+        min_samples_leaf=10,
+        min_samples_split=5,
     )
     clf.fit(X_train, y_train)
     return clf
@@ -554,18 +583,17 @@ def train_forest_classifier_auroc(
         random_state=random_state,
         splitter=splitter,
         class_weight=class_weight,
+        n_estimators=250,
     )
 
-    param_grid = {
-        "n_estimators": [25, 50, 100, 200],
-    }
+    parameter_grid = {"min_impurity_decrease": [0.001, 0.01, 0.05, 0.1]}
     cv = StratifiedKFold(
         n_splits=n_splits,
         shuffle=True,
         random_state=np.random.RandomState(random_state),
     )
     grid = GridSearchCV(
-        clf, param_grid=param_grid, cv=cv, n_jobs=-1, refit=True, scoring="roc_auc"
+        clf, param_grid=parameter_grid, cv=cv, n_jobs=-1, refit=True, scoring="roc_auc"
     )
     grid = grid.fit(
         X_train,
@@ -607,16 +635,18 @@ def calculate_mean_roc(interpolated_fpr, interpolated_tpr):
     return mean_fpr, mean_tpr, std_tpr
 
 
+import pandas as pd
+
+
 def compute_test_metrics_fw_mrs(
-    data,
+    N,
+    R,
     columns,
-    calculate_roc=False,
     random_state=None,
     feature_weights=None,
     draw_with_feature_weights=False,
-    method=train_feature_weighted_classifier_forest,
+    method=train_feature_weighted_random_forest,
     class_weight="balanced",
-    speedup=True,
     splitter="feature_weighted_best",
     max_features="sqrt",
     n_splits_test=5,
@@ -632,13 +662,13 @@ def compute_test_metrics_fw_mrs(
     :return: Test metrics for mrs
     """
     auroc_scores = []
-    ifpr_list = []
-    itpr_list = []
+    data = pd.concat([N, R])
     kf = StratifiedKFold(
         n_splits=n_splits_test, shuffle=True, random_state=random_state
     )
-    for train_indices, test_indices in kf.split(data[columns], data["label"]):
+    for train_indices, test_indices in kf.split(data[columns], data.label):
         train, test = data.iloc[train_indices], data.iloc[test_indices]
+
         clf = method(
             train[columns],
             train.label,
@@ -646,39 +676,28 @@ def compute_test_metrics_fw_mrs(
             draw_with_feature_weights=draw_with_feature_weights,
             random_state=random_state,
             class_weight=class_weight,
-            speedup=speedup,
             splitter=splitter,
             max_features=max_features,
-            cv=3,
+            cv=5,
             max_depth=max_depth,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]
         auroc = roc_auc_score(test.label, y_predict)
         auroc_scores.append(auroc)
-        if calculate_roc:
-            interpolated_fpr, interpolated_tpr = interpolate_roc(test.label, y_predict)
-            ifpr_list.append(interpolated_fpr)
-            itpr_list.append(interpolated_tpr)
-    if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, std_tpr = calculate_mean_roc(
-            ifpr_list, itpr_list
-        )
-        return np.mean(auroc_scores), mean_ifpr_list, mean_itpr_list, std_tpr
-    else:
-        return np.mean(auroc_scores)
+    return np.mean(auroc_scores)
 
 
-def train_feature_weighted_classifier_tree(
+def train_feature_weighted_classifier_decision_tree(
     X,
     y,
     feature_weights=None,
-    draw_with_feature_weights=False,
+    draw_with_feature_weights=True,
     random_state=None,
     class_weight="balanced",
     splitter="feature_weighted_best",
     max_features="sqrt",
     n_skip=10,
-    speedup=True,
+    speedup=False,
     cv=5,
     max_depth=None,
 ):

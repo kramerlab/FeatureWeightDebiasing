@@ -1,7 +1,6 @@
 NUMBER_OF_REPETETIONS=10
 
-# for BIAS_TYPE in mean_difference less_negative_class less_positive_class 
-for BIAS_TYPE in mean_difference
+for BIAS_TYPE in mean_difference less_negative_class less_positive_class 
 do
     for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs soft-mrs mrs
     do

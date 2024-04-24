@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from sklearn.inspection import permutation_importance
 from tqdm import trange
 import shap
 
@@ -9,9 +8,8 @@ from utils.metrics import (
     compute_test_metrics_fw_mrs,
     train_pu_classifier,
     train_feature_weighted_random_forest,
-    train_feature_weighted_classifier_decision_tree,
+    train_feature_weighted_decision_tree,
 )
-import json
 
 # Used to draw radom states
 max_int = 2**32 - 1
@@ -23,7 +21,6 @@ def mrs(
     columns,
     n_drop: int = 1,
     n_splits=5,
-    n_repeats=5,
     class_weights="balanced",
     random_state=None,
     *args,
@@ -43,12 +40,9 @@ def mrs(
     all_predictions = np.zeros(len(N))
     feature_importance_list = []
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for (N_train_index, N_test_index), (R_train_index, R_test_index) in zip(
-        kf.split(N), kf.split(R)
-    ):
+    for N_train_index, N_test_index in kf.split(N):
         N_train, N_test = N.iloc[N_train_index], N.iloc[N_test_index]
-        R_train, R_test = R.iloc[R_train_index], R.iloc[R_test_index]
-        train = pd.concat([N_train, R_train])
+        train = pd.concat([N_train, R])
         clf = train_pu_classifier(
             train[columns],
             train.label,
@@ -60,7 +54,6 @@ def mrs(
         feature_importance = calculate_feature_importance(
             columns,
             test_N=N_test,
-            test_R=R_test,
             clf=clf,
         )
         feature_importance_list.append(feature_importance)
@@ -79,7 +72,6 @@ def mrs_without_cv(
     n_drop: int = 1,
     class_weight="balanced",
     random_state=None,
-    n_repeats=5,
     *args,
     **attributes,
 ):
@@ -104,7 +96,6 @@ def mrs_without_cv(
     feature_importance = calculate_feature_importance(
         columns,
         test_N=N,
-        test_R=R,
         clf=clf,
     )
 
@@ -114,26 +105,10 @@ def mrs_without_cv(
     return drop_index, feature_importance
 
 
-def calculate_feature_importance(columns, test_N, test_R, clf):
+def calculate_feature_importance(columns, test_N, clf):
     explainer = shap.TreeExplainer(clf)
-    # data = pd.concat([test_N, test_R])
-    shap_values = explainer.shap_values(test_N[columns])
-    # feature_importance = permutation_importance(
-    #    clf,
-    #    test[columns],
-    #    test.label,
-    #    n_repeats=n_repeats,
-    #    random_state=random_state,
-    #    n_jobs=-1,
-    # scoring="roc_auc",
-    # ).importances_mean
-    # sample_weight = np.concatenate([
-    #    np.ones(len(test_N)) / len(test_N),
-    #    np.ones(len(test_R)) / len(test_R),
-    # ])
-
+    shap_values = explainer.shap_values(test_N[columns], tree_limit=-1)
     return np.average(np.abs(shap_values[1]), axis=0)
-    # return feature_importance
 
 
 def compute_feature_weights_with_temperature(temperature, feature_importance):
@@ -158,18 +133,20 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.001,
+    delta=0.005,
     early_stopping=False,
     drop=1,
-    budgets=[0.0],
+    budgets=[1.0],
     random_generator=None,
     class_weight="balanced",
     return_auroc=False,
-    n_test_splits=10,
+    n_test_splits=5,
     n_pu_splits=5,
-    n_repeats=5,
-    max_patience=20,
+    max_patience=5,
     feature_weight_method="temperature",
+    validation_method="random_forest",
+    splitter="feature_weighted_best",
+    n_estimators=500,
     *args,
     **attributes,
 ):
@@ -200,16 +177,21 @@ def feature_weighted_repeated_MRS(
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     feature_importance_list = []
-    for budget in budgets:
-        feature_weighted_aurocs_dict[budget] = []
-        feature_weights_dict[budget] = []
 
-    auroc_method = train_feature_weighted_random_forest
     feature_weight_method = (
         compute_feature_weights_with_temperature
         if feature_weight_method == "temperature"
         else compute_feature_weights_with_budget
     )
+    if validation_method == "random_forest":
+        validation_method = train_feature_weighted_random_forest
+    elif validation_method == "decision_tree":
+        validation_method = train_feature_weighted_decision_tree
+    else:
+        validation_method = "both"
+
+    feature_weights = np.ones(len(columns))
+    rand_int = random_generator.randint(max_int)
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
@@ -220,34 +202,92 @@ def feature_weighted_repeated_MRS(
             n_drop=drop,
             random_state=rand_int,
             class_weight=class_weight,
-            n_repeats=n_repeats,
             n_splits=n_pu_splits,
         )
         feature_importance_list.append(feature_importance.tolist())
 
         for budget in budgets:
-            np.random.seed(rand_int)
-            feature_weights = feature_weight_method(budget, feature_importance)
-            auroc = compute_test_metrics_fw_mrs(
-                dropped_N,
-                R,
-                columns,
-                random_state=rand_int,
-                feature_weights=feature_weights,
-                method=auroc_method,
-                draw_with_feature_weights=draw_with_feature_weights,
-                class_weight="balanced",
-                max_features="sqrt",
-                splitter="feature_weighted_best",
-                n_splits_test=n_test_splits,
+            feature_weights = (
+                np.ones(len(feature_importance))
+                if budget is None or budget == 0.0
+                else feature_weight_method(budget, feature_importance)
             )
+            if validation_method == "both":
+                tree_auroc = compute_test_metrics_fw_mrs(
+                    dropped_N,
+                    R,
+                    columns,
+                    random_state=rand_int,
+                    feature_weights=feature_weights,
+                    method=train_feature_weighted_decision_tree,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    class_weight="balanced",
+                    max_features="sqrt",
+                    splitter=splitter,
+                    n_splits_test=n_test_splits,
+                    n_estimators=n_estimators,
+                )
+                if budget is None or budget == 0.0:
+                    key = "MRS DT"
+                else:
+                    key = f"FW-MRS DT {budget}"
+                if not key in feature_weighted_aurocs_dict:
+                    feature_weighted_aurocs_dict[key] = []
+                    feature_weights_dict[key] = []
+                feature_weighted_aurocs_dict[key].append(tree_auroc)
+                feature_weights_dict[key].append(list(feature_weights))
 
-            feature_weighted_aurocs_dict[budget].append(auroc)
-            feature_weights_dict[budget].append(feature_weights.tolist())
+                forest_auroc = compute_test_metrics_fw_mrs(
+                    dropped_N,
+                    R,
+                    columns,
+                    random_state=rand_int,
+                    feature_weights=feature_weights,
+                    method=train_feature_weighted_random_forest,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    class_weight="balanced",
+                    max_features="sqrt",
+                    splitter=splitter,
+                    n_splits_test=n_test_splits,
+                    n_estimators=n_estimators,
+                )
+
+                if budget is None or budget == 0.0:
+                    key = "MRS RF"
+                else:
+                    key = f"FW-MRS RF {budget}"
+                if not key in feature_weighted_aurocs_dict:
+                    feature_weighted_aurocs_dict[key] = []
+                    feature_weights_dict[key] = []
+                feature_weighted_aurocs_dict[key].append(forest_auroc)
+                feature_weights_dict[key].append(list(feature_weights))
+                auroc = forest_auroc
+            else:
+                auroc = compute_test_metrics_fw_mrs(
+                    dropped_N,
+                    R,
+                    columns,
+                    random_state=rand_int,
+                    feature_weights=feature_weights,
+                    method=validation_method,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    class_weight="balanced",
+                    max_features="sqrt",
+                    splitter=splitter,
+                    n_splits_test=n_test_splits,
+                    n_estimators=n_estimators,
+                )
+
+                if budget not in feature_weighted_aurocs_dict:
+                    feature_weighted_aurocs_dict[budget] = []
+                    feature_weights_dict[budget] = []
+                feature_weighted_aurocs_dict[budget].append(auroc)
+                feature_weights_dict[budget].append(list(feature_weights))
 
         auc_difference = abs(auroc - 0.5)
         if (auc_difference + delta) <= best_difference:
-            best_weights = sample_weights.copy().astype(np.float64)
+            best_sample_weights = sample_weights.copy().astype(np.float64)
+            best_sample_weights /= np.sum(best_sample_weights)
             mrs_iteration = (i + 1) * drop
             best_difference = auc_difference
             best_feature_weights = feature_weights.copy()
@@ -264,7 +304,7 @@ def feature_weighted_repeated_MRS(
             break
 
         dropped_N = dropped_N.drop(drop_ids)
-        sample_weights[drop_ids] = 0
+        sample_weights[drop_ids] = 0.0
 
     if return_auroc:
         return (
@@ -275,4 +315,4 @@ def feature_weighted_repeated_MRS(
         )
 
     else:
-        return best_weights / best_weights.sum(), best_feature_weights
+        return best_sample_weights, best_feature_weights

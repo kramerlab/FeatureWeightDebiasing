@@ -35,6 +35,7 @@ def write_result_dict(
     rf_auprc_list,
     tree_auroc_list,
     tree_auprc_list,
+    dropped_samples_list,
     number_of_samples,
     explicit_weights,
 ):
@@ -71,6 +72,10 @@ def write_result_dict(
             "mean": np.mean(tree_auprc_list),
             "sd": np.std(tree_auprc_list),
         },
+        "dropped_samples": {
+            "mean": np.mean(dropped_samples_list),
+            "std": np.std(dropped_samples_list),
+        },
         "all_samples": number_of_samples,
     }
 
@@ -92,6 +97,7 @@ def write_result_dict_test_set(
     rf_auprc_list,
     tree_auroc_list,
     tree_auprc_list,
+    dropped_samples_list,
     number_of_samples,
 ):
     """Creates the result dictionary
@@ -123,6 +129,10 @@ def write_result_dict_test_set(
             "mean": np.mean(tree_auprc_list),
             "sd": np.std(tree_auprc_list),
         },
+        "dropped_samples": {
+            "mean": np.mean(dropped_samples_list),
+            "std": np.std(dropped_samples_list),
+        },
         "all_samples": number_of_samples,
     }
 
@@ -130,7 +140,11 @@ def write_result_dict_test_set(
 
 
 def create_result_path(
-    method_name, bias_type, data_set_name, experiment_name="downstream", bias_fraction=""
+    method_name,
+    bias_type,
+    data_set_name,
+    experiment_name="downstream",
+    bias_fraction="",
 ):
     """The function creates the save path and makes the directory.
 

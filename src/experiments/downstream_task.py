@@ -6,7 +6,7 @@ from sklearn.discriminant_analysis import StandardScaler
 
 from utils.statistics import create_result_path, write_result_dict
 from utils.sampling import sample
-from utils.visualization import plot_weights
+from utils.visualization import plot_feature_weights, plot_sample_weights
 from utils.metrics import (
     compute_classification_metrics_random_forest,
     compute_classification_metrics_tree,
@@ -30,7 +30,9 @@ def downstream_experiment(
     load_previous_results=False,
     method_name=None,
     budget=0.0,
-    bias_fraction=0.5,
+    bias_fraction=0.25,
+    validation_method="random_forest",
+    drop=1,
     **args
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -48,12 +50,13 @@ def downstream_experiment(
     """
     weighted_mmds_list = []
     biases_list = []
-    mean_list = []
     rf_auroc_list = []
     rf_auprc_list = []
 
     tree_auroc_list = []
     tree_auprc_list = []
+
+    dropped_samples_list = []
 
     result_path = create_result_path(
         method_name,
@@ -69,18 +72,12 @@ def downstream_experiment(
     feature_weights_save_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
-    feature_weight_list = load_weights(feature_weights_save_path)
+    feature_weights_list = load_weights(feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
-
-    draw_with_feature_weights = (
-        True
-        if sample_weighting_method.__name__ == "feature_weighted_repeated_MRS"
-        else False
-    )
 
     for i in trange(number_of_repetitions):
         N, R = sample(
@@ -96,6 +93,7 @@ def downstream_experiment(
 
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
+            feature_weights = np.array(feature_weights_list[i])
         else:
             sample_weights, feature_weights = sample_weighting_method(
                 N=N,
@@ -103,34 +101,34 @@ def downstream_experiment(
                 columns=columns,
                 save_path=result_path,
                 bias_variable=target,
-                mean_list=mean_list,
-                auroc_list=rf_auroc_list,
-                auprc_list=rf_auprc_list,
-                drop=2,
-                early_stopping=False,
+                drop=drop,
+                early_stopping=True,
                 random_generator=random_generator,
-                max_patience=100,
                 target=target,
-                budgets=budget,
+                budgets=[budget],
+                validation_method=validation_method,
             )
-            sample_weight_list.append(sample_weights.tolist())
             save_weights(sample_weights_save_path, sample_weight_list)
+            save_weights(feature_weights_save_path, feature_weights_list)
 
-            feature_weight_list.append(feature_weights.tolist())
-            save_weights(feature_weights_save_path, feature_weight_list)
+        dropped_samples = np.count_nonzero(sample_weights == 0.0)
+        dropped_samples_list.append(dropped_samples)
+        feature_weights_list.append(feature_weights.tolist())
+        sample_weight_list.append(sample_weights.tolist())
 
         if explicit_weights:
-            (
-                weighted_mmd,
-                relative_bias,
-            ) = compute_metrics(
+            draw_with_feature_weights = (
+                True
+                if sample_weighting_method.__name__ == "feature_weighted_repeated_MRS"
+                else False
+            )
+            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
                 R,
                 scaler,
                 columns,
                 columns,
                 sample_weights,
-                feature_weights,
                 gamma,
             )
 
@@ -143,6 +141,7 @@ def downstream_experiment(
                 target,
                 random_state=seed,
                 draw_with_feature_weights=draw_with_feature_weights,
+                class_weight="balanced",
             )
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
@@ -156,8 +155,8 @@ def downstream_experiment(
                 draw_with_feature_weights=draw_with_feature_weights,
             )
 
-            plot_weights(sample_weights, sample_weights_save_path, i)
-            plot_weights(feature_weights, feature_weights_save_path, i)
+            plot_sample_weights(sample_weights, sample_weights_save_path, i)
+            plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
             weighted_mmds_list.append(weighted_mmd)
             biases_list.append(relative_bias)
@@ -174,6 +173,7 @@ def downstream_experiment(
         rf_auprc_list,
         tree_auroc_list,
         tree_auprc_list,
+        dropped_samples_list,
         len(N),
         explicit_weights=explicit_weights,
     )

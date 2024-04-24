@@ -64,7 +64,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
             relative_bias_list,
             mrs_iteration,
             roc_list,
-        ) = maximum_representative_subsampling.repeated_MRS(
+        ) = maximum_representative_subsampling.mrs(
             scaled_N,
             scaled_R,
             columns,

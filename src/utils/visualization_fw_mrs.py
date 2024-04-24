@@ -3,7 +3,16 @@ import seaborn as sns
 import numpy as np
 
 sns.set_theme(style="ticks")
-line_styles = ["solid", "dotted", "dashdot", (0, (3, 10, 1, 10))]
+line_styles = [
+    "solid",
+    "dotted",
+    "dashdot",
+    (0, (3, 10, 1, 10)),
+    (0, (1, 10)),
+    (0, (1, 1)),
+    (5, (10, 3)),
+    (0, (3, 1, 1, 1, 1, 1)),
+]
 
 
 def plot_budget_comparison_auroc(

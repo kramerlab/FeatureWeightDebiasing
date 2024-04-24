@@ -92,6 +92,8 @@ def load_gbs_gesis():
 
     N = gbs.copy()
     R = gesis.copy()
+    N["BRS6"] = 6 - N["BRS6"]
+    N[N["Erwerbstaetigkeit"] == 4] = 3
 
     N["label"] = 1
     R["label"] = 0

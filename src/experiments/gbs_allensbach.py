@@ -7,11 +7,12 @@ from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
 from utils.statistics import logistic_regression
 from utils.visualization import (
     plot_statistical_analysis,
-    plot_weights,
+    plot_sample_weights,
 )
 
 bins = 25
 seed = 5
+
 
 def gbs_allensbach_experiment(
     df,
@@ -57,7 +58,7 @@ def gbs_allensbach_experiment(
             mmd_list=mmd_list,
             drop=1,
             early_stopping=True,
-            random_generator=random_generator
+            random_generator=random_generator,
         )
 
         (
@@ -68,7 +69,7 @@ def gbs_allensbach_experiment(
             scaled_N, scaled_R, weights, scaler, scale_columns, columns, gamma
         )
 
-        plot_weights(weights, result_path / "weights", i)
+        plot_sample_weights(weights, result_path / "weights", i)
         remaining_samples = np.count_nonzero(weights != 0)
 
         weighted_mmds_list.append(weighted_mmd)
@@ -77,7 +78,7 @@ def gbs_allensbach_experiment(
         remaining_samples_list.append(remaining_samples)
 
         remaining_samples = np.count_nonzero(weights != 0)
-        plot_weights(weights, result_path, i, "GBS")
+        plot_sample_weights(weights, result_path, i, "GBS")
 
     result_dict = {
         "MMDs": weighted_mmd,
@@ -105,6 +106,7 @@ def gbs_allensbach_experiment(
     plot_statistical_analysis(
         bins, scaled_N[columns], scaled_R[columns], result_path, weights, method
     )
+
 
 def create_result_path(method):
     """Creates the result path and makes the directory.

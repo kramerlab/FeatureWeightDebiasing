@@ -24,6 +24,8 @@ def weighting_experiment(
     budget: float,
     drop: int,
     transformation_method,
+    validation_method,
+    bias_fraction,
 ) -> None:
     """_summary_
 
@@ -63,6 +65,8 @@ def weighting_experiment(
         budget=budget,
         drop=drop,
         transformation_method=transformation_method,
+        validation_method=validation_method,
+        bias_fraction=bias_fraction,
     )
 
 
@@ -78,4 +82,6 @@ if __name__ == "__main__":
         args.budget,
         args.drop,
         args.transformation_method,
+        args.validation_method,
+        args.bias_fraction,
     )

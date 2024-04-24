@@ -71,7 +71,7 @@ def soft_mrs_weighting(
         predictions_N = predictions[: len(N), 1]
         weights_N = update_weights(weights_N, predictions_N, exponential=exponential)
 
-    return best_weights
+    return best_weights, np.ones(len(columns))
 
 
 def train_weighted_random_forest(
@@ -92,7 +92,7 @@ def train_weighted_random_forest(
             exponential=exponential,
         ),
         greater_is_better=False,
-        response_method="predict_proba"
+        response_method="predict_proba",
     )
     tree = DecisionTreeClassifier(
         max_features="sqrt",

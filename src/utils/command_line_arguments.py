@@ -14,7 +14,7 @@ from weighting_methods import (
     feature_weighted_repeated_MRS,
     uniform_sample_weighting,
     train_domain_adversarial_network,
-    repeated_MRS,
+    mrs,
 )
 
 
@@ -49,11 +49,6 @@ dataset_list = [
     "loan_prediction",
 ]
 
-mrs_ablation_experiments = [
-    "random",
-    "cross-validation",
-]
-
 down_stream_data_sets = [
     "breast_cancer",
     "folktables_employment",
@@ -75,28 +70,14 @@ def parse_command_line_arguments():
     )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--number_of_repetitions", default=50, type=int)
-    parser.add_argument("--budget", default=0.0, type=float)
+    parser.add_argument("--budget", default=0.01, type=float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
     parser.add_argument("--drop", default=1, type=int)
     parser.add_argument("--transformation_method", default="temperature")
+    parser.add_argument("--validation_method", default="random_forest")
+    parser.add_argument("--bias_fraction", default=0.25, type=float)
 
-    return parser.parse_args()
-
-
-def parse_mrs_ablation_command_line_arguments():
-    """Parses the command line arguments for the ablation study.
-
-    :return: Parsed command line arguments for the ablation study.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--ablation_experiment", choices=mrs_ablation_experiments, required=True
-    )
-    parser.add_argument("--dataset_name", choices=dataset_list, required=True)
-    parser.add_argument("--bias_type", choices=bias_choice, default="none")
-    parser.add_argument("--number_of_repetitions", default=100, type=int)
-    parser.add_argument("--drop", default=1, type=int)
     return parser.parse_args()
 
 
@@ -138,7 +119,7 @@ def get_sample_weighting_function(method_name):
     elif method_name == "fw-sampling-mrs":
         return feature_weighted_repeated_MRS
     elif method_name == "mrs":
-        return repeated_MRS
+        return mrs
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "dann":

@@ -5,7 +5,7 @@ from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
 from utils.visualization import (
     plot_statistical_analysis,
     plot_results_with_variance,
-    plot_weights,
+    plot_sample_weights,
 )
 
 
@@ -67,7 +67,7 @@ def gbs_gesis_experiment(
     )
 
     remaining_samples = np.count_nonzero(weights != 0)
-    plot_weights(weights, visualisation_path, 0, "GBS")
+    plot_sample_weights(weights, visualisation_path, 0, "GBS")
 
     if "neural_network_mmd_loss" in method:
         biases_path = visualisation_path / "MMDs"

@@ -13,7 +13,7 @@ from utils.data_loader import load_dataset
 from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
 from utils.statistics import logistic_regression
 from utils.visualization import plot_statistical_analysis
-from weighting_methods import repeated_MRS, soft_mrs_weighting
+from weighting_methods import mrs, soft_mrs_weighting
 
 
 bins = 25
@@ -78,7 +78,7 @@ def statistical_analysis(
     )
 
     for i in trange(n_repeats):
-        weights_mrs = repeated_MRS(
+        weights_mrs = mrs(
             scaled_N,
             scaled_R,
             scale_columns,

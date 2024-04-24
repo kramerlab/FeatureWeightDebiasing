@@ -18,12 +18,12 @@ from utils.metrics import (
 max_int = 2**32 - 1
 
 
-def mrs(
+def mrs_step(
     N,
     R,
     columns,
     n_drop: int = 1,
-    cv=5,
+    n_splits=5,
     class_weights="balanced",
     random_state=None,
     *args,
@@ -41,7 +41,7 @@ def mrs(
     :return: _description_
     """
     all_predictions = np.zeros(len(N))
-    kf = KFold(n_splits=cv, shuffle=True, random_state=random_state)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for train_index, test_index in kf.split(N):
         N_train, N_test = N.iloc[train_index], N.iloc[test_index]
         data = pd.concat([N_train, R])
@@ -93,13 +93,13 @@ def mrs_without_cv(
     return N.drop(N.index[drop_ids]), drop_index
 
 
-def repeated_MRS(
+def mrs(
     N,
     R,
     columns,
     delta=0.005,
     early_stopping=False,
-    mrs_function=mrs,
+    mrs_function=mrs_step,
     return_metrics=False,
     compute_bias=True,
     bias_variable=None,
@@ -108,6 +108,7 @@ def repeated_MRS(
     class_weights="balanced",
     drop=1,
     random_generator=None,
+    max_patience=20,
     *args,
     **attributes
 ):
@@ -135,10 +136,11 @@ def repeated_MRS(
     number_of_iterations = (len(N) - n_test_splits) // drop
     mrs_iteration = 0
     roc_iteration = (len(N) // drop // 3.5) + 1
-    dropping_N = N.copy()
+    dropped_N = N.copy()
     weights = np.ones(len(N))
-    dropping_N = dropping_N.reset_index(drop=True)
+    dropped_N = dropped_N.reset_index(drop=True)
     best_difference = np.inf
+    current_patience = 0
 
     # Compute and save mmd inputs to save time
     # Start values
@@ -160,7 +162,7 @@ def repeated_MRS(
             )
         )
     auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-        pd.concat([dropping_N, R]),
+        pd.concat([dropped_N, R]),
         columns,
         calculate_roc=True,
         random_state=random_generator.randint(max_int),
@@ -177,20 +179,20 @@ def repeated_MRS(
     auc_list.append(auroc)
 
     for i in trange(number_of_iterations):
-        dropping_N, drop_ids = mrs_function(
-            N=dropping_N,
+        dropped_N, drop_ids = mrs_function(
+            N=dropped_N,
             R=R,
             columns=columns,
             n_drop=drop,
             class_weights=class_weights,
-            cv=n_pu_cv,
+            n_splits=n_pu_cv,
             random_state=random_generator.randint(max_int),
         )
-        weights[drop_ids] = 0
+        weights[drop_ids] = 0.0
 
         if (i + 1) % roc_iteration == 0:
             auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-                pd.concat([dropping_N, R]),
+                pd.concat([dropped_N, R]),
                 columns,
                 calculate_roc=True,
                 n_test_splits=n_test_splits,
@@ -198,7 +200,7 @@ def repeated_MRS(
             roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
         else:
             auroc = compute_test_metrics_mrs(
-                pd.concat([dropping_N, R]),
+                pd.concat([dropped_N, R]),
                 columns,
                 random_state=random_generator.randint(max_int),
                 n_test_splits=n_test_splits,
@@ -230,11 +232,15 @@ def repeated_MRS(
             best_weights = weights.copy().astype(np.float64)
             mrs_iteration = (i + 1) * drop
             best_difference = auc_difference
+            current_patience = 0
+        else:
+            current_patience += 1
 
         if (
-            (len(dropping_N) - n_test_splits) <= n_test_splits
-            or ((best_difference <= delta) and early_stopping)
-            or len(dropping_N) <= drop
+            ((best_difference <= delta) and early_stopping)
+            or len(dropped_N) <= drop
+            or len(dropped_N) <= n_test_splits
+            or current_patience >= max_patience
         ):
             break
 
@@ -243,7 +249,7 @@ def repeated_MRS(
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return best_weights / best_weights.sum()
+        return best_weights / best_weights.sum(), np.ones(len(columns))
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

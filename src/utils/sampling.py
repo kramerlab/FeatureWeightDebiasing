@@ -54,7 +54,7 @@ def sample(
         temperature = -(1 / 20)
         sample_weights = np.exp(temperature * differences)
         N = train.sample(
-            frac=bias_fraction,
+            frac=bias_fraction + 0.15,
             weights=sample_weights,
             random_state=sampling_random_generator,
         )
@@ -89,16 +89,17 @@ def sample_with_test_set(
     # Sample from the data set because the complete one is too big.
     if len(df) > 7500:
         df = df.sample(7500, random_state=sampling_random_generator).copy()
-    test = df.sample(
+    T = df.sample(
         frac=test_fraction, replace=False, random_state=sampling_random_generator
-    ).copy()
-    tmp_df = df.drop(test.index).copy().reset_index(drop=True)
+    )
+    tmp_df = df.drop(T.index)
     train = tmp_df.sample(
         frac=train_fraction, replace=False, random_state=sampling_random_generator
-    ).copy()
+    )
+    R = tmp_df.drop(train.index)
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]
-    R = tmp_df.drop(train.index).copy().reset_index(drop=True)
+    
 
     if bias_type == "less_positive_class":
         N = sample_N(
@@ -126,7 +127,9 @@ def sample_with_test_set(
         weight = -(1 / 20)
         sample_weights = np.exp(weight * differences)
         N = train.sample(
-            frac=0.9, weights=sample_weights, random_state=sampling_random_generator
+            frac=bias_fraction,
+            weights=sample_weights,
+            random_state=sampling_random_generator,
         )
     else:
         N = train.reset_index(drop=True)
@@ -134,7 +137,7 @@ def sample_with_test_set(
     N["label"] = 1
     R["label"] = 0
 
-    return N, R, test
+    return N, R, T
 
 
 def sample_N(positive_samples, negative_samples, positive_fraction, negative_fraction):

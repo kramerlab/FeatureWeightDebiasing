@@ -1,11 +1,14 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
+from experiments.downstream_task import load_weights
 from utils.statistics import create_result_path
 from utils.sampling import sample
 from weighting_methods.feature_weighted_maximum_representative_subsampling import (
     feature_weighted_repeated_MRS,
 )
+from weighting_methods.maximum_representative_subsampling import mrs
+
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
     plot_feature_importance,
@@ -28,6 +31,7 @@ def feature_weight_budget_comparison_experiment(
     drop=1,
     bias_fraction=0.25,
     transformation_method="temperature",
+    validation_method="both",
     **args,
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -45,9 +49,10 @@ def feature_weight_budget_comparison_experiment(
     """
 
     budgets = (
-        [1.0, 0.1, 0.01, 0.005]
+        # [None, 0.01, 0.005]
+        [None, 0.1, 0.01, 0.001, 0.0001]
         if transformation_method == "temperature"
-        else [0, 0.25, 0.5, 0.9]
+        else [None, 0.5, 0.9]
     )
     result_path = create_result_path(
         method_name,
@@ -56,11 +61,16 @@ def feature_weight_budget_comparison_experiment(
         experiment_name="budget_comparison",
         bias_fraction=bias_fraction,
     )
-    result_path = result_path / transformation_method
+    result_path = result_path / transformation_method / validation_method
     result_path.mkdir(parents=True, exist_ok=True)
+
+    saved_weights_path = result_path / "saved_weights"
+    saved_weights_path.mkdir(parents=True, exist_ok=True)
 
     auroc_path = result_path / "aurocs"
     auroc_path.mkdir(exist_ok=True, parents=True)
+
+    feature_weights_list = []
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -68,43 +78,52 @@ def feature_weight_budget_comparison_experiment(
     sample_df = df.copy()
     feature_weighted_aurocs_list = []
     feature_importances_list = []
-    feature_weights_list = []
-    N, R = sample(
-        bias_type,
-        sample_df,
-        target,
-        train_fraction=0.5,
-        bias_fraction=bias_fraction,
-        columns=columns,
-    )
+
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+        N = sample_df[sample_df["label"] == 1]
+        R = sample_df[sample_df["label"] == 0]
+    else:
+        N, R = sample(
+            bias_type,
+            sample_df,
+            target,
+            train_fraction=0.5,
+            bias_fraction=bias_fraction,
+            columns=columns,
+        )
 
     for i in trange(number_of_repetitions):
-        feature_weighted_aurocs, feature_importances, feature_weights, mrs_iteration = (
-            feature_weighted_repeated_MRS(
-                N=N,
-                R=R,
-                columns=columns,
-                save_path=result_path,
-                bias_variable=target,
-                drop=drop,
-                early_stopping=False,
-                random_generator=random_generator,
-                max_patience=len(N),
-                target=target,
-                budgets=budgets,
-                return_auroc=True,
-                feature_weight_method=transformation_method,
-            )
+
+        (
+            random_forest_feature_weighted_aurocs,
+            feature_importances,
+            feature_weights,
+            _,
+        ) = feature_weighted_repeated_MRS(
+            N=N,
+            R=R,
+            columns=columns,
+            save_path=result_path,
+            bias_variable=target,
+            drop=drop,
+            early_stopping=False,
+            random_generator=random_generator,
+            max_patience=len(N),
+            target=target,
+            budgets=budgets,
+            return_auroc=True,
+            feature_weight_method=transformation_method,
+            validation_method=validation_method,
         )
 
         number_of_samples = len(N)
-        feature_weighted_aurocs_list.append(feature_weighted_aurocs)
+        feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
         feature_importances_list.append(feature_importances)
         feature_weights_list.append(feature_weights)
 
         # Visualize individual run results
         plot_budget_comparison_auroc(
-            feature_weighted_aurocs,
+            random_forest_feature_weighted_aurocs,
             number_of_samples,
             drop,
             auroc_path / f"iteration_{i}",

@@ -102,7 +102,7 @@ def plot_feature_histograms(
     plt.clf()
 
 
-def plot_weights(weights, path, iteration, title="", bins=25):
+def plot_sample_weights(weights, path, iteration, title="", bins=100):
     """Plot the weights for a method
 
     :param weights: Weights
@@ -113,6 +113,21 @@ def plot_weights(weights, path, iteration, title="", bins=25):
     """
     path.mkdir(exist_ok=True)
     sns.histplot(x=weights, bins=bins).set_title(title)
+    plt.savefig(f"{path}/weights_{iteration}.pdf", bbox_inches="tight")
+    plt.clf()
+
+
+def plot_feature_weights(weights, path, iteration, title=""):
+    """Plot the weights for a method
+
+    :param weights: Weights
+    :param path: Save path
+    :param iteration: From which iteration are the weights
+    :param title: Title for the plot, defaults to ""
+    :param bins: How many bin are used, defaults to 25
+    """
+    path.mkdir(exist_ok=True)
+    sns.barplot(weights).set_title(title)
     plt.savefig(f"{path}/weights_{iteration}.pdf", bbox_inches="tight")
     plt.clf()
 

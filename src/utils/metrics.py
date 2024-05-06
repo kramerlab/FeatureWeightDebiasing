@@ -6,7 +6,7 @@ from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
@@ -211,6 +211,9 @@ def compute_classification_metrics_tree(
     label,
     random_state=None,
     draw_with_feature_weights=False,
+    n_splits=10,
+    splitter="feature_weighted_best",
+    max_features="sqrt",
 ):
     """Computes classification metrics for downstream tasks
 
@@ -227,9 +230,11 @@ def compute_classification_metrics_tree(
         sample_weights,
         feature_weights,
         random_state=random_state,
-        n_splits=10,
+        n_splits=n_splits,
         speedup=False,
         draw_with_feature_weights=draw_with_feature_weights,
+        splitter=splitter,
+        max_features=max_features,
     )
     y_predictions = clf.predict_proba(R[columns])[:, 1]
     auroc_score = roc_auc_score(R[label], y_predictions)
@@ -251,6 +256,7 @@ def compute_classification_metrics_random_forest(
     class_weight=None,
     splitter="feature_weighted_best",
     n_estimators=1000,
+    max_depth=None,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -272,6 +278,7 @@ def compute_classification_metrics_random_forest(
         class_weight=class_weight,
         splitter=splitter,
         n_estimators=n_estimators,
+        max_depth=max_depth,
     )
     y_predictions = clf.predict_proba(R[columns])[:, 1]
     auroc_score = roc_auc_score(R[label], y_predictions)
@@ -308,30 +315,74 @@ def train_feature_weighted_random_forest(
         class_weight=class_weight,
         max_features=max_features,
         n_jobs=-1,
+        bootstrap=True,
     )
-    # parameter_grid = {
-    #    "min_impurity_decrease": [
-    #        0.001,
-    #       0.01,
-    #        0.1,
-    #    ]
-    # }
-    # grid = GridSearchCV(
-    #    # param_grid=parameter_grid,
-    #    estimator=clf,
-    #    cv=cv,
-    #    refit=True,
-    #    scoring="roc_auc",
-    #    n_jobs=-1,
-    # )
-    clf.fit(
+    parameter_grid = {
+        "min_impurity_decrease": [
+            0.001,
+            0.01,
+            0.1,
+        ]
+    }
+    grid = GridSearchCV(
+        param_grid=parameter_grid,
+        estimator=clf,
+        cv=cv,
+        refit=True,
+        scoring="roc_auc",
+        n_jobs=-1,
+    )
+    return grid.fit(
         X,
         y,
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
 
-    return clf
+
+def compute_classification_metrics_boosting(
+    N,
+    R,
+    columns,
+    sample_weights,
+    feature_weights,
+    label,
+    draw_with_feature_weights=False,
+    random_state=None,
+    n_splits=10,
+    class_weight=None,
+    splitter="feature_weighted_best",
+    n_estimators=100,
+    max_features="sqrt",
+    max_depth=None,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    clf = train_boosting_classifier(
+        N[columns],
+        N[label],
+        sample_weights,
+        feature_weights,
+        random_state=random_state,
+        n_splits=n_splits,
+        draw_with_feature_weights=draw_with_feature_weights,
+        class_weight=class_weight,
+        splitter=splitter,
+        n_estimators=n_estimators,
+        max_features=max_features,
+    )
+    y_predictions = clf.predict_proba(R[columns])[:, 1]
+    auroc_score = roc_auc_score(R[label], y_predictions)
+    auprc = average_precision_score(R[label], y_predictions)
+
+    return auroc_score, auprc
 
 
 def train_feature_weighted_classifier_forest(
@@ -510,6 +561,7 @@ def train_tree_classifier_auroc(
     random_state=None,
     draw_with_feature_weights=False,
     splitter="feature_weighted_best",
+    max_features="sqrt",
     **kwargs,
 ):
     """Train a classifier to measure the auroc
@@ -522,7 +574,6 @@ def train_tree_classifier_auroc(
     :return: Trained classifier
     """
 
-    max_features = "sqrt" if draw_with_feature_weights else None
     clf = DecisionTreeClassifier(
         random_state=np.random.RandomState(random_state),
         max_features=max_features,
@@ -580,6 +631,7 @@ def train_random_forest_classifier(
     class_weight=None,
     splitter="feature_weighted_best",
     n_estimators=500,
+    max_depth=None,
     **kwargs,
 ):
     """Train a classifier to measure the auroc
@@ -596,6 +648,7 @@ def train_random_forest_classifier(
         splitter=splitter,
         class_weight=class_weight,
         n_estimators=n_estimators,
+        max_depth=max_depth,
     )
 
     parameter_grid = {
@@ -608,6 +661,7 @@ def train_random_forest_classifier(
             0.1,
         ]
     }
+
     cv = StratifiedKFold(
         n_splits=n_splits,
         shuffle=True,
@@ -616,14 +670,58 @@ def train_random_forest_classifier(
     grid = GridSearchCV(
         clf, param_grid=parameter_grid, cv=cv, n_jobs=-1, refit=True, scoring="roc_auc"
     )
-    grid = grid.fit(
+    return grid.fit(
         X_train,
         y_train,
         sample_weight=sample_weights,
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
-    return grid
+
+
+def train_boosting_classifier(
+    X_train,
+    y_train,
+    sample_weights,
+    feature_weights=None,
+    n_splits=5,
+    draw_with_feature_weights=False,
+    random_state=None,
+    class_weight=None,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    max_features="sqrt",
+    **kwargs,
+):
+    """Train a classifier to measure the auroc
+
+    :param X_train: Training features
+    :param y_train: Training targets
+    :param weights: Sample weights, defaults to None
+    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param n_splits: Number of cross-validation iterations, defaults to 5
+    :return: Trained classifier
+    """
+    estimator = DecisionTreeClassifier(
+        random_state=np.random.RandomState(random_state),
+        max_features=max_features,
+        splitter=splitter,
+        max_depth=1,
+    )
+    clf = AdaBoostClassifier(
+        estimator=estimator,
+        random_state=random_state,
+        n_estimators=n_estimators,
+        algorithm="SAMME",
+    )
+
+    return clf.fit(
+        X_train,
+        y_train,
+        sample_weight=sample_weights,
+        feature_weights=feature_weights,
+        draw_with_feature_weights=draw_with_feature_weights,
+    )
 
 
 def calculate_mean_rocs(rocs):

@@ -133,20 +133,20 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
     random_generator=None,
     class_weight="balanced",
     return_auroc=False,
-    n_test_splits=5,
+    n_test_splits=10,
     n_pu_splits=5,
     max_patience=5,
     feature_weight_method="temperature",
     validation_method="random_forest",
     splitter="feature_weighted_best",
-    n_estimators=500,
+    n_estimators=100,
     *args,
     **attributes,
 ):
@@ -167,7 +167,7 @@ def feature_weighted_repeated_MRS(
     :param random_generator: Random generator to create random_states to make results reproducible
     :return: Sample weights or test metrics
     """
-    number_of_iterations = (len(N) - n_test_splits) // drop
+    number_of_iterations = (len(N) - (n_test_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
     best_difference = np.inf
@@ -176,6 +176,9 @@ def feature_weighted_repeated_MRS(
     draw_with_feature_weights = True
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
+    dropped_samples_dict = {}
+    for budget in budgets:
+        dropped_samples_dict[budget] = 0
     feature_importance_list = []
 
     feature_weight_method = (
@@ -212,77 +215,31 @@ def feature_weighted_repeated_MRS(
                 if budget is None or budget == 0.0
                 else feature_weight_method(budget, feature_importance)
             )
-            if validation_method == "both":
-                tree_auroc = compute_test_metrics_fw_mrs(
-                    dropped_N,
-                    R,
-                    columns,
-                    random_state=rand_int,
-                    feature_weights=feature_weights,
-                    method=train_feature_weighted_decision_tree,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    class_weight="balanced",
-                    max_features="sqrt",
-                    splitter=splitter,
-                    n_splits_test=n_test_splits,
-                    n_estimators=n_estimators,
-                )
-                if budget is None or budget == 0.0:
-                    key = "MRS DT"
-                else:
-                    key = f"FW-MRS DT {budget}"
-                if not key in feature_weighted_aurocs_dict:
-                    feature_weighted_aurocs_dict[key] = []
-                    feature_weights_dict[key] = []
-                feature_weighted_aurocs_dict[key].append(tree_auroc)
-                feature_weights_dict[key].append(list(feature_weights))
 
-                forest_auroc = compute_test_metrics_fw_mrs(
-                    dropped_N,
-                    R,
-                    columns,
-                    random_state=rand_int,
-                    feature_weights=feature_weights,
-                    method=train_feature_weighted_random_forest,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    class_weight="balanced",
-                    max_features="sqrt",
-                    splitter=splitter,
-                    n_splits_test=n_test_splits,
-                    n_estimators=n_estimators,
-                )
+            auroc = compute_test_metrics_fw_mrs(
+                dropped_N,
+                R,
+                columns,
+                random_state=rand_int,
+                feature_weights=feature_weights,
+                method=validation_method,
+                draw_with_feature_weights=draw_with_feature_weights,
+                class_weight=None,
+                max_features="sqrt",
+                splitter=splitter,
+                n_splits_test=n_test_splits,
+                n_estimators=n_estimators,
+            )
 
-                if budget is None or budget == 0.0:
-                    key = "MRS RF"
-                else:
-                    key = f"FW-MRS RF {budget}"
-                if not key in feature_weighted_aurocs_dict:
-                    feature_weighted_aurocs_dict[key] = []
-                    feature_weights_dict[key] = []
-                feature_weighted_aurocs_dict[key].append(forest_auroc)
-                feature_weights_dict[key].append(list(feature_weights))
-                auroc = forest_auroc
-            else:
-                auroc = compute_test_metrics_fw_mrs(
-                    dropped_N,
-                    R,
-                    columns,
-                    random_state=rand_int,
-                    feature_weights=feature_weights,
-                    method=validation_method,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    class_weight="balanced",
-                    max_features="sqrt",
-                    splitter=splitter,
-                    n_splits_test=n_test_splits,
-                    n_estimators=n_estimators,
-                )
+            if budget not in feature_weighted_aurocs_dict:
+                feature_weighted_aurocs_dict[budget] = []
+                feature_weights_dict[budget] = []
+            feature_weighted_aurocs_dict[budget].append(auroc)
+            feature_weights_dict[budget].append(list(feature_weights))
 
-                if budget not in feature_weighted_aurocs_dict:
-                    feature_weighted_aurocs_dict[budget] = []
-                    feature_weights_dict[budget] = []
-                feature_weighted_aurocs_dict[budget].append(auroc)
-                feature_weights_dict[budget].append(list(feature_weights))
+            auc_difference = abs(auroc - 0.5)
+            if (auc_difference <= delta) and (dropped_samples_dict[budget] == 0):
+                dropped_samples_dict[budget] = i * drop
 
         auc_difference = abs(auroc - 0.5)
         if (auc_difference + delta) <= best_difference:
@@ -311,6 +268,7 @@ def feature_weighted_repeated_MRS(
             feature_weighted_aurocs_dict,
             feature_importance_list,
             feature_weights_dict,
+            dropped_samples_dict,
             mrs_iteration,
         )
 

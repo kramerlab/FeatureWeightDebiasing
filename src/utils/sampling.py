@@ -20,51 +20,80 @@ def sample(
     """
     # Sample from the data set because the complete one is too big.
     if len(df) > 5000:
-        df = df.sample(5000, random_state=sampling_random_generator).copy()
+        df = df.sample(5000, random_state=sampling_random_generator, replace=False)
     train = df.sample(
         frac=train_fraction, replace=False, random_state=sampling_random_generator
-    ).copy()
-    positive_samples = train[train[bias_variable] == 1]
-    negative_samples = train[train[bias_variable] == 0]
-    R = df.drop(train.index).copy().reset_index(drop=True)
-
-    if bias_type == "less_positive_class":
-        N = sample_N(
-            positive_samples,
-            negative_samples,
-            positive_fraction=bias_fraction,
-            negative_fraction=1,
-        )
-    elif bias_type == "less_negative_class":
-        N = sample_N(
-            positive_samples,
-            negative_samples,
-            positive_fraction=1,
-            negative_fraction=bias_fraction,
-        )
-    elif bias_type == "mean_difference":
-        mean_sample = df[columns].mean().values
-        differences = (
-            np.linalg.norm(
-                train[columns].values - mean_sample,
-                axis=1,
-            )
-            ** 3
-        )
-        temperature = -(1 / 20)
-        sample_weights = np.exp(temperature * differences)
-        N = train.sample(
-            frac=bias_fraction + 0.15,
-            weights=sample_weights,
-            random_state=sampling_random_generator,
-        )
-    else:
-        N = train.reset_index(drop=True)
+    )
+    R = df.drop(train.index).reset_index(drop=True)
+    N = sample_N(
+        bias_type,
+        bias_fraction,
+        columns,
+        train,
+        bias_variable,
+    )
 
     N["label"] = 1
     R["label"] = 0
 
     return N, R
+
+
+def sample_N(bias_type, bias_fraction, columns, train, bias_variable):
+    positive_samples = train[train[bias_variable] == 1]
+    negative_samples = train[train[bias_variable] == 0]
+    if bias_type in ("less_positive_class", "less_negative_class"):
+        if bias_type == "less_positive_class":
+            positive_fraction = bias_fraction
+            negative_fraction = 1
+        elif bias_type == "less_negative_class":
+            positive_fraction = 1
+            negative_fraction = bias_fraction
+
+        N = sample_class_biased_N(
+            positive_samples,
+            negative_samples,
+            positive_fraction=positive_fraction,
+            negative_fraction=negative_fraction,
+        )
+    elif bias_type == "mean_difference":
+        N = less_outlier_sampling(train, bias_fraction, columns)
+    elif bias_type == "most_important_feature":
+        N = bias_most_important_feature(train, bias_fraction, columns)
+    else:
+        N = train.reset_index(drop=True)
+    return N
+
+
+def bias_most_important_feature(train, bias_fraction, columns):
+    bias_column = "WKHP"
+    unbiased_probabilities = (train.WKHP.sort_values().value_counts() / len(train))
+    mean_wkhp = np.mean(train.WKHP)
+    sample_percentage = unbiased_probabilities[train.WKHP.values].values
+    sample_percentage[train.WKHP <= mean_wkhp] = sample_percentage[train.WKHP < mean_wkhp] - 0.1
+    sample_percentage[train.WKHP > mean_wkhp] = sample_percentage[train.WKHP > mean_wkhp] + 0.1
+    sample_percentage[sample_percentage < 0] = 0
+    N = train.sample(frac=bias_fraction, replace=False, weights=sample_percentage)
+    return N
+
+
+def less_outlier_sampling(train, bias_fraction, columns):
+    mean_sample = train[columns].mean().values
+    differences = (
+        np.linalg.norm(
+            train[columns].values - mean_sample,
+            axis=1,
+        )
+        ** 3
+    )
+    temperature = -(1 / 20)
+    sample_weights = np.exp(temperature * differences)
+    N = train.sample(
+        frac=bias_fraction + 0.15,
+        weights=sample_weights,
+        random_state=sampling_random_generator,
+    )
+    return N
 
 
 def sample_with_test_set(
@@ -92,47 +121,19 @@ def sample_with_test_set(
     T = df.sample(
         frac=test_fraction, replace=False, random_state=sampling_random_generator
     )
-    tmp_df = df.drop(T.index)
-    train = tmp_df.sample(
-        frac=train_fraction, replace=False, random_state=sampling_random_generator
+    df_without_T = df.drop(T.index)
+    R = df_without_T.sample(
+        frac=(1 - train_fraction), replace=False, random_state=sampling_random_generator
     )
-    R = tmp_df.drop(train.index)
-    positive_samples = train[train[bias_variable] == 1]
-    negative_samples = train[train[bias_variable] == 0]
-    
+    train = df_without_T.drop(R.index)
 
-    if bias_type == "less_positive_class":
-        N = sample_N(
-            positive_samples,
-            negative_samples,
-            positive_fraction=bias_fraction,
-            negative_fraction=1,
-        )
-    elif bias_type == "less_negative_class":
-        N = sample_N(
-            positive_samples,
-            negative_samples,
-            positive_fraction=1,
-            negative_fraction=bias_fraction,
-        )
-    elif bias_type == "mean_difference":
-        mean_sample = df[columns].mean().values
-        differences = (
-            np.linalg.norm(
-                train[columns].values - mean_sample,
-                axis=1,
-            )
-            ** 3
-        )
-        weight = -(1 / 20)
-        sample_weights = np.exp(weight * differences)
-        N = train.sample(
-            frac=bias_fraction,
-            weights=sample_weights,
-            random_state=sampling_random_generator,
-        )
-    else:
-        N = train.reset_index(drop=True)
+    N = sample_N(
+        bias_type,
+        bias_fraction,
+        columns,
+        train,
+        bias_variable,
+    )
 
     N["label"] = 1
     R["label"] = 0
@@ -140,7 +141,9 @@ def sample_with_test_set(
     return N, R, T
 
 
-def sample_N(positive_samples, negative_samples, positive_fraction, negative_fraction):
+def sample_class_biased_N(
+    positive_samples, negative_samples, positive_fraction, negative_fraction
+):
     """Samples a biased data set
 
     :param positive_samples: Samples of the positive class

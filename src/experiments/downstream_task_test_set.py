@@ -87,7 +87,7 @@ def downstream_experiment_with_test_set(
             bias_type,
             sample_df,
             target,
-            train_fraction=0.4,
+            train_fraction=0.5,
             bias_fraction=bias_fraction,
             test_fraction=0.2,
             columns=columns,

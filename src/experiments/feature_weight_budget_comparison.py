@@ -1,13 +1,12 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
-from experiments.downstream_task import load_weights
 from utils.statistics import create_result_path
 from utils.sampling import sample
 from weighting_methods.feature_weighted_maximum_representative_subsampling import (
     feature_weighted_repeated_MRS,
 )
-from weighting_methods.maximum_representative_subsampling import mrs
+import numpy as np
 
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
@@ -71,6 +70,7 @@ def feature_weight_budget_comparison_experiment(
     auroc_path.mkdir(exist_ok=True, parents=True)
 
     feature_weights_list = []
+    dropped_samples_list = []
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -98,6 +98,7 @@ def feature_weight_budget_comparison_experiment(
             random_forest_feature_weighted_aurocs,
             feature_importances,
             feature_weights,
+            dropped_samples,
             _,
         ) = feature_weighted_repeated_MRS(
             N=N,
@@ -120,6 +121,7 @@ def feature_weight_budget_comparison_experiment(
         feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
         feature_importances_list.append(feature_importances)
         feature_weights_list.append(feature_weights)
+        dropped_samples_list.append(dropped_samples)
 
         # Visualize individual run results
         plot_budget_comparison_auroc(
@@ -145,12 +147,30 @@ def feature_weight_budget_comparison_experiment(
     )
 
     with open(
-        result_path / f"feature_weighted_aurocs.json", "w", encoding="utf-8"
+        result_path / "feature_weighted_aurocs.json", "w", encoding="utf-8"
     ) as file:
         json.dump(feature_weighted_aurocs_list, file, indent=4)
 
-    with open(result_path / f"feature_importances.json", "w", encoding="utf-8") as file:
+    with open(result_path / "feature_importances.json", "w", encoding="utf-8") as file:
         json.dump(feature_importances_list, file, indent=4)
 
-    with open(result_path / f"feature_weights.json", "w", encoding="utf-8") as file:
+    with open(result_path / "feature_weights.json", "w", encoding="utf-8") as file:
         json.dump(feature_weights_list, file, indent=4)
+
+    with open(result_path / "dropped_samples", "w", encoding="utf-8") as file:
+        json.dump(dropped_samples_list, file, indent=4)
+
+    save_mean_dropped_elements(result_path, dropped_samples_list)
+
+
+def save_mean_dropped_elements(result_path, dropped_samples_list):
+    mean_dropped_samples_dict = {}
+    for _, budget in dropped_samples_list[0].keys():
+        dropped_elements = []
+        for dictionary in dropped_samples_list:
+            dropped_elements.append(dictionary[budget])
+        mean_dropped_samples_dict[f"{budget} mean"] = np.mean(dropped_elements)
+        mean_dropped_samples_dict[f"{budget} std"] = np.std(dropped_elements)
+
+    with open(result_path / "mean_dropped_samples", "w", encoding="utf-8") as file:
+        json.dump(mean_dropped_samples_dict, file, indent=4)

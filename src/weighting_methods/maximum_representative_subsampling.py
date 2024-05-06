@@ -97,7 +97,7 @@ def mrs(
     N,
     R,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     mrs_function=mrs_step,
     return_metrics=False,

@@ -210,7 +210,6 @@ def compute_classification_metrics_tree(
     feature_weights,
     label,
     random_state=None,
-    draw_with_feature_weights=False,
     n_splits=10,
     splitter="feature_weighted_best",
     max_features="sqrt",
@@ -224,6 +223,7 @@ def compute_classification_metrics_tree(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
+    draw_with_feature_weights = False if feature_weights is None else True
     clf = train_tree_classifier_auroc(
         N[columns],
         N[label],
@@ -250,13 +250,13 @@ def compute_classification_metrics_random_forest(
     sample_weights,
     feature_weights,
     label,
-    draw_with_feature_weights=False,
     random_state=None,
     n_splits=10,
     class_weight=None,
     splitter="feature_weighted_best",
     n_estimators=1000,
     max_depth=None,
+    draw_with_feature_weights=True,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -267,6 +267,7 @@ def compute_classification_metrics_random_forest(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
+
     clf = train_random_forest_classifier(
         N[columns],
         N[label],
@@ -318,11 +319,8 @@ def train_feature_weighted_random_forest(
         bootstrap=True,
     )
     parameter_grid = {
-        "min_impurity_decrease": [
-            0.001,
-            0.01,
-            0.1,
-        ]
+        "min_samples_split": [10, 20, 50],
+        "min_samples_leaf": [5, 10, 25],
     }
     grid = GridSearchCV(
         param_grid=parameter_grid,
@@ -616,7 +614,7 @@ def train_tree_classifier_auroc(
         y_train,
         sample_weight=sample_weights,
         feature_weights=feature_weights,
-        draw_with_feature_weights=True,
+        draw_with_feature_weights=draw_with_feature_weights,
     )
 
 
@@ -651,15 +649,20 @@ def train_random_forest_classifier(
         max_depth=max_depth,
     )
 
+    # parameter_grid = {
+    #    "min_impurity_decrease": [
+    #        0.0,
+    #        0.001,
+    #        0.005,
+    #        0.01,
+    #        0.05,
+    #        0.1,
+    #    ]
+    # }
+
     parameter_grid = {
-        "min_impurity_decrease": [
-            0.0,
-            0.001,
-            0.005,
-            0.01,
-            0.05,
-            0.1,
-        ]
+        "min_samples_split": [4, 10, 20, 50],
+        "min_samples_leaf": [2, 5, 10, 25],
     }
 
     cv = StratifiedKFold(
@@ -764,13 +767,13 @@ def compute_test_metrics_fw_mrs(
     columns,
     random_state=None,
     feature_weights=None,
-    draw_with_feature_weights=False,
     method=train_feature_weighted_random_forest,
     class_weight="balanced",
     splitter="feature_weighted_best",
     max_features="sqrt",
     n_splits_test=5,
     n_estimators=500,
+    draw_with_feature_weights=False,
 ):
     """Compute test metrics for mrs
 
@@ -781,6 +784,7 @@ def compute_test_metrics_fw_mrs(
     :param cv: Number of cross-validation iterations, defaults to 3
     :return: Test metrics for mrs
     """
+
     auroc_scores = []
     data = pd.concat([N, R])
     kf = StratifiedKFold(
@@ -872,3 +876,58 @@ def train_feature_weighted_decision_tree(
     )
 
     return grid
+
+
+def compute_classification_metrics_feature_weights(
+    N,
+    R,
+    columns,
+    sample_weights,
+    label,
+    random_state=None,
+    n_splits=10,
+    class_weight=None,
+    splitter="feature_weighted_best",
+    n_estimators=1000,
+    max_depth=None,
+    feature_weights_list=None,
+    drop_ids_list=None,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    n_estimators_per_budget = n_estimators // len(feature_weights_list)
+    clf_list = []
+    for feature_weights, drop_ids in zip(feature_weights_list, drop_ids_list):
+        draw_with_feature_weights = False if feature_weights is None else True
+        iteration_sample_weights = sample_weights.copy()
+        iteration_sample_weights[drop_ids] = 0
+        clf = train_random_forest_classifier(
+            N[columns],
+            N[label],
+            iteration_sample_weights,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            class_weight=class_weight,
+            splitter=splitter,
+            n_estimators=n_estimators_per_budget,
+            max_depth=max_depth,
+        )
+        clf_list.append(clf)
+
+    y_predictions = []
+    for clf in clf_list:
+        y_predictions.append(clf.predict_proba(R[columns])[:, 1])
+    y_predictions = np.mean(y_predictions, axis=0)
+    auroc_score = roc_auc_score(R[label], y_predictions)
+    auprc = average_precision_score(R[label], y_predictions)
+
+    return auroc_score, auprc

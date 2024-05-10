@@ -118,6 +118,8 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     :param feature_importance: _description_
     :return: _description_
     """
+    if temperature is None:
+        return np.ones(len(feature_importance))
     feature_weights = np.exp(-feature_importance / temperature)
     return feature_weights / np.sum(feature_weights)
 
@@ -127,6 +129,24 @@ def compute_feature_weights_with_budget(budget, feature_importance):
     feature_weights = feature_importance / max_importance
     feature_weights = feature_weights * budget
     return 1 - feature_weights
+
+
+def compute_feature_weights_test(budget, feature_importance):
+    if budget is None:
+        return np.ones(len(feature_importance))
+    else:
+        weights = np.exp(feature_importance / budget)
+    return weights
+
+def compute_feature_weights(budget, feature_importance):
+    if budget is None:
+        return np.ones(len(feature_importance))
+    else:
+        max_importance = np.max(feature_importance)
+        feature_importance = feature_importance / max_importance 
+        scaled_feature_importance = feature_importance * budget
+        scaled_feature_importance = 1 + scaled_feature_importance
+        return scaled_feature_importance 
 
 
 def feature_weighted_repeated_MRS(
@@ -173,7 +193,6 @@ def feature_weighted_repeated_MRS(
     best_difference = np.inf
     feature_weights = np.ones(len(columns))
     current_patience = 0
-    draw_with_feature_weights = True
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
@@ -181,11 +200,12 @@ def feature_weighted_repeated_MRS(
         dropped_samples_dict[budget] = 0
     feature_importance_list = []
 
-    feature_weight_method = (
-        compute_feature_weights_with_temperature
-        if feature_weight_method == "temperature"
-        else compute_feature_weights_with_budget
-    )
+    # feature_weight_method = (
+    #    compute_feature_weights_with_temperature
+    #    if feature_weight_method == "temperature"
+    #    else compute_feature_weights_with_budget
+    # )
+    feature_weight_method = compute_feature_weights
     if validation_method == "random_forest":
         validation_method = train_feature_weighted_random_forest
     elif validation_method == "decision_tree":
@@ -223,7 +243,6 @@ def feature_weighted_repeated_MRS(
                 random_state=rand_int,
                 feature_weights=feature_weights,
                 method=validation_method,
-                draw_with_feature_weights=draw_with_feature_weights,
                 class_weight=None,
                 max_features="sqrt",
                 splitter=splitter,
@@ -269,7 +288,7 @@ def feature_weighted_repeated_MRS(
             feature_importance_list,
             feature_weights_dict,
             dropped_samples_dict,
-            mrs_iteration,
+            sample_weights,
         )
 
     else:

@@ -249,7 +249,7 @@ def mrs(
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return best_weights / best_weights.sum(), np.ones(len(columns))
+        return best_weights / best_weights.sum(), None
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

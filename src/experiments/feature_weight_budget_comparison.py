@@ -49,7 +49,8 @@ def feature_weight_budget_comparison_experiment(
 
     budgets = (
         # [None, 0.01, 0.005]
-        [None, 0.1, 0.01, 0.001, 0.0001]
+        # [None, 0.1, 0.01, 0.001, 0.0001]
+        [None, 1, 0.7, 0.5,  0.1]
         if transformation_method == "temperature"
         else [None, 0.5, 0.9]
     )
@@ -165,7 +166,7 @@ def feature_weight_budget_comparison_experiment(
 
 def save_mean_dropped_elements(result_path, dropped_samples_list):
     mean_dropped_samples_dict = {}
-    for _, budget in dropped_samples_list[0].keys():
+    for _, budget in enumerate(dropped_samples_list[0].keys()):
         dropped_elements = []
         for dictionary in dropped_samples_list:
             dropped_elements.append(dictionary[budget])

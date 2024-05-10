@@ -70,7 +70,7 @@ def parse_command_line_arguments():
     )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--number_of_repetitions", default=50, type=int)
-    parser.add_argument("--budget", default=0.01, type=float)
+    parser.add_argument("--budget", default=0.01, type=none_or_float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
     parser.add_argument("--drop", default=1, type=int)
@@ -79,6 +79,12 @@ def parse_command_line_arguments():
     parser.add_argument("--bias_fraction", default=0.25, type=float)
 
     return parser.parse_args()
+
+
+def none_or_float(value):
+    if value == "None":
+        return None
+    return float(value)
 
 
 def parse_mrs_analysis_command_line_arguments():

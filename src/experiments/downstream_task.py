@@ -113,15 +113,11 @@ def downstream_experiment(
 
         dropped_samples = np.count_nonzero(sample_weights == 0.0)
         dropped_samples_list.append(dropped_samples)
-        feature_weights_list.append(feature_weights.tolist())
+        if not feature_weights is None:
+            feature_weights_list.append(feature_weights.tolist())
         sample_weight_list.append(sample_weights.tolist())
 
         if explicit_weights:
-            draw_with_feature_weights = (
-                True
-                if sample_weighting_method.__name__ == "feature_weighted_repeated_MRS"
-                else False
-            )
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
                 R,
@@ -132,6 +128,8 @@ def downstream_experiment(
                 gamma,
             )
 
+            if feature_weights is None:
+                feature_weights = np.ones(len(columns))
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 R,
@@ -140,8 +138,8 @@ def downstream_experiment(
                 feature_weights,
                 target,
                 random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                class_weight="balanced",
+                splitter="feature_weighted_best",
+                class_weight=None,
             )
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
@@ -152,11 +150,11 @@ def downstream_experiment(
                 feature_weights,
                 target,
                 random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
             )
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
-            plot_feature_weights(feature_weights, feature_weights_save_path, i)
+            if not feature_weights is None:
+                plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
             weighted_mmds_list.append(weighted_mmd)
             biases_list.append(relative_bias)

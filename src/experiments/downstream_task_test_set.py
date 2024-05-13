@@ -116,7 +116,8 @@ def downstream_experiment_with_test_set(
             save_weights(feature_weights_save_path, feature_weight_list)
 
         dropped_samples = np.count_nonzero(sample_weights == 0.0)
-        feature_weight_list.append(feature_weights.tolist())
+        if not feature_weights is None:
+            feature_weight_list.append(feature_weights.tolist())
         sample_weight_list.append(sample_weights.tolist())
         dropped_samples_list.append(dropped_samples)
 

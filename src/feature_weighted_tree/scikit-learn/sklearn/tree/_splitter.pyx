@@ -1998,8 +1998,6 @@ cdef inline int node_split_feature_weighted_best(
     # Return values
     split[0] = best_split
     n_constant_features[0] = n_total_constants
-    # with gil:
-    #     print(best_split.feature)
     return 0
 
 cdef class FeatureWeightedRandomSplitter(Splitter):

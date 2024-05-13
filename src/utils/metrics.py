@@ -318,10 +318,16 @@ def train_feature_weighted_random_forest(
         n_jobs=-1,
         bootstrap=True,
     )
+
     parameter_grid = {
-        "min_samples_split": [10, 20, 50],
-        "min_samples_leaf": [5, 10, 25],
+        "min_impurity_decrease": [
+            0.001,
+            0.01,
+            0.1,
+            0.0,
+        ]
     }
+
     grid = GridSearchCV(
         param_grid=parameter_grid,
         estimator=clf,
@@ -330,6 +336,7 @@ def train_feature_weighted_random_forest(
         scoring="roc_auc",
         n_jobs=-1,
     )
+    
     return grid.fit(
         X,
         y,
@@ -650,19 +657,17 @@ def train_random_forest_classifier(
     )
 
     # parameter_grid = {
-    #    "min_impurity_decrease": [
-    #        0.0,
-    #        0.001,
-    #        0.005,
-    #        0.01,
-    #        0.05,
-    #        0.1,
-    #    ]
+    # "min_impurity_decrease": [
+    #   0.001,
+    #   0.01,
+    #  0.1,
+    #   0.0,
+    # ]
     # }
 
     parameter_grid = {
-        "min_samples_split": [4, 10, 20, 50],
-        "min_samples_leaf": [2, 5, 10, 25],
+        "min_samples_split": [10, 20, 50, 100],
+        "min_samples_leaf": [5, 10, 25, 50],
     }
 
     cv = StratifiedKFold(

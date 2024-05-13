@@ -139,7 +139,7 @@ def downstream_experiment(
                 target,
                 random_state=seed,
                 splitter="feature_weighted_best",
-                class_weight=None,
+                class_weight="balanced",
             )
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(

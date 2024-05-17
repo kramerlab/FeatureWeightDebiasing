@@ -84,7 +84,6 @@ DENSE_SPLITTERS = {
     "best": _splitter.BestSplitter,
     "random": _splitter.RandomSplitter,
     "feature_weighted_best": _splitter.FeatureWeightedBestSplitter,
-    "feature_weighted_random": _splitter.FeatureWeightedRandomSplitter,
 }
 
 SPARSE_SPLITTERS = {

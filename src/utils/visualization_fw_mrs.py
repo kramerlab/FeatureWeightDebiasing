@@ -17,7 +17,10 @@ def plot_budget_comparison_auroc(
     number_of_samples,
     drop,
     file_name,
+    wide=True,
 ):
+    if wide:
+        plt.figure(figsize=(10, 5))
     n_auroc_values = len(auroc_dictionary[list(auroc_dictionary.keys())[0]])
     stop = number_of_samples - (n_auroc_values * drop)
     x_labels = list(range(number_of_samples, stop, -drop))
@@ -58,7 +61,10 @@ def plot_budget_comparison_auroc_mean(
     number_of_samples,
     drop,
     file_name,
+    wide=True
 ):
+    if wide:
+        plt.figure(figsize=(10, 5))
     n_auroc_values = len(
         auroc_list_of_dictionaries[0][list(auroc_list_of_dictionaries[0].keys())[0]]
     )

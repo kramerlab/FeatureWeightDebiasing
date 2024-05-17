@@ -213,6 +213,7 @@ def compute_classification_metrics_tree(
     n_splits=10,
     splitter="feature_weighted_best",
     max_features="sqrt",
+    draw_with_feature_weights=False,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -223,7 +224,6 @@ def compute_classification_metrics_tree(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
-    draw_with_feature_weights = False if feature_weights is None else True
     clf = train_tree_classifier_auroc(
         N[columns],
         N[label],
@@ -252,11 +252,10 @@ def compute_classification_metrics_random_forest(
     label,
     random_state=None,
     n_splits=10,
-    class_weight=None,
     splitter="feature_weighted_best",
     n_estimators=1000,
     max_depth=None,
-    draw_with_feature_weights=True,
+    draw_with_feature_weights=False,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -276,7 +275,6 @@ def compute_classification_metrics_random_forest(
         random_state=random_state,
         n_splits=n_splits,
         draw_with_feature_weights=draw_with_feature_weights,
-        class_weight=class_weight,
         splitter=splitter,
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -315,16 +313,14 @@ def train_feature_weighted_random_forest(
         splitter=splitter,
         class_weight=class_weight,
         max_features=max_features,
-        n_jobs=-1,
-        bootstrap=True,
     )
 
     parameter_grid = {
         "min_impurity_decrease": [
+            0.0,
             0.001,
             0.01,
             0.1,
-            0.0,
         ]
     }
 
@@ -336,7 +332,7 @@ def train_feature_weighted_random_forest(
         scoring="roc_auc",
         n_jobs=-1,
     )
-    
+
     return grid.fit(
         X,
         y,
@@ -388,48 +384,6 @@ def compute_classification_metrics_boosting(
     auprc = average_precision_score(R[label], y_predictions)
 
     return auroc_score, auprc
-
-
-def train_feature_weighted_classifier_forest(
-    X,
-    y,
-    feature_weights=None,
-    draw_with_feature_weights=False,
-    random_state=None,
-    class_weight="balanced",
-    splitter="feature_weighted_best",
-    max_features="sqrt",
-    max_depth=None,
-    **args,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 3
-    :return: Trained classifier
-    """
-    clf = RandomForestClassifier(
-        n_estimators=250,
-        random_state=random_state,
-        splitter=splitter,
-        class_weight=class_weight,
-        max_features=max_features,
-        n_jobs=-1,
-        max_depth=max_depth,
-        min_samples_leaf=10,
-        min_samples_split=5,
-    )
-    clf.fit(
-        X,
-        y,
-        feature_weights=feature_weights,
-        draw_with_feature_weights=draw_with_feature_weights,
-    )
-
-    return clf
 
 
 def train_classifier_auroc(
@@ -501,6 +455,7 @@ def compute_test_metrics_mrs(
     )
     for train_indices, test_indices in kf.split(data[columns], data.label):
         train, test = data.iloc[train_indices], data.iloc[test_indices]
+        train_random_forest_classifier
         clf = train_classifier_auroc(
             train[columns],
             train.label,
@@ -522,7 +477,7 @@ def compute_test_metrics_mrs(
         return np.mean(auroc_scores)
 
 
-def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
+def train_fw_mrs_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
     """Train the positive unlabeled classifier
 
     :param X_train: Training features
@@ -536,6 +491,23 @@ def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=
         n_jobs=-1,
         random_state=random_state,
         min_samples_leaf=0.01,
+    )
+    clf.fit(X_train, y_train)
+    return clf
+
+def train_mrs_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
+    """Train the positive unlabeled classifier
+
+    :param X_train: Training features
+    :param y_train: Training target
+    :param class_weight: Sample weights, defaults to "balanced"
+    :return: Trained positive unlabeled classifier
+    """
+    clf = RandomForestClassifier(
+        class_weight=class_weight,
+        n_estimators=500,
+        n_jobs=-1,
+        random_state=random_state,
     )
     clf.fit(X_train, y_train)
     return clf
@@ -656,18 +628,10 @@ def train_random_forest_classifier(
         max_depth=max_depth,
     )
 
-    # parameter_grid = {
-    # "min_impurity_decrease": [
-    #   0.001,
-    #   0.01,
-    #  0.1,
-    #   0.0,
-    # ]
-    # }
-
     parameter_grid = {
-        "min_samples_split": [10, 20, 50, 100],
-        "min_samples_leaf": [5, 10, 25, 50],
+        "min_samples_split": [2, 10, 20, 50],
+        "min_samples_leaf": [1, 5, 10, 25],
+        "class_weight": ["balanced", None],
     }
 
     cv = StratifiedKFold(
@@ -776,7 +740,7 @@ def compute_test_metrics_fw_mrs(
     class_weight="balanced",
     splitter="feature_weighted_best",
     max_features="sqrt",
-    n_splits_test=5,
+    n_splits_test=10,
     n_estimators=500,
     draw_with_feature_weights=False,
 ):
@@ -807,7 +771,7 @@ def compute_test_metrics_fw_mrs(
             class_weight=class_weight,
             splitter=splitter,
             max_features=max_features,
-            cv=10,
+            cv=5,
             n_estimators=n_estimators,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]

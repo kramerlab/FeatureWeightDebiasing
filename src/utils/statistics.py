@@ -35,6 +35,8 @@ def write_result_dict(
     rf_auprc_list,
     tree_auroc_list,
     tree_auprc_list,
+    gradient_ascent_auroc_list,
+    gradient_ascent_auprc_list,
     dropped_samples_list,
     number_of_samples,
     explicit_weights,
@@ -72,6 +74,14 @@ def write_result_dict(
             "mean": np.mean(tree_auprc_list),
             "sd": np.std(tree_auprc_list),
         },
+        "gradient ascent auroc": {
+            "mean": np.mean(gradient_ascent_auroc_list),
+            "sd": np.std(gradient_ascent_auroc_list),
+        },
+        "gradient ascent auprc": {
+            "mean": np.mean(gradient_ascent_auprc_list),
+            "sd": np.std(gradient_ascent_auprc_list),
+        },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),
             "std": np.std(dropped_samples_list),
@@ -97,6 +107,8 @@ def write_result_dict_test_set(
     rf_auprc_list,
     tree_auroc_list,
     tree_auprc_list,
+    gradient_ascent_auroc_list,
+    gradient_ascent_auprc_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -128,6 +140,14 @@ def write_result_dict_test_set(
         "tree auprc": {
             "mean": np.mean(tree_auprc_list),
             "sd": np.std(tree_auprc_list),
+        },
+        "gradient descent auroc": {
+            "mean": np.mean(gradient_ascent_auroc_list),
+            "sd": np.std(gradient_ascent_auroc_list),
+        },
+        "gradient descent auprc": {
+            "mean": np.mean(gradient_ascent_auprc_list),
+            "sd": np.std(gradient_ascent_auprc_list),
         },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),

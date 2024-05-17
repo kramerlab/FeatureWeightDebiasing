@@ -10,11 +10,11 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_relative_bias,
     compute_test_metrics_mrs,
-    train_pu_classifier,
+    train_mrs_pu_classifier,
     weighted_maximum_mean_discrepancy,
 )
 
-# Used to draw radom states
+# Used to draw random states
 max_int = 2**32 - 1
 
 
@@ -45,7 +45,7 @@ def mrs_step(
     for train_index, test_index in kf.split(N):
         N_train, N_test = N.iloc[train_index], N.iloc[test_index]
         data = pd.concat([N_train, R])
-        clf = train_pu_classifier(
+        clf = train_mrs_pu_classifier(
             data[columns],
             data.label,
             class_weight=class_weights,
@@ -80,7 +80,7 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf = train_pu_classifier(
+    clf = train_mrs_pu_classifier(
         data[columns],
         data.label,
         class_weight=class_weights,
@@ -161,22 +161,6 @@ def mrs(
                 y_y_rbf_matrix=y_y_rbf_matrix,
             )
         )
-    auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-        pd.concat([dropped_N, R]),
-        columns,
-        calculate_roc=True,
-        random_state=random_generator.randint(max_int),
-        n_test_splits=n_test_splits,
-    )
-    roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, 0])
-
-    if compute_bias and bias_variable is not None:
-        relative_bias = compute_relative_bias(
-            N[bias_variable], R[bias_variable], weights
-        )
-        relative_bias_list.append(relative_bias)
-
-    auc_list.append(auroc)
 
     for i in trange(number_of_iterations):
         dropped_N, drop_ids = mrs_function(
@@ -188,9 +172,8 @@ def mrs(
             n_splits=n_pu_cv,
             random_state=random_generator.randint(max_int),
         )
-        weights[drop_ids] = 0.0
 
-        if (i + 1) % roc_iteration == 0:
+        if i % roc_iteration == 0:
             auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
                 pd.concat([dropped_N, R]),
                 columns,
@@ -243,6 +226,8 @@ def mrs(
             or current_patience >= max_patience
         ):
             break
+        else:
+            weights[drop_ids] = 0.0
 
     best_weights = best_weights.astype(np.float64)
 

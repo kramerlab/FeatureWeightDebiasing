@@ -24,7 +24,8 @@ sample_weighting_method_list = [
     "uniform",
     "soft-mrs",
     "mrs",
-    "fw-sampling-mrs",
+    "fw-mrs-temperature",
+    "fw-mrs-budget",
     "kmm",
     "dann",
 ]
@@ -122,7 +123,7 @@ def get_sample_weighting_function(method_name):
         return propensity_score_adjustment
     elif method_name == "soft-mrs":
         return soft_mrs_weighting
-    elif method_name == "fw-sampling-mrs":
+    elif method_name in ("fw-mrs-temperature", "fw-mrs-budget"):
         return feature_weighted_repeated_MRS
     elif method_name == "mrs":
         return mrs

@@ -13,6 +13,7 @@ from utils.metrics import (
     compute_metrics,
     calculate_rbf_gamma,
 )
+from utils.gradient_ascent import compute_classification_metrics_gradient_ascent
 
 seed = 5
 
@@ -56,6 +57,9 @@ def downstream_experiment(
     tree_auroc_list = []
     tree_auprc_list = []
 
+    gradient_ascent_auroc_list = []
+    gradient_ascent_auprc_list = []
+
     dropped_samples_list = []
 
     result_path = create_result_path(
@@ -78,6 +82,13 @@ def downstream_experiment(
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
+
+    draw_with_feature_weights = True if method_name == "fw-mrs-temperature" else False
+    splitter = (
+        "feature_weighted_best"
+        if method_name in ("fw-mrs-temperature", "fw-mrs-budget")
+        else "best"
+    )
 
     for i in trange(number_of_repetitions):
         N, R = sample(
@@ -107,6 +118,7 @@ def downstream_experiment(
                 target=target,
                 budgets=[budget],
                 validation_method=validation_method,
+                method_name=method_name,
             )
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weights_list)
@@ -130,6 +142,19 @@ def downstream_experiment(
 
             if feature_weights is None:
                 feature_weights = np.ones(len(columns))
+
+            gradient_ascent_auroc, gradient_ascent_auprc = (
+                compute_classification_metrics_gradient_ascent(
+                    N,
+                    R,
+                    columns,
+                    sample_weights,
+                    feature_weights,
+                    target,
+                    random_state=seed,
+                )
+            )
+
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 R,
@@ -138,8 +163,8 @@ def downstream_experiment(
                 feature_weights,
                 target,
                 random_state=seed,
-                splitter="feature_weighted_best",
-                class_weight="balanced",
+                draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
             )
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
@@ -150,7 +175,10 @@ def downstream_experiment(
                 feature_weights,
                 target,
                 random_state=seed,
+                draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
             )
+
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
             if not feature_weights is None:
@@ -162,6 +190,8 @@ def downstream_experiment(
             rf_auprc_list.append(rf_auprc)
             tree_auroc_list.append(tree_auroc)
             tree_auprc_list.append(tree_auprc)
+            gradient_ascent_auroc_list.append(gradient_ascent_auroc)
+            gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,
@@ -171,6 +201,8 @@ def downstream_experiment(
         rf_auprc_list,
         tree_auroc_list,
         tree_auprc_list,
+        gradient_ascent_auroc_list,
+        gradient_ascent_auprc_list,
         dropped_samples_list,
         len(N),
         explicit_weights=explicit_weights,

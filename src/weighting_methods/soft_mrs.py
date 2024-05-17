@@ -27,7 +27,7 @@ min_weight_fraction_leaf = [
 
 
 def soft_mrs_weighting(
-    N, R, columns, random_generator, exponential=False, patience=50, *args, **kwargs
+    N, R, columns, random_generator=None, exponential=False, patience=50, *args, **kwargs
 ):
     """Soft MRS method
 

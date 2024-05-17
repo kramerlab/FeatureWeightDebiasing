@@ -2,7 +2,7 @@ import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 from utils.statistics import create_result_path
-from utils.sampling import sample
+from utils.sampling import sample_with_test_set
 from weighting_methods.feature_weighted_maximum_representative_subsampling import (
     feature_weighted_repeated_MRS,
 )
@@ -29,7 +29,6 @@ def feature_weight_budget_comparison_experiment(
     method_name=None,
     drop=1,
     bias_fraction=0.25,
-    transformation_method="temperature",
     validation_method="both",
     **args,
 ):
@@ -48,12 +47,11 @@ def feature_weight_budget_comparison_experiment(
     """
 
     budgets = (
-        # [None, 0.01, 0.005]
-        # [None, 0.1, 0.01, 0.001, 0.0001]
-        [None, 1, 0.7, 0.5,  0.1]
-        if transformation_method == "temperature"
-        else [None, 0.5, 0.9]
+        [None, 0.01, 0.025, 0.05, 0.1]
+        if method_name == "fw-mrs-budget"
+        else [None, 0.1, 0.01, 0.005, 0.001]
     )
+
     result_path = create_result_path(
         method_name,
         bias_type,
@@ -61,7 +59,7 @@ def feature_weight_budget_comparison_experiment(
         experiment_name="budget_comparison",
         bias_fraction=bias_fraction,
     )
-    result_path = result_path / transformation_method / validation_method
+    result_path = result_path / method_name / validation_method
     result_path.mkdir(parents=True, exist_ok=True)
 
     saved_weights_path = result_path / "saved_weights"
@@ -84,12 +82,13 @@ def feature_weight_budget_comparison_experiment(
         N = sample_df[sample_df["label"] == 1]
         R = sample_df[sample_df["label"] == 0]
     else:
-        N, R = sample(
+        N, R, _ = sample_with_test_set(
             bias_type,
             sample_df,
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
+            test_fraction=0.2,
             columns=columns,
         )
 
@@ -114,8 +113,8 @@ def feature_weight_budget_comparison_experiment(
             target=target,
             budgets=budgets,
             return_auroc=True,
-            feature_weight_method=transformation_method,
             validation_method=validation_method,
+            method_name=method_name,
         )
 
         number_of_samples = len(N)

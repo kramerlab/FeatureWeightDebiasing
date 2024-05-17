@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
@@ -58,22 +59,8 @@ def sample_N(bias_type, bias_fraction, columns, train, bias_variable):
         )
     elif bias_type == "mean_difference":
         N = less_outlier_sampling(train, bias_fraction, columns)
-    elif bias_type == "most_important_feature":
-        N = bias_most_important_feature(train, bias_fraction, columns)
     else:
         N = train.reset_index(drop=True)
-    return N
-
-
-def bias_most_important_feature(train, bias_fraction, columns):
-    bias_column = "WKHP"
-    unbiased_probabilities = (train.WKHP.sort_values().value_counts() / len(train))
-    mean_wkhp = np.mean(train.WKHP)
-    sample_percentage = unbiased_probabilities[train.WKHP.values].values
-    sample_percentage[train.WKHP <= mean_wkhp] = sample_percentage[train.WKHP < mean_wkhp] - 0.1
-    sample_percentage[train.WKHP > mean_wkhp] = sample_percentage[train.WKHP > mean_wkhp] + 0.1
-    sample_percentage[sample_percentage < 0] = 0
-    N = train.sample(frac=bias_fraction, replace=False, weights=sample_percentage)
     return N
 
 
@@ -89,7 +76,7 @@ def less_outlier_sampling(train, bias_fraction, columns):
     temperature = -(1 / 20)
     sample_weights = np.exp(temperature * differences)
     N = train.sample(
-        frac=bias_fraction + 0.15,
+        frac=bias_fraction + 0.4,
         weights=sample_weights,
         random_state=sampling_random_generator,
     )
@@ -118,12 +105,16 @@ def sample_with_test_set(
     # Sample from the data set because the complete one is too big.
     if len(df) > 7500:
         df = df.sample(7500, random_state=sampling_random_generator).copy()
-    T = df.sample(
-        frac=test_fraction, replace=False, random_state=sampling_random_generator
+    T = df.groupby(bias_variable, group_keys=False).apply(
+        lambda x: x.sample(
+            frac=test_fraction, random_state=sampling_random_generator, replace=False
+        )
     )
     df_without_T = df.drop(T.index)
-    R = df_without_T.sample(
-        frac=(1 - train_fraction), replace=False, random_state=sampling_random_generator
+    R = df_without_T.groupby(bias_variable, group_keys=False).apply(
+        lambda x: x.sample(
+            frac=test_fraction, random_state=sampling_random_generator, replace=False
+        )
     )
     train = df_without_T.drop(R.index)
 

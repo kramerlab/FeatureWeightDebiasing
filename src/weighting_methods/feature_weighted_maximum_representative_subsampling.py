@@ -6,7 +6,7 @@ import shap
 from sklearn.model_selection import KFold
 from utils.metrics import (
     compute_test_metrics_fw_mrs,
-    train_pu_classifier,
+    train_fw_mrs_pu_classifier,
     train_feature_weighted_random_forest,
     train_feature_weighted_decision_tree,
 )
@@ -43,7 +43,7 @@ def mrs(
     for N_train_index, N_test_index in kf.split(N):
         N_train, N_test = N.iloc[N_train_index], N.iloc[N_test_index]
         train = pd.concat([N_train, R])
-        clf = train_pu_classifier(
+        clf = train_fw_mrs_pu_classifier(
             train[columns],
             train.label,
             class_weight=class_weights,
@@ -86,7 +86,7 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf = train_pu_classifier(
+    clf = train_fw_mrs_pu_classifier(
         data[columns],
         data.label,
         class_weight=class_weight,
@@ -119,34 +119,23 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     :return: _description_
     """
     if temperature is None:
-        return np.ones(len(feature_importance))
+        return np.ones(len(feature_importance)) / len(feature_importance)
     feature_weights = np.exp(-feature_importance / temperature)
     return feature_weights / np.sum(feature_weights)
 
 
 def compute_feature_weights_with_budget(budget, feature_importance):
-    max_importance = np.max(feature_importance)
-    feature_weights = feature_importance / max_importance
-    feature_weights = feature_weights * budget
-    return 1 - feature_weights
-
-
-def compute_feature_weights_test(budget, feature_importance):
-    if budget is None:
-        return np.ones(len(feature_importance))
-    else:
-        weights = np.exp(feature_importance / budget)
-    return weights
-
-def compute_feature_weights(budget, feature_importance):
     if budget is None:
         return np.ones(len(feature_importance))
     else:
         max_importance = np.max(feature_importance)
-        feature_importance = feature_importance / max_importance 
+        min_importance = np.min(feature_importance)
+        feature_importance = (feature_importance - min_importance) / (
+            max_importance - min_importance
+        )
         scaled_feature_importance = feature_importance * budget
         scaled_feature_importance = 1 + scaled_feature_importance
-        return scaled_feature_importance 
+        return scaled_feature_importance
 
 
 def feature_weighted_repeated_MRS(
@@ -160,13 +149,13 @@ def feature_weighted_repeated_MRS(
     random_generator=None,
     class_weight="balanced",
     return_auroc=False,
-    n_test_splits=10,
+    n_test_splits=5,
     n_pu_splits=5,
     max_patience=5,
-    feature_weight_method="temperature",
     validation_method="random_forest",
     splitter="feature_weighted_best",
     n_estimators=100,
+    method_name=None,
     *args,
     **attributes,
 ):
@@ -200,18 +189,17 @@ def feature_weighted_repeated_MRS(
         dropped_samples_dict[budget] = 0
     feature_importance_list = []
 
-    # feature_weight_method = (
-    #    compute_feature_weights_with_temperature
-    #    if feature_weight_method == "temperature"
-    #    else compute_feature_weights_with_budget
-    # )
-    feature_weight_method = compute_feature_weights
     if validation_method == "random_forest":
         validation_method = train_feature_weighted_random_forest
     elif validation_method == "decision_tree":
         validation_method = train_feature_weighted_decision_tree
-    else:
-        validation_method = "both"
+
+    if method_name == "fw-mrs-temperature":
+        draw_with_feature_weights = True
+        feature_weight_method = compute_feature_weights_with_temperature
+    if method_name == "fw-mrs-budget":
+        draw_with_feature_weights = False
+        feature_weight_method = compute_feature_weights_with_budget
 
     feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
@@ -248,6 +236,7 @@ def feature_weighted_repeated_MRS(
                 splitter=splitter,
                 n_splits_test=n_test_splits,
                 n_estimators=n_estimators,
+                draw_with_feature_weights=draw_with_feature_weights,
             )
 
             if budget not in feature_weighted_aurocs_dict:

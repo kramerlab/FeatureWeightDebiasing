@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
+from utils.gradient_ascent import compute_classification_metrics_gradient_ascent
 from utils.statistics import create_result_path, write_result_dict_test_set
 from utils.sampling import sample_with_test_set
 from utils.visualization import plot_sample_weights, plot_feature_weights
@@ -30,6 +31,7 @@ def downstream_experiment_with_test_set(
     bias_fraction=0.75,
     drop=1,
     validation_method="random_forest",
+    method_name=None,
     **args
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -51,10 +53,13 @@ def downstream_experiment_with_test_set(
     tree_auroc_list = []
     tree_auprc_list = []
 
+    gradient_ascent_auroc_list = []
+    gradient_ascent_auprc_list = []
+
     dropped_samples_list = []
 
     result_path = create_result_path(
-        sample_weighting_method.__name__,
+        method_name,
         bias_type,
         data_set_name,
         experiment_name="test_set_classification",
@@ -76,10 +81,11 @@ def downstream_experiment_with_test_set(
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
 
-    draw_with_feature_weights = (
-        True
-        if sample_weighting_method.__name__ == "feature_weighted_repeated_MRS"
-        else False
+    draw_with_feature_weights = True if method_name == "fw-mrs-temperature" else False
+    splitter = (
+        "feature_weighted_best"
+        if method_name in ("fw-mrs-temperature", "fw-mrs-budget")
+        else "best"
     )
 
     for i in trange(number_of_repetitions):
@@ -110,6 +116,7 @@ def downstream_experiment_with_test_set(
                 target=target,
                 budgets=[budget],
                 validation_method=validation_method,
+                method_name=method_name,
             )
 
             save_weights(sample_weights_save_path, sample_weight_list)
@@ -122,6 +129,20 @@ def downstream_experiment_with_test_set(
         dropped_samples_list.append(dropped_samples)
 
         if explicit_weights:
+            if feature_weights is None:
+                feature_weights = np.ones(len(columns))
+            gradient_ascent_auroc, gradient_ascent_auprc = (
+                compute_classification_metrics_gradient_ascent(
+                    N,
+                    R,
+                    columns,
+                    sample_weights,
+                    feature_weights,
+                    target,
+                    random_state=seed,
+                )
+            )
+            
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 T,
@@ -131,6 +152,7 @@ def downstream_experiment_with_test_set(
                 target,
                 random_state=seed,
                 draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
             )
 
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
@@ -142,6 +164,7 @@ def downstream_experiment_with_test_set(
                 target,
                 random_state=seed,
                 draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
             )
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
@@ -151,12 +174,16 @@ def downstream_experiment_with_test_set(
             rf_auprc_list.append(rf_auprc)
             tree_auroc_list.append(tree_auroc)
             tree_auprc_list.append(tree_auprc)
+            gradient_ascent_auroc_list.append(gradient_ascent_auroc)
+            gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
     result_dict = write_result_dict_test_set(
         rf_auroc_list,
         rf_auprc_list,
         tree_auroc_list,
         tree_auprc_list,
+        gradient_ascent_auroc_list,
+        gradient_ascent_auprc_list,
         dropped_samples_list,
         len(N),
     )

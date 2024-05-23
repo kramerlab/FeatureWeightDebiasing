@@ -13,7 +13,7 @@ from utils.metrics import (
     compute_metrics,
     calculate_rbf_gamma,
 )
-from utils.gradient_ascent import compute_classification_metrics_gradient_ascent
+from utils.gradient_descent import compute_classification_metrics_gradient_descent
 
 seed = 5
 
@@ -144,7 +144,7 @@ def downstream_experiment(
                 feature_weights = np.ones(len(columns))
 
             gradient_ascent_auroc, gradient_ascent_auprc = (
-                compute_classification_metrics_gradient_ascent(
+                compute_classification_metrics_gradient_descent(
                     N,
                     R,
                     columns,
@@ -178,7 +178,6 @@ def downstream_experiment(
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
             )
-
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
             if not feature_weights is None:

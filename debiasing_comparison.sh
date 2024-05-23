@@ -4,7 +4,7 @@ BIAS_FRACTION=0.9
 
 for BIAS_TYPE in less_negative_class less_positive_class mean_difference
 do
-    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs  mrs soft-mrs
+    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs mrs soft-mrs
     do
         for DATASET in breast_cancer loan_prediction 
         do
@@ -17,7 +17,7 @@ done
 DROP=5
 for BIAS_TYPE in less_negative_class less_positive_class mean_difference
 do
-    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs  mrs soft-mrs
+    for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-sampling-mrs mrs soft-mrs
     do
         for DATASET in hr_analytics folktables_income folktables_employment
         do

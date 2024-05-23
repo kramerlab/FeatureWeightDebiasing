@@ -225,8 +225,9 @@ def compute_classification_metrics_tree(
     :return: Downstream classification metrics
     """
     clf = train_tree_classifier_auroc(
-        N[columns],
-        N[label],
+        N[columns].values,
+        N[label].values,
+        R[columns].values,
         sample_weights,
         feature_weights,
         random_state=random_state,
@@ -477,7 +478,9 @@ def compute_test_metrics_mrs(
         return np.mean(auroc_scores)
 
 
-def train_fw_mrs_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
+def train_fw_mrs_pu_classifier(
+    X_train, y_train, class_weight="balanced", random_state=None
+):
     """Train the positive unlabeled classifier
 
     :param X_train: Training features
@@ -495,7 +498,10 @@ def train_fw_mrs_pu_classifier(X_train, y_train, class_weight="balanced", random
     clf.fit(X_train, y_train)
     return clf
 
-def train_mrs_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
+
+def train_mrs_pu_classifier(
+    X_train, y_train, class_weight="balanced", random_state=None
+):
     """Train the positive unlabeled classifier
 
     :param X_train: Training features
@@ -529,8 +535,9 @@ def interpolate_roc(y_test, y_predict):
 
 
 def train_tree_classifier_auroc(
-    X_train,
-    y_train,
+    X,
+    y,
+    R,
     sample_weights=None,
     feature_weights=None,
     speedup=True,
@@ -550,15 +557,18 @@ def train_tree_classifier_auroc(
     :param cv: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-
+    best_auroc = -np.inf
+    best_ccp_alpha = None
+    r_sample_weights = np.ones(len(R)) / len(R)
+    r_feature_weights = np.ones(len(feature_weights)) / len(feature_weights)
     clf = DecisionTreeClassifier(
         random_state=np.random.RandomState(random_state),
         max_features=max_features,
         splitter=splitter,
     )
     path = clf.cost_complexity_pruning_path(
-        X_train,
-        y_train,
+        X,
+        y,
         sample_weight=sample_weights,
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
@@ -573,28 +583,57 @@ def train_tree_classifier_auroc(
             ccp_alphas_unique = np.append(
                 ccp_alphas_unique[-10:], shortened_ccp_alphas_unique
             )
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    for ccp_alpha in ccp_alphas_unique:
+        for train_indices_n, val_indices_n in skf.split(X, y):
+            auroc_list = []
+            X_train, y_train = X[train_indices_n], y[train_indices_n]
+            sample_weights_train = sample_weights[train_indices_n]
+            X_val, y_val = X[val_indices_n], y[val_indices_n]
+            clf = DecisionTreeClassifier(
+                random_state=np.random.RandomState(random_state),
+                max_features=max_features,
+                splitter=splitter,
+                ccp_alpha=ccp_alpha,
+            )
+            clf.fit(
+                X_train,
+                y_train,
+                sample_weight=sample_weights_train,
+                feature_weights=feature_weights,
+                draw_with_feature_weights=draw_with_feature_weights,
+            )
+            self_labeled_targets = clf.predict(R)
+            clf.fit(
+                R,
+                self_labeled_targets,
+                sample_weights=r_sample_weights,
+                feature_weights=r_feature_weights,
+            )
+            reverse_probs = clf.predict_proba(X_val)[:, 1]
 
-    param_grid = {"ccp_alpha": ccp_alphas_unique}
-    cv = StratifiedKFold(
-        n_splits=n_splits,
-        shuffle=True,
-        random_state=np.random.RandomState(random_state),
-    )
-    grid = GridSearchCV(
-        clf,
-        param_grid=param_grid,
-        cv=cv,
-        n_jobs=-1,
-        refit=True,
-    )
+            auroc = roc_auc_score(y_val, reverse_probs)
+            auroc_list.append(auroc)
 
-    return grid.fit(
-        X_train,
-        y_train,
-        sample_weight=sample_weights,
+        mean_auroc = np.mean(auroc_list)
+        if mean_auroc > best_auroc:
+            best_auroc = auroc
+            best_ccp_alpha = ccp_alpha
+
+    clf = DecisionTreeClassifier(
+                random_state=np.random.RandomState(random_state),
+                max_features=max_features,
+                splitter=splitter,
+                ccp_alpha=best_ccp_alpha,
+            )
+    clf.fit(
+        X,
+        y,
+        sample_weights=sample_weights,
         feature_weights=feature_weights,
-        draw_with_feature_weights=draw_with_feature_weights,
     )
+
+    return clf
 
 
 def train_random_forest_classifier(
@@ -771,7 +810,7 @@ def compute_test_metrics_fw_mrs(
             class_weight=class_weight,
             splitter=splitter,
             max_features=max_features,
-            cv=5,
+            cv=10,
             n_estimators=n_estimators,
         )
         y_predict = clf.predict_proba(test[columns])[:, 1]

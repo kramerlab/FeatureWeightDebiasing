@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
-from utils.gradient_ascent import compute_classification_metrics_gradient_ascent
+from utils.gradient_descent import compute_classification_metrics_gradient_descent
 from utils.statistics import create_result_path, write_result_dict_test_set
 from utils.sampling import sample_with_test_set
 from utils.visualization import plot_sample_weights, plot_feature_weights
@@ -26,13 +26,13 @@ def downstream_experiment_with_test_set(
     data_set_name: str = "",
     random_generator=None,
     explicit_weights=True,
-    load_previous_results=False,
+    load_previous_results=True,
     budget="",
     bias_fraction=0.75,
     drop=1,
     validation_method="random_forest",
     method_name=None,
-    **args
+    **args,
 ):
     """The function uses the weighting method to compute the sample weights and
     computes the metrics, visualizes the results and saves the result in a file.
@@ -68,8 +68,10 @@ def downstream_experiment_with_test_set(
     result_path = result_path / str(budget)
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
+    classificiation_result_path = result_path / "classification_results"
 
     result_path.mkdir(exist_ok=True)
+    classificiation_result_path.mkdir(exist_ok=True)
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
 
@@ -119,22 +121,24 @@ def downstream_experiment_with_test_set(
                 method_name=method_name,
             )
 
-            save_weights(sample_weights_save_path, sample_weight_list)
-            save_weights(feature_weights_save_path, feature_weight_list)
-
         dropped_samples = np.count_nonzero(sample_weights == 0.0)
-        if not feature_weights is None:
-            feature_weight_list.append(feature_weights.tolist())
+
+        if feature_weights is None:
+            feature_weights = np.ones(len(columns)) / len(columns)
+
+        feature_weight_list.append(feature_weights.tolist())
         sample_weight_list.append(sample_weights.tolist())
         dropped_samples_list.append(dropped_samples)
 
+        save_weights(sample_weights_save_path, sample_weight_list)
+        save_weights(feature_weights_save_path, feature_weight_list)
+
         if explicit_weights:
-            if feature_weights is None:
-                feature_weights = np.ones(len(columns))
             gradient_ascent_auroc, gradient_ascent_auprc = (
-                compute_classification_metrics_gradient_ascent(
+                compute_classification_metrics_gradient_descent(
                     N,
                     R,
+                    T,
                     columns,
                     sample_weights,
                     feature_weights,
@@ -142,7 +146,7 @@ def downstream_experiment_with_test_set(
                     random_state=seed,
                 )
             )
-            
+
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 T,
@@ -190,6 +194,31 @@ def downstream_experiment_with_test_set(
 
     with open(result_path / "results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
+
+    for result_list, file_name in zip(
+        (
+            rf_auroc_list,
+            rf_auprc_list,
+            tree_auroc_list,
+            tree_auprc_list,
+            gradient_ascent_auroc_list,
+            gradient_ascent_auprc_list,
+            dropped_samples_list,
+        ),
+        (
+            "rf_auroc",
+            "rf_auprc",
+            "tree_auroc",
+            "tree_auprc",
+            "gradient_ascent_auroc",
+            "gradient_ascent_auprc",
+            "dropped_samples",
+        ),
+    ):
+        with open(
+            classificiation_result_path / f"{file_name}.json", "w"
+        ) as result_file:
+            result_file.write(json.dumps(result_list))
 
 
 def save_weights(path, weights_list):

@@ -102,11 +102,11 @@ def feature_weighted_repeated_MRS(
             )
 
             auc_difference = abs(auroc - 0.5)
-            if auc_difference <= delta:
-                dropped_samples_dict[temperature] = i * drop
-                finished_dict[temperature] = True
 
-            if (auc_difference + delta) <= best_difference_dict[temperature]:
+            if (auc_difference + delta) <= best_difference_dict[
+                temperature
+            ] and not finished_dict[temperature]:
+                dropped_samples_dict[temperature] = i * drop
                 best_sample_weights_dict[temperature] = sample_weights.copy().astype(
                     np.float64
                 )
@@ -117,6 +117,8 @@ def feature_weighted_repeated_MRS(
                 best_inverse_feature_weights_dict[temperature] = feature_weight_method(
                     temperature, -feature_importance
                 )
+            if auc_difference <= delta:
+                finished_dict[temperature] = True
 
         if all(finished_dict.values()):
             break

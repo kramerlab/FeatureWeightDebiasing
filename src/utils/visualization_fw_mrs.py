@@ -97,7 +97,7 @@ def visualize_boxplot(
     y_lim=None,
     file_name="",
 ):
-    tmp_dict = {"None": values_dict[None]}
+    tmp_dict = {"Uniform": values_dict[None]}
     values_dict.pop(None)
     tmp_dict.update(values_dict)
     ax = sns.boxplot(data=tmp_dict)

@@ -68,15 +68,18 @@ def downstream_experiment_with_test_set(
     result_path = result_path / str(budget)
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
+    inverse_feature_weights_save_path = result_path / "inverse_feature_weights"
     classificiation_result_path = result_path / "classification_results"
 
     result_path.mkdir(exist_ok=True)
     classificiation_result_path.mkdir(exist_ok=True)
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
+    inverse_feature_weights_save_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weight_list = load_weights(feature_weights_save_path)
+    inverse_feature_weight_list = load_weights(feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -104,9 +107,10 @@ def downstream_experiment_with_test_set(
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
             feature_weights = np.array(feature_weight_list[i])
+            inverse_feature_weights = np.array(inverse_feature_weight_list[i])
 
         else:
-            sample_weights, feature_weights = sample_weighting_method(
+            sample_weights, feature_weights, inverse_feature_weights = sample_weighting_method(
                 N=N,
                 R=R,
                 columns=columns,
@@ -125,8 +129,10 @@ def downstream_experiment_with_test_set(
 
         if feature_weights is None:
             feature_weights = np.ones(len(columns)) / len(columns)
+            inverse_feature_weights = np.ones(len(columns)) / len(columns)
 
         feature_weight_list.append(feature_weights.tolist())
+        inverse_feature_weight_list.append(inverse_feature_weights.tolist())
         sample_weight_list.append(sample_weights.tolist())
         dropped_samples_list.append(dropped_samples)
 
@@ -141,14 +147,16 @@ def downstream_experiment_with_test_set(
                     T,
                     columns,
                     sample_weights,
-                    feature_weights,
+                    inverse_feature_weights,
                     target,
                     random_state=seed,
+                    n_splits=5,
                 )
             )
 
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
+                R,
                 T,
                 columns,
                 sample_weights,
@@ -157,19 +165,24 @@ def downstream_experiment_with_test_set(
                 random_state=seed,
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
+                n_estimators=500,
+                n_splits=5,
             )
 
-            tree_auroc, tree_auprc = compute_classification_metrics_tree(
-                N,
-                T,
-                columns,
-                sample_weights,
-                feature_weights,
-                target,
-                random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
-            )
+            # tree_auroc, tree_auprc = compute_classification_metrics_tree(
+            #    N,
+            #    R,
+            #    T,
+            #    columns,
+            #    sample_weights,
+            #    feature_weights,
+            #    target,
+            #    random_state=seed,
+            #     draw_with_feature_weights=draw_with_feature_weights,
+            #    splitter=splitter,
+            # )
+            tree_auroc = 0
+            tree_auprc = 0
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
             plot_feature_weights(feature_weights, feature_weights_save_path, i)

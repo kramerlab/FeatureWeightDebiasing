@@ -12,6 +12,8 @@ from sklearn.metrics import (
     roc_curve,
     average_precision_score,
 )
+from sklearn import set_config
+from utils.reverse_validation import ReverseScorer
 
 
 def compute_weighted_means(N, weights):
@@ -205,6 +207,7 @@ def compute_metrics(
 def compute_classification_metrics_tree(
     N,
     R,
+    T,
     columns,
     sample_weights,
     feature_weights,
@@ -214,6 +217,7 @@ def compute_classification_metrics_tree(
     splitter="feature_weighted_best",
     max_features="sqrt",
     draw_with_feature_weights=False,
+    speedup=False,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -232,14 +236,14 @@ def compute_classification_metrics_tree(
         feature_weights,
         random_state=random_state,
         n_splits=n_splits,
-        speedup=False,
+        speedup=speedup,
         draw_with_feature_weights=draw_with_feature_weights,
         splitter=splitter,
         max_features=max_features,
     )
-    y_predictions = clf.predict_proba(R[columns])[:, 1]
-    auroc_score = roc_auc_score(R[label], y_predictions)
-    auprc = average_precision_score(R[label], y_predictions)
+    y_predictions = clf.predict_proba(T[columns].values)[:, 1]
+    auroc_score = roc_auc_score(T[label], y_predictions)
+    auprc = average_precision_score(T[label], y_predictions)
 
     return auroc_score, auprc
 
@@ -247,14 +251,15 @@ def compute_classification_metrics_tree(
 def compute_classification_metrics_random_forest(
     N,
     R,
+    T,
     columns,
     sample_weights,
     feature_weights,
     label,
     random_state=None,
-    n_splits=10,
+    n_splits=5,
     splitter="feature_weighted_best",
-    n_estimators=1000,
+    n_estimators=500,
     max_depth=None,
     draw_with_feature_weights=False,
 ):
@@ -267,10 +272,11 @@ def compute_classification_metrics_random_forest(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
-
+    set_config(enable_metadata_routing=True)
     clf = train_random_forest_classifier(
-        N[columns],
-        N[label],
+        N[columns].values,
+        N[label].values,
+        R[columns].values,
         sample_weights,
         feature_weights,
         random_state=random_state,
@@ -280,10 +286,11 @@ def compute_classification_metrics_random_forest(
         n_estimators=n_estimators,
         max_depth=max_depth,
     )
-    y_predictions = clf.predict_proba(R[columns])[:, 1]
-    auroc_score = roc_auc_score(R[label], y_predictions)
-    auprc = average_precision_score(R[label], y_predictions)
+    y_predictions = clf.predict_proba(T[columns].values)[:, 1]
+    auroc_score = roc_auc_score(T[label], y_predictions)
+    auprc = average_precision_score(T[label], y_predictions)
 
+    set_config(enable_metadata_routing=False)
     return auroc_score, auprc
 
 
@@ -308,6 +315,7 @@ def train_feature_weighted_random_forest(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
+    set_config(enable_metadata_routing=False)
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
@@ -315,7 +323,6 @@ def train_feature_weighted_random_forest(
         class_weight=class_weight,
         max_features=max_features,
     )
-
     parameter_grid = {
         "min_impurity_decrease": [
             0.0,
@@ -488,6 +495,7 @@ def train_fw_mrs_pu_classifier(
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
+    set_config(enable_metadata_routing=False)
     clf = RandomForestClassifier(
         class_weight=class_weight,
         n_estimators=500,
@@ -540,7 +548,7 @@ def train_tree_classifier_auroc(
     R,
     sample_weights=None,
     feature_weights=None,
-    speedup=True,
+    speedup=False,
     n_splits=10,
     random_state=None,
     draw_with_feature_weights=False,
@@ -560,7 +568,6 @@ def train_tree_classifier_auroc(
     best_auroc = -np.inf
     best_ccp_alpha = None
     r_sample_weights = np.ones(len(R)) / len(R)
-    r_feature_weights = np.ones(len(feature_weights)) / len(feature_weights)
     clf = DecisionTreeClassifier(
         random_state=np.random.RandomState(random_state),
         max_features=max_features,
@@ -583,12 +590,16 @@ def train_tree_classifier_auroc(
             ccp_alphas_unique = np.append(
                 ccp_alphas_unique[-10:], shortened_ccp_alphas_unique
             )
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
     for ccp_alpha in ccp_alphas_unique:
+        auroc_list = []
+        skf = StratifiedKFold(
+            n_splits=n_splits, shuffle=True, random_state=random_state
+        )
         for train_indices_n, val_indices_n in skf.split(X, y):
-            auroc_list = []
             X_train, y_train = X[train_indices_n], y[train_indices_n]
             sample_weights_train = sample_weights[train_indices_n]
+            sample_weights_val = sample_weights[val_indices_n]
             X_val, y_val = X[val_indices_n], y[val_indices_n]
             clf = DecisionTreeClassifier(
                 random_state=np.random.RandomState(random_state),
@@ -607,29 +618,33 @@ def train_tree_classifier_auroc(
             clf.fit(
                 R,
                 self_labeled_targets,
-                sample_weights=r_sample_weights,
-                feature_weights=r_feature_weights,
+                sample_weight=r_sample_weights,
+                feature_weights=feature_weights,
             )
-            reverse_probs = clf.predict_proba(X_val)[:, 1]
+            reverse_probs = clf.predict_proba(X_val)
+            if reverse_probs.shape[1] == 2:
+                reverse_probs = reverse_probs[:, 1]
 
-            auroc = roc_auc_score(y_val, reverse_probs)
+            auroc = roc_auc_score(
+                y_val, reverse_probs, sample_weight=sample_weights_val
+            )
             auroc_list.append(auroc)
 
         mean_auroc = np.mean(auroc_list)
         if mean_auroc > best_auroc:
-            best_auroc = auroc
+            best_auroc = mean_auroc
             best_ccp_alpha = ccp_alpha
 
     clf = DecisionTreeClassifier(
-                random_state=np.random.RandomState(random_state),
-                max_features=max_features,
-                splitter=splitter,
-                ccp_alpha=best_ccp_alpha,
-            )
+        random_state=np.random.RandomState(random_state),
+        max_features=max_features,
+        splitter=splitter,
+        ccp_alpha=best_ccp_alpha,
+    )
     clf.fit(
         X,
         y,
-        sample_weights=sample_weights,
+        sample_weight=sample_weights,
         feature_weights=feature_weights,
     )
 
@@ -637,8 +652,9 @@ def train_tree_classifier_auroc(
 
 
 def train_random_forest_classifier(
-    X_train,
-    y_train,
+    X,
+    y,
+    R,
     sample_weights,
     feature_weights=None,
     n_splits=5,
@@ -659,35 +675,31 @@ def train_random_forest_classifier(
     :param n_splits: Number of cross-validation iterations, defaults to 5
     :return: Trained classifier
     """
-    clf = RandomForestClassifier(
-        random_state=random_state,
-        splitter=splitter,
-        class_weight=class_weight,
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-    )
 
-    parameter_grid = {
-        "min_samples_split": [2, 10, 20, 50],
-        "min_samples_leaf": [1, 5, 10, 25],
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    scorer = ReverseScorer(R, feature_weights).set_score_request(sample_weight=True)
+    param_grid = {
+        "min_samples_split": [2, 4, 10, 20, 40],
+        "min_samples_leaf": [1, 2, 5, 10, 20],
         "class_weight": ["balanced", None],
     }
-
-    cv = StratifiedKFold(
-        n_splits=n_splits,
-        shuffle=True,
-        random_state=np.random.RandomState(random_state),
+    clf = RandomForestClassifier(
+        random_state=random_state, splitter=splitter, n_estimators=n_estimators
+    ).set_fit_request(
+        sample_weight=True, feature_weights=True, draw_with_feature_weights=True
     )
-    grid = GridSearchCV(
-        clf, param_grid=parameter_grid, cv=cv, n_jobs=-1, refit=True, scoring="roc_auc"
+    grid_cv = GridSearchCV(
+        clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
     )
-    return grid.fit(
-        X_train,
-        y_train,
+    grid_cv.fit(
+        X,
+        y,
         sample_weight=sample_weights,
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
+
+    return grid_cv
 
 
 def train_boosting_classifier(

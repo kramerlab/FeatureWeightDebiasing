@@ -57,11 +57,7 @@ def plot_feature_importance(feature_importance_list, save_path):
 
 
 def plot_budget_comparison_auroc_mean(
-    auroc_list_of_dictionaries,
-    number_of_samples,
-    drop,
-    file_name,
-    wide=True
+    auroc_list_of_dictionaries, number_of_samples, drop, file_name, wide=True
 ):
     if wide:
         plt.figure(figsize=(10, 5))
@@ -92,4 +88,22 @@ def plot_budget_comparison_auroc_mean(
     plt.gca().invert_xaxis()
 
     plt.savefig(f"{file_name}.pdf")
+    plt.close()
+
+
+def visualize_boxplot(
+    values_dict,
+    y_label,
+    y_lim=None,
+    file_name="",
+):
+    tmp_dict = {"None": values_dict[None]}
+    values_dict.pop(None)
+    tmp_dict.update(values_dict)
+    ax = sns.boxplot(data=tmp_dict)
+    ax.set_ylabel(y_label)
+    if y_lim is not None:
+        ax.set_ylim(y_lim)
+
+    plt.savefig(f"{file_name}.pdf", bbox_inches="tight")
     plt.close()

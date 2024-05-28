@@ -197,9 +197,6 @@ def feature_weighted_repeated_MRS(
     if method_name == "fw-mrs-temperature":
         draw_with_feature_weights = True
         feature_weight_method = compute_feature_weights_with_temperature
-    if method_name == "fw-mrs-budget":
-        draw_with_feature_weights = False
-        feature_weight_method = compute_feature_weights_with_budget
 
     feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
@@ -256,6 +253,9 @@ def feature_weighted_repeated_MRS(
             mrs_iteration = (i + 1) * drop
             best_difference = auc_difference
             best_feature_weights = feature_weights.copy()
+            best_negative_feature_weights = feature_weight_method(
+                budgets[0], -feature_importance
+            )
             current_patience = 0
         else:
             current_patience += 1
@@ -281,4 +281,4 @@ def feature_weighted_repeated_MRS(
         )
 
     else:
-        return best_sample_weights, best_feature_weights
+        return best_sample_weights, best_feature_weights, best_negative_feature_weights

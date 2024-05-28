@@ -3,9 +3,12 @@ from sklearn.metrics import (
     roc_auc_score,
     average_precision_score,
 )
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.multiclass import unique_labels
+from sklearn.utils.validation import check_X_y, check_is_fitted
+from utils.reverse_validation import ReverseScorer
+from sklearn import set_config
 
 
 def compute_classification_metrics_gradient_descent(
@@ -17,9 +20,9 @@ def compute_classification_metrics_gradient_descent(
     feature_weights,
     label,
     random_state=None,
-    regularization_name="scad",
-    n_splits=10,
+    n_splits=5,
 ):
+    set_config(enable_metadata_routing=True)
     clf = train_gradient_descent_classifier(
         N[columns].values,
         N[label].values,
@@ -27,14 +30,13 @@ def compute_classification_metrics_gradient_descent(
         sample_weights,
         feature_weights,
         random_state,
-        regularization_name=regularization_name,
         n_splits=n_splits,
     )
-    print(clf.lambda_value)
     y_predictions = clf.predict_proba(T[columns])[:, 1]
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
 
+    set_config(enable_metadata_routing=False)
     return auroc_score, auprc
 
 
@@ -45,108 +47,69 @@ def train_gradient_descent_classifier(
     sample_weights,
     feature_weights=None,
     random_state=None,
-    regularization_name=None,
     n_splits=5,
 ):
-    lambda_values = [0.1, 0.01, 0.001, 0.0001]
-    # lambda_values = [0.1]
-    best_auroc = -np.inf
-    best_lambda = None
-    r_sample_weights = np.ones(len(R)) / len(R)
-    r_feature_weights = np.ones(len(feature_weights)) / len(feature_weights)
+
+    param_grid = {
+        "lambda_value": [10, 1, 0.1, 0.01, 0.001],
+        "learning_rate": [0.01],
+        "regularization_name": ["scad", "l1", "l2"],
+    }
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for lambda_value in lambda_values:
-        auroc_list = []
-        for train_indices_n, val_indices_n in skf.split(X, y):
-            X_train, y_train = X[train_indices_n], y[train_indices_n]
-            sample_weights_train = sample_weights[train_indices_n]
-            sample_weights_val = sample_weights[val_indices_n]
-            X_val, y_val = X[val_indices_n], y[val_indices_n]
-
-            clf = GradientDescentModel(
-                regularization_name=regularization_name,
-                lambda_value=lambda_value,
-            )
-            clf.fit(
-                X_train,
-                y_train,
-                sample_weights=sample_weights_train,
-                feature_weights=feature_weights,
-            )
-            self_labeled_targets = clf.predict(R)
-            clf.fit(
-                R,
-                self_labeled_targets,
-                sample_weights=r_sample_weights,
-                feature_weights=r_feature_weights,
-            )
-            reverse_probs = clf.predict_proba(X_val)[:, 1]
-
-            auroc = roc_auc_score(
-                y_val, reverse_probs, sample_weight=sample_weights_val
-            )
-            auroc_list.append(auroc)
-
-        mean_auroc = np.mean(auroc_list)
-        if mean_auroc > best_auroc:
-            best_auroc = mean_auroc
-            best_lambda = lambda_value
-
-    clf = GradientDescentModel(
-        regularization_name=regularization_name,
-        lambda_value=best_lambda,
+    scorer = ReverseScorer(R, feature_weights).set_score_request(sample_weight=True)
+    clf = GradientDescentModel().set_fit_request(
+        sample_weight=True,
+        feature_weights=True,
     )
-    clf.fit(
-        X,
-        y,
-        sample_weights=sample_weights,
-        feature_weights=feature_weights,
+    grid_cv = GridSearchCV(
+        clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
     )
+    grid_cv.fit(X, y, sample_weight=sample_weights, feature_weights=feature_weights)
+    # print(grid_cv.best_params_)
+    # print(grid_cv.best_estimator_.coefficients_)
+    return grid_cv
 
-    return clf
 
-
-class GradientDescentModel(BaseEstimator, ClassifierMixin):
+class GradientDescentModel(ClassifierMixin, BaseEstimator):
     def __init__(
         self,
-        epsilon=1e-4,
-        learning_rate=0.01,
+        learning_rate=0.1,
+        regularization_name="scad",
+        lambda_value=0.01,
+        epsilon=1e-3,
         max_patience=100,
-        regularization_name=None,
-        lambda_value=0.0,
     ) -> None:
         self.epsilon = epsilon
         self.learning_rate = learning_rate
         self.max_patience = max_patience
         self.regularization_name = regularization_name
-        self.regularization_method = self.get_regularization_function(
-            regularization_name
-        )
         self.lambda_value = lambda_value
-        self.weights = None
 
     def fit(
         self,
         X,
         y,
-        sample_weights,
+        sample_weight,
         feature_weights,
     ) -> None:
-        self.weights = np.zeros(len(feature_weights) + 1)
+        self.regularization_method = self.get_regularization_function(
+            self.regularization_name
+        )
         current_patience = 0
         lowest_gradient = np.inf
+        X, y = check_X_y(X, y)
         self.classes_ = unique_labels(y)
         X_with_intercept = np.append(np.ones(len(X))[:, np.newaxis], X, axis=1)
-        feature_weights = np.append(np.max(feature_weights), feature_weights)
-        feature_weights = feature_weights / np.sum(feature_weights)
+        feature_weights = np.append(np.min(feature_weights), feature_weights)
+        self.coefficients_ = np.zeros(len(feature_weights))
+
         while True:
             gradient_norm = self.gradient_descent_step(
                 X_with_intercept,
                 y,
-                sample_weights,
+                sample_weight,
                 feature_weights,
-                self.regularization_method,
             )
             if gradient_norm < self.epsilon:
                 break
@@ -157,6 +120,7 @@ class GradientDescentModel(BaseEstimator, ClassifierMixin):
                 current_patience += 1
             if current_patience >= self.max_patience:
                 break
+        return self
 
     def gradient_descent_step(
         self,
@@ -164,42 +128,49 @@ class GradientDescentModel(BaseEstimator, ClassifierMixin):
         y,
         sample_weights,
         feature_weights,
-        regularization_method,
     ):
-        # feature_weights = feature_weights / np.sum(feature_weights)
         predicted_probabilities = self.predict_proba(X)[:, 1]
-        target_difference = y - predicted_probabilities
+        target_difference = predicted_probabilities - y
         gradients = np.average(
             X * target_difference[:, np.newaxis],
             weights=sample_weights,
             axis=0,
         )
-        if regularization_method is not None:
-            regularization_gradients = regularization_method(
-                self.weights, self.lambda_value
+        if self.regularization_method is not None:
+            regularization_gradients = self.regularization_method(
+                self.coefficients_, self.lambda_value * feature_weights
             )
-            regularization_gradients = (1 - feature_weights) * regularization_gradients
+            weighted_regularization_gradients = regularization_gradients
         else:
-            regularization_gradients = 0
-        weighted_gradients = self.learning_rate * (
-            -gradients + regularization_gradients
-        )
-        self.weights -= weighted_gradients
+            weighted_regularization_gradients = 0
+        regularized_gradients = gradients + weighted_regularization_gradients
+        weighted_gradients = self.learning_rate * regularized_gradients
+
+        self.coefficients_ -= weighted_gradients
 
         return np.linalg.norm(weighted_gradients)
 
-    def smoothly_clipped_absolute_deviation(self, weights, lambda_value=0.4, a=3.7):
-        gradients = np.zeros(len(weights))
-        first_indices = np.abs(weights) <= lambda_value
-        gradients[first_indices] = lambda_value * np.sign(weights[first_indices])
+    def smoothly_clipped_absolute_deviation(
+        self, coefficients, lambda_value=0.4, a=3.7
+    ):
+        gradients = np.zeros(len(coefficients))
+        first_indices = np.abs(coefficients) <= lambda_value
+        if first_indices.any():
+            gradients[first_indices] = lambda_value[first_indices] * np.sign(
+                coefficients[first_indices]
+            )
 
-        second_indices = (lambda_value < np.abs(weights)) & (
-            np.abs(weights) <= a * lambda_value
+        second_indices = (lambda_value < np.abs(coefficients)) & (
+            np.abs(coefficients) <= a * lambda_value
         )
-        gradients[second_indices] = (
-            (a * lambda_value - np.abs(weights[second_indices]))
-            * np.sign(weights[second_indices])
-        ) / (a - 1)
+        if second_indices.any():
+            gradients[second_indices] = (
+                (
+                    a * lambda_value[second_indices]
+                    - np.abs(coefficients[second_indices])
+                )
+                * np.sign(coefficients[second_indices])
+            ) / ((a - 1) * lambda_value[second_indices])
 
         return gradients
 
@@ -213,7 +184,7 @@ class GradientDescentModel(BaseEstimator, ClassifierMixin):
         elif regularization_method_name == "mcp":
             return self.minimax_concave_penalty
         else:
-            return None
+            return self.l1
 
     def minimax_concave_penalty(self, weights, lambda_value, a=3):
         gradients = np.zeros(len(weights))
@@ -231,16 +202,17 @@ class GradientDescentModel(BaseEstimator, ClassifierMixin):
         return weights * lambda_value
 
     def predict_proba(self, X):
-        if X.shape[1] < len(self.weights):
+        if X.shape[1] < len(self.coefficients_):
             X_with_intercept = np.append(np.ones(len(X))[:, np.newaxis], X, axis=1)
         else:
             X_with_intercept = X
         probabilities = self.logistic_function(
-            np.sum(X_with_intercept * self.weights, axis=1)
+            np.sum(X_with_intercept * self.coefficients_, axis=1)
         )
         return np.stack([1 - probabilities, probabilities], axis=1)
 
     def predict(self, X):
+        check_is_fitted(self)
         probabilities = self.predict_proba(X)
         return np.argmax(probabilities, axis=1)
 
@@ -251,3 +223,18 @@ class GradientDescentModel(BaseEstimator, ClassifierMixin):
     def logistic_function(self, X):
         np.seterr(over="ignore")
         return 1 / (1 + np.exp(-X))
+
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+        return self
+
+    def get_params(self, deep=True):
+        # suppose this estimator has parameters "alpha" and "recursive"
+        return {
+            "epsilon": self.epsilon,
+            "learning_rate": self.learning_rate,
+            "max_patience": self.max_patience,
+            "regularization_name": self.regularization_name,
+            "lambda_value": self.lambda_value,
+        }

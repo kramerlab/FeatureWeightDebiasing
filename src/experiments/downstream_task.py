@@ -106,7 +106,7 @@ def downstream_experiment(
             sample_weights = np.array(sample_weight_list[i])
             feature_weights = np.array(feature_weights_list[i])
         else:
-            sample_weights, feature_weights = sample_weighting_method(
+            sample_weights, feature_weights, negative_feature_weights = sample_weighting_method(
                 N=N,
                 R=R,
                 columns=columns,
@@ -141,15 +141,16 @@ def downstream_experiment(
             )
 
             if feature_weights is None:
-                feature_weights = np.ones(len(columns))
+                feature_weights = np.ones(len(columns)) / len(columns)
 
             gradient_ascent_auroc, gradient_ascent_auprc = (
                 compute_classification_metrics_gradient_descent(
                     N,
                     R,
+                    R,
                     columns,
                     sample_weights,
-                    feature_weights,
+                    negative_feature_weights,
                     target,
                     random_state=seed,
                 )
@@ -158,17 +159,6 @@ def downstream_experiment(
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 R,
-                columns,
-                sample_weights,
-                feature_weights,
-                target,
-                random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
-            )
-
-            tree_auroc, tree_auprc = compute_classification_metrics_tree(
-                N,
                 R,
                 columns,
                 sample_weights,
@@ -178,6 +168,7 @@ def downstream_experiment(
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
             )
+
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
             if not feature_weights is None:
@@ -187,8 +178,8 @@ def downstream_experiment(
             biases_list.append(relative_bias)
             rf_auroc_list.append(rf_auroc)
             rf_auprc_list.append(rf_auprc)
-            tree_auroc_list.append(tree_auroc)
-            tree_auprc_list.append(tree_auprc)
+            tree_auroc_list.append(0)
+            tree_auprc_list.append(0)
             gradient_ascent_auroc_list.append(gradient_ascent_auroc)
             gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 

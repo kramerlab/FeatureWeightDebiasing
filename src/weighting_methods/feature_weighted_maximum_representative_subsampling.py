@@ -228,7 +228,7 @@ def feature_weighted_repeated_MRS(
                 random_state=rand_int,
                 feature_weights=feature_weights,
                 method=validation_method,
-                class_weight="balanced",
+                class_weight=None,
                 max_features="sqrt",
                 splitter=splitter,
                 n_splits_test=n_test_splits,

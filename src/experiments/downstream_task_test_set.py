@@ -150,7 +150,7 @@ def downstream_experiment_with_test_set(
                     inverse_feature_weights,
                     target,
                     random_state=seed,
-                    n_splits=5,
+                    n_splits=10,
                 )
             )
 
@@ -166,7 +166,7 @@ def downstream_experiment_with_test_set(
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
                 n_estimators=500,
-                n_splits=5,
+                n_splits=10,
             )
 
             # tree_auroc, tree_auprc = compute_classification_metrics_tree(

@@ -57,12 +57,6 @@ def feature_weight_downstream_comparison_experiment(
     result_path = result_path / method_name / validation_method
     result_path.mkdir(parents=True, exist_ok=True)
 
-    saved_weights_path = result_path / "saved_weights"
-    saved_weights_path.mkdir(parents=True, exist_ok=True)
-
-    auroc_path = result_path / "aurocs"
-    auroc_path.mkdir(exist_ok=True, parents=True)
-
     dropped_samples_list_dict = {}
 
     scaler = StandardScaler()
@@ -82,7 +76,7 @@ def feature_weight_downstream_comparison_experiment(
         dropped_samples_list_dict[temperature] = []
 
     for _ in trange(number_of_repetitions):
-        N, R, T = sample_with_test_set(
+        N, R, _ = sample_with_test_set(
             bias_type,
             sample_df,
             target,
@@ -111,7 +105,9 @@ def feature_weight_downstream_comparison_experiment(
         )
 
         for temperature in temperatures:
-            dropped_samples_list_dict[temperature].append(dropped_samples_dict[temperature])
+            dropped_samples_list_dict[temperature].append(
+                dropped_samples_dict[temperature]
+            )
             sample_weights = best_sample_weights_dict[temperature]
             feature_weights = best_feature_weights_dict[temperature]
             inverse_feature_weights = best_inverse_feature_weights_dict[temperature]
@@ -128,7 +124,7 @@ def feature_weight_downstream_comparison_experiment(
                     inverse_feature_weights,
                     target,
                     random_state=seed,
-                    n_splits=5,
+                    n_splits=10,
                 )
             )
             gradient_ascent_auroc_dict[temperature].append(gradient_ascent_auroc)
@@ -146,7 +142,7 @@ def feature_weight_downstream_comparison_experiment(
                 draw_with_feature_weights=True,
                 splitter="feature_weighted_best",
                 n_estimators=500,
-                n_splits=5,
+                n_splits=10,
             )
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)
@@ -189,4 +185,3 @@ def feature_weight_downstream_comparison_experiment(
     ):
         with open(result_path / f"{file_name}.json", "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-

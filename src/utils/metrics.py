@@ -463,7 +463,6 @@ def compute_test_metrics_mrs(
     )
     for train_indices, test_indices in kf.split(data[columns], data.label):
         train, test = data.iloc[train_indices], data.iloc[test_indices]
-        train_random_forest_classifier
         clf = train_classifier_auroc(
             train[columns],
             train.label,

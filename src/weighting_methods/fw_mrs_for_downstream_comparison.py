@@ -93,7 +93,7 @@ def feature_weighted_repeated_MRS(
                 columns,
                 random_state=rand_int,
                 feature_weights=feature_weights,
-                class_weight="balanced",
+                class_weight=None,
                 max_features="sqrt",
                 splitter=splitter,
                 n_splits_test=n_test_splits,
@@ -108,7 +108,7 @@ def feature_weighted_repeated_MRS(
             ] and not finished_dict[temperature]:
                 dropped_samples_dict[temperature] = i * drop
                 best_sample_weights_dict[temperature] = sample_weights.copy().astype(
-                    np.float64
+                    np.float64htpo
                 )
                 best_sample_weights_dict[temperature] /= np.sum(
                     best_sample_weights_dict[temperature]

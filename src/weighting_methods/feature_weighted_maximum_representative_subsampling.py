@@ -8,7 +8,6 @@ from utils.metrics import (
     compute_test_metrics_fw_mrs,
     train_fw_mrs_pu_classifier,
     train_feature_weighted_random_forest,
-    train_feature_weighted_decision_tree,
 )
 
 # Used to draw radom states
@@ -118,7 +117,7 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     :param feature_importance: _description_
     :return: _description_
     """
-    if temperature is None:
+    if temperature is None or temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
     feature_weights = np.exp(-feature_importance / temperature)
     return feature_weights / np.sum(feature_weights)
@@ -142,7 +141,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.01,
+    delta=0.02,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
@@ -151,7 +150,7 @@ def feature_weighted_repeated_MRS(
     return_auroc=False,
     n_test_splits=10,
     n_pu_splits=5,
-    max_patience=5,
+    max_patience=10,
     validation_method="random_forest",
     splitter="feature_weighted_best",
     n_estimators=100,
@@ -179,24 +178,27 @@ def feature_weighted_repeated_MRS(
     number_of_iterations = (len(N) - (n_test_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
-    best_difference = np.inf
     feature_weights = np.ones(len(columns))
-    current_patience = 0
+    feature_importance_list = []
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
-    for budget in budgets:
-        dropped_samples_dict[budget] = 0
-    feature_importance_list = []
+    finished_dict = {}
+    best_difference_dict = {}
+    best_inverse_feature_weights_dict = {}
+    best_sample_weights_dict = {}
+    dropped_samples_dict = {}
+    best_feature_weights_dict = {}
+    auc_difference_dict = {}
+    current_patience_dict = {}
 
-    if validation_method == "random_forest":
-        validation_method = train_feature_weighted_random_forest
-    elif validation_method == "decision_tree":
-        validation_method = train_feature_weighted_decision_tree
-
-    if method_name == "fw-mrs-temperature":
-        draw_with_feature_weights = True
-        feature_weight_method = compute_feature_weights_with_temperature
+    finished_dict = {}
+    for temperature in budgets:
+        finished_dict[temperature] = False
+        best_difference_dict[temperature] = np.inf
+        auc_difference_dict[temperature] = 1
+        dropped_samples_dict[temperature] = 0
+        current_patience_dict[temperature] = 0
 
     feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
@@ -215,10 +217,8 @@ def feature_weighted_repeated_MRS(
         feature_importance_list.append(feature_importance.tolist())
 
         for budget in budgets:
-            feature_weights = (
-                np.ones(len(feature_importance))
-                if budget is None or budget == 0.0
-                else feature_weight_method(budget, feature_importance)
+            feature_weights = compute_feature_weights_with_temperature(
+                budget, feature_importance
             )
 
             auroc = compute_test_metrics_fw_mrs(
@@ -227,13 +227,13 @@ def feature_weighted_repeated_MRS(
                 columns,
                 random_state=rand_int,
                 feature_weights=feature_weights,
-                method=validation_method,
-                class_weight=None,
+                method=train_feature_weighted_random_forest,
+                class_weight="balanced",
                 max_features="sqrt",
                 splitter=splitter,
                 n_splits_test=n_test_splits,
                 n_estimators=n_estimators,
-                draw_with_feature_weights=draw_with_feature_weights,
+                draw_with_feature_weights=True,
             )
 
             if budget not in feature_weighted_aurocs_dict:
@@ -243,29 +243,36 @@ def feature_weighted_repeated_MRS(
             feature_weights_dict[budget].append(list(feature_weights))
 
             auc_difference = abs(auroc - 0.5)
-            if (auc_difference <= delta) and (dropped_samples_dict[budget] == 0):
-                dropped_samples_dict[budget] = i * drop
 
-        auc_difference = abs(auroc - 0.5)
-        if (auc_difference + delta) <= best_difference:
-            best_sample_weights = sample_weights.copy().astype(np.float64)
-            best_sample_weights /= np.sum(best_sample_weights)
-            mrs_iteration = (i + 1) * drop
-            best_difference = auc_difference
-            best_feature_weights = feature_weights.copy()
-            best_negative_feature_weights = feature_weight_method(
-                budgets[0], -feature_importance
-            )
-            current_patience = 0
-        else:
-            current_patience += 1
+            if (auc_difference + delta) <= best_difference_dict[
+                temperature
+            ] and not finished_dict[temperature]:
+                best_difference_dict[temperature] = auc_difference
+                dropped_samples_dict[temperature] = i * drop
+                best_sample_weights_dict[temperature] = (
+                    sample_weights / np.sum(sample_weights)
+                ).tolist()
+                best_feature_weights_dict[temperature] = feature_weights.tolist().copy()
+                best_inverse_feature_weights_dict[temperature] = (
+                    compute_feature_weights_with_temperature(
+                        temperature, -feature_importance
+                    )
+                ).tolist()
+                current_patience_dict[temperature] += 0
+            else:
+                current_patience_dict[temperature] += 1
+            if (
+                len(dropped_N) <= drop
+                or len(dropped_N) <= n_test_splits
+                or (
+                    current_patience_dict[temperature] >= max_patience
+                    and early_stopping
+                )
+                or (auc_difference <= delta and early_stopping)
+            ):
+                finished_dict[temperature] = True
 
-        if (
-            ((best_difference <= delta) and early_stopping)
-            or len(dropped_N) <= drop
-            or len(dropped_N) <= n_test_splits
-            or current_patience >= max_patience
-        ):
+        if all(finished_dict.values()):
             break
 
         dropped_N = dropped_N.drop(drop_ids)
@@ -281,4 +288,8 @@ def feature_weighted_repeated_MRS(
         )
 
     else:
-        return best_sample_weights, best_feature_weights, best_negative_feature_weights
+        return (
+            best_sample_weights_dict,
+            best_feature_weights_dict,
+            best_inverse_feature_weights_dict,
+        )

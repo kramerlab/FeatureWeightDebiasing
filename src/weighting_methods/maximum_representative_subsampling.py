@@ -97,7 +97,7 @@ def mrs(
     N,
     R,
     columns,
-    delta=0.01,
+    delta=0.02,
     early_stopping=False,
     mrs_function=mrs_step,
     return_metrics=False,
@@ -234,7 +234,7 @@ def mrs(
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return best_weights / best_weights.sum(), None, None
+        return (best_weights / best_weights.sum()).tolist(), None, None
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

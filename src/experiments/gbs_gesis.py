@@ -40,7 +40,7 @@ def gbs_gesis_experiment(
     scaled_N = scaled_df[scaled_df["label"] == 1]
     scaled_R = scaled_df[scaled_df["label"] == 0]
 
-    weights = weighting_method(
+    sample_weights, feature_weights, inverse_feature_weights = weighting_method(
         scaled_N,
         scaled_R,
         columns,
@@ -59,26 +59,16 @@ def gbs_gesis_experiment(
     ) = compute_metrics(
         scaled_N[columns],
         scaled_R[columns],
-        weights,
+        sample_weights,
         scaler,
         scale_columns,
         columns,
         gamma,
     )
 
-    remaining_samples = np.count_nonzero(weights != 0)
-    plot_sample_weights(weights, visualisation_path, 0, "GBS")
+    remaining_samples = np.count_nonzero(sample_weights != 0)
+    plot_sample_weights(sample_weights, visualisation_path, 0, "GBS")
 
-    if "neural_network_mmd_loss" in method:
-        biases_path = visualisation_path / "MMDs"
-        biases_path.mkdir(exist_ok=True)
-        plot_results_with_variance(
-            [],
-            [mmd_list[-1]],
-            [],
-            biases_path,
-            "",
-        )
 
     result_dict = {
         "MMDs": weighted_mmd,
@@ -100,7 +90,7 @@ def gbs_gesis_experiment(
         scaled_N[columns],
         scaled_R[columns],
         visualisation_path,
-        weights,
+        sample_weights,
     )
 
 

@@ -29,7 +29,7 @@ def feature_weight_budget_comparison_experiment(
     method_name=None,
     drop=1,
     bias_fraction=0.25,
-    validation_method="both",
+    validation_method="",
     **args,
 ):
     """The function uses the weighting method to compute the sample weights and
@@ -46,11 +46,8 @@ def feature_weight_budget_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    budgets = (
-        [None, 0.01, 0.025, 0.05, 0.1]
-        if method_name == "fw-mrs-budget"
-        else [None, 0.1, 0.01, 0.005, 0.001]
-    )
+    temperatures = [None, 0.1, 0.01, 0.005, 0.001]
+    
 
     result_path = create_result_path(
         method_name,
@@ -111,7 +108,7 @@ def feature_weight_budget_comparison_experiment(
             random_generator=random_generator,
             max_patience=len(N),
             target=target,
-            budgets=budgets,
+            budgets=temperatures,
             return_auroc=True,
             validation_method=validation_method,
             method_name=method_name,

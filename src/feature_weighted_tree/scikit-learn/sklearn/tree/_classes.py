@@ -455,8 +455,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                     min_weight_leaf,
                     random_state,
                     monotonic_cst,
-                    feature_weights,
-                    draw_with_feature_weights,
+                    feature_weights=feature_weights,
+                    draw_with_feature_weights=draw_with_feature_weights,
                 )
             else:
                 splitter = SPLITTERS[self.splitter](

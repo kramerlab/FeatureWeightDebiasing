@@ -23,16 +23,34 @@ def compute_classification_metrics_gradient_descent(
     n_splits=5,
 ):
     set_config(enable_metadata_routing=True)
-    clf = train_gradient_descent_classifier(
-        N[columns].values,
-        N[label].values,
-        R[columns].values,
-        sample_weights,
-        feature_weights,
-        random_state,
-        n_splits=n_splits,
-    )
-    y_predictions = clf.predict_proba(T[columns])[:, 1]
+    if isinstance(sample_weights, dict):
+        best_clf = None
+        best_score = -1
+        for sample_weight, feature_weight in zip(sample_weights.values(), feature_weights.values()):
+            clf, score = train_gradient_descent_classifier(
+                N[columns].values,
+                N[label].values,
+                R[columns].values,
+                sample_weight,
+                feature_weight,
+                random_state,
+                n_splits=n_splits,
+            )
+            if score > best_score:
+                best_score = score
+                best_clf = clf
+    else:
+        best_clf, _ = train_gradient_descent_classifier(
+            N[columns].values,
+            N[label].values,
+            R[columns].values,
+            sample_weights,
+            feature_weights,
+            random_state,
+            n_splits=n_splits,
+        )
+
+    y_predictions = best_clf.predict_proba(T[columns])[:, 1]
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
 
@@ -66,9 +84,7 @@ def train_gradient_descent_classifier(
         clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
     )
     grid_cv.fit(X, y, sample_weight=sample_weights, feature_weights=feature_weights)
-    # print(grid_cv.best_params_)
-    # print(grid_cv.best_estimator_.coefficients_)
-    return grid_cv
+    return grid_cv, grid_cv.best_score_
 
 
 class GradientDescentModel(ClassifierMixin, BaseEstimator):

@@ -273,20 +273,39 @@ def compute_classification_metrics_random_forest(
     :return: Downstream classification metrics
     """
     set_config(enable_metadata_routing=True)
-    clf = train_random_forest_classifier(
-        N[columns].values,
-        N[label].values,
-        R[columns].values,
-        sample_weights,
-        feature_weights,
-        random_state=random_state,
-        n_splits=n_splits,
-        draw_with_feature_weights=draw_with_feature_weights,
-        splitter=splitter,
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-    )
-    y_predictions = clf.predict_proba(T[columns].values)[:, 1]
+    if isinstance(sample_weights, dict):
+        best_clf = None
+        best_score = -1
+        for sample_weight, feature_weight in zip(sample_weights.values(), feature_weights.values()):
+            clf, score = train_random_forest_classifier(
+                N[columns].values,
+                N[label].values,
+                R[columns].values,
+                sample_weight,
+                feature_weight,
+                random_state=random_state,
+                n_splits=n_splits,
+                draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
+                n_estimators=n_estimators,
+            )
+        if score > best_score:
+            best_score = score
+            best_clf = clf
+    else:
+        best_clf, _ = train_random_forest_classifier(
+            N[columns].values,
+            N[label].values,
+            R[columns].values,
+            sample_weights,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=n_estimators,
+        )
+    y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
 
@@ -659,10 +678,8 @@ def train_random_forest_classifier(
     n_splits=5,
     draw_with_feature_weights=False,
     random_state=None,
-    class_weight=None,
     splitter="feature_weighted_best",
     n_estimators=500,
-    max_depth=None,
     **kwargs,
 ):
     """Train a classifier to measure the auroc
@@ -693,12 +710,12 @@ def train_random_forest_classifier(
     grid_cv.fit(
         X,
         y,
-        sample_weight=sample_weights,
-        feature_weights=feature_weights,
+        sample_weight=np.array(sample_weights),
+        feature_weights=np.array(feature_weights),
         draw_with_feature_weights=draw_with_feature_weights,
     )
 
-    return grid_cv
+    return grid_cv, grid_cv.best_score_
 
 
 def train_boosting_classifier(

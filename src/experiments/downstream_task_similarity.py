@@ -4,19 +4,20 @@ import numpy as np
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
-from utils.gradient_descent import compute_classification_metrics_gradient_descent
-from utils.statistics import create_result_path, write_result_dict_test_set
-from utils.sampling import sample_with_test_set
-from utils.visualization import plot_sample_weights, plot_feature_weights
+from utils.statistics import create_result_path, write_result_dict
+from utils.sampling import sample
+from utils.visualization import plot_feature_weights, plot_sample_weights
 from utils.metrics import (
     compute_classification_metrics_random_forest,
-    compute_classification_metrics_tree,
+    compute_metrics,
+    calculate_rbf_gamma,
 )
+from utils.gradient_descent import compute_classification_metrics_gradient_descent
 
 seed = 5
 
 
-def downstream_experiment_with_test_set(
+def downstream_experiment(
     df,
     columns,
     sample_weighting_method,
@@ -26,13 +27,13 @@ def downstream_experiment_with_test_set(
     data_set_name: str = "",
     random_generator=None,
     explicit_weights=True,
-    load_previous_results=True,
-    budget="",
-    bias_fraction=0.75,
-    drop=1,
-    validation_method="random_forest",
+    load_previous_results=False,
     method_name=None,
-    **args,
+    budget=0.0,
+    bias_fraction=0.25,
+    validation_method="random_forest",
+    drop=1,
+    **args
 ):
     """The function uses the weighting method to compute the sample weights and
     computes the metrics, visualizes the results and saves the result in a file.
@@ -47,6 +48,8 @@ def downstream_experiment_with_test_set(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
+    weighted_mmds_list = []
+    biases_list = []
     rf_auroc_list = []
     rf_auprc_list = []
 
@@ -62,24 +65,17 @@ def downstream_experiment_with_test_set(
         method_name,
         bias_type,
         data_set_name,
-        experiment_name="test_set_classification",
+        "R_classsification",
         bias_fraction=bias_fraction,
     )
-    result_path = result_path / str(budget)
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
-    inverse_feature_weights_save_path = result_path / "inverse_feature_weights"
-    classificiation_result_path = result_path / "classification_results"
 
-    result_path.mkdir(exist_ok=True)
-    classificiation_result_path.mkdir(exist_ok=True)
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
-    inverse_feature_weights_save_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
-    feature_weight_list = load_weights(feature_weights_save_path)
-    inverse_feature_weight_list = load_weights(feature_weights_save_path)
+    feature_weights_list = load_weights(feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -94,23 +90,22 @@ def downstream_experiment_with_test_set(
     )
 
     for i in trange(number_of_repetitions):
-        N, R, T = sample_with_test_set(
+        N, R = sample(
             bias_type,
             sample_df,
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.2,
             columns=columns,
         )
 
+        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
+
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
-            feature_weights = np.array(feature_weight_list[i])
-            inverse_feature_weights = np.array(inverse_feature_weight_list[i])
-
+            feature_weights = np.array(feature_weights_list[i])
         else:
-            sample_weights, feature_weights, inverse_feature_weights = sample_weighting_method(
+            sample_weights, feature_weights, negative_feature_weights = sample_weighting_method(
                 N=N,
                 R=R,
                 columns=columns,
@@ -124,40 +119,46 @@ def downstream_experiment_with_test_set(
                 validation_method=validation_method,
                 method_name=method_name,
             )
+            save_weights(sample_weights_save_path, sample_weight_list)
+            save_weights(feature_weights_save_path, feature_weights_list)
 
         dropped_samples = np.count_nonzero(sample_weights == 0.0)
-
-        if feature_weights is None:
-            feature_weights = np.ones(len(columns)) / len(columns)
-            inverse_feature_weights = np.ones(len(columns)) / len(columns)
-
-        feature_weight_list.append(feature_weights.tolist())
-        inverse_feature_weight_list.append(inverse_feature_weights.tolist())
-        sample_weight_list.append(sample_weights.tolist())
         dropped_samples_list.append(dropped_samples)
-
-        save_weights(sample_weights_save_path, sample_weight_list)
-        save_weights(feature_weights_save_path, feature_weight_list)
+        if not feature_weights is None:
+            feature_weights_list.append(feature_weights.tolist())
+        sample_weight_list.append(sample_weights.tolist())
 
         if explicit_weights:
+            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+                N,
+                R,
+                scaler,
+                columns,
+                columns,
+                sample_weights,
+                gamma,
+            )
+
+            if feature_weights is None:
+                feature_weights = np.ones(len(columns)) / len(columns)
+
             gradient_ascent_auroc, gradient_ascent_auprc = (
                 compute_classification_metrics_gradient_descent(
                     N,
                     R,
-                    T,
+                    R,
                     columns,
                     sample_weights,
-                    inverse_feature_weights,
+                    negative_feature_weights,
                     target,
                     random_state=seed,
-                    n_splits=10,
                 )
             )
 
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 R,
-                T,
+                R,
                 columns,
                 sample_weights,
                 feature_weights,
@@ -165,36 +166,26 @@ def downstream_experiment_with_test_set(
                 random_state=seed,
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
-                n_estimators=500,
-                n_splits=10,
             )
 
-            # tree_auroc, tree_auprc = compute_classification_metrics_tree(
-            #    N,
-            #    R,
-            #    T,
-            #    columns,
-            #    sample_weights,
-            #    feature_weights,
-            #    target,
-            #    random_state=seed,
-            #     draw_with_feature_weights=draw_with_feature_weights,
-            #    splitter=splitter,
-            # )
-            tree_auroc = 0
-            tree_auprc = 0
 
             plot_sample_weights(sample_weights, sample_weights_save_path, i)
-            plot_feature_weights(feature_weights, feature_weights_save_path, i)
+            if not feature_weights is None:
+                plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
+            weighted_mmds_list.append(weighted_mmd)
+            biases_list.append(relative_bias)
             rf_auroc_list.append(rf_auroc)
             rf_auprc_list.append(rf_auprc)
-            tree_auroc_list.append(tree_auroc)
-            tree_auprc_list.append(tree_auprc)
+            tree_auroc_list.append(0)
+            tree_auprc_list.append(0)
             gradient_ascent_auroc_list.append(gradient_ascent_auroc)
             gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
-    result_dict = write_result_dict_test_set(
+    result_dict = write_result_dict(
+        N.drop(["label"], axis="columns").columns,
+        weighted_mmds_list,
+        biases_list,
         rf_auroc_list,
         rf_auprc_list,
         tree_auroc_list,
@@ -203,35 +194,11 @@ def downstream_experiment_with_test_set(
         gradient_ascent_auprc_list,
         dropped_samples_list,
         len(N),
+        explicit_weights=explicit_weights,
     )
 
     with open(result_path / "results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
-
-    for result_list, file_name in zip(
-        (
-            rf_auroc_list,
-            rf_auprc_list,
-            tree_auroc_list,
-            tree_auprc_list,
-            gradient_ascent_auroc_list,
-            gradient_ascent_auprc_list,
-            dropped_samples_list,
-        ),
-        (
-            "rf_auroc",
-            "rf_auprc",
-            "tree_auroc",
-            "tree_auprc",
-            "gradient_ascent_auroc",
-            "gradient_ascent_auprc",
-            "dropped_samples",
-        ),
-    ):
-        with open(
-            classificiation_result_path / f"{file_name}.json", "w"
-        ) as result_file:
-            result_file.write(json.dumps(result_list))
 
 
 def save_weights(path, weights_list):

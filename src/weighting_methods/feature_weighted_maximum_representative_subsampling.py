@@ -216,9 +216,9 @@ def feature_weighted_repeated_MRS(
         )
         feature_importance_list.append(feature_importance.tolist())
 
-        for budget in budgets:
+        for temperature in budgets:
             feature_weights = compute_feature_weights_with_temperature(
-                budget, feature_importance
+                temperature, feature_importance
             )
 
             auroc = compute_test_metrics_fw_mrs(
@@ -236,11 +236,11 @@ def feature_weighted_repeated_MRS(
                 draw_with_feature_weights=True,
             )
 
-            if budget not in feature_weighted_aurocs_dict:
-                feature_weighted_aurocs_dict[budget] = []
-                feature_weights_dict[budget] = []
-            feature_weighted_aurocs_dict[budget].append(auroc)
-            feature_weights_dict[budget].append(list(feature_weights))
+            if temperature not in feature_weighted_aurocs_dict:
+                feature_weighted_aurocs_dict[temperature] = []
+                feature_weights_dict[temperature] = []
+            feature_weighted_aurocs_dict[temperature].append(auroc)
+            feature_weights_dict[temperature].append(list(feature_weights))
 
             auc_difference = abs(auroc - 0.5)
 

@@ -25,6 +25,7 @@ def feature_weighted_repeated_MRS(
     splitter="feature_weighted_best",
     n_estimators=100,
     method_name=None,
+    max_patience=20,
     *args,
     **attributes,
 ):
@@ -54,6 +55,7 @@ def feature_weighted_repeated_MRS(
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
+    current_patience_dict = {}
 
     finished_dict = {}
     for temperature in budgets:
@@ -61,6 +63,7 @@ def feature_weighted_repeated_MRS(
         best_difference_dict[temperature] = np.inf
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
+        current_patience_dict[temperature] = 0
 
     if method_name == "fw-mrs-temperature":
         draw_with_feature_weights = True
@@ -106,18 +109,23 @@ def feature_weighted_repeated_MRS(
             if (auc_difference + delta) <= best_difference_dict[
                 temperature
             ] and not finished_dict[temperature]:
+                best_difference_dict[temperature] = auc_difference
                 dropped_samples_dict[temperature] = i * drop
-                best_sample_weights_dict[temperature] = sample_weights.copy().astype(
-                    np.float64htpo
-                )
-                best_sample_weights_dict[temperature] /= np.sum(
-                    best_sample_weights_dict[temperature]
+                best_sample_weights_dict[temperature] = sample_weights / np.sum(
+                    sample_weights
                 )
                 best_feature_weights_dict[temperature] = feature_weights.copy()
                 best_inverse_feature_weights_dict[temperature] = feature_weight_method(
                     temperature, -feature_importance
                 )
-            if auc_difference <= delta:
+            else:
+                current_patience_dict[temperature] += 1
+            if (
+                len(dropped_N) <= drop
+                or len(dropped_N) <= n_test_splits
+                or current_patience_dict[temperature] >= max_patience
+                or auc_difference <= delta
+            ):
                 finished_dict[temperature] = True
 
         if all(finished_dict.values()):

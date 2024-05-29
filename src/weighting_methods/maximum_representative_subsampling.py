@@ -97,7 +97,7 @@ def mrs(
     N,
     R,
     columns,
-    delta=0.02,
+    delta=0.01,
     early_stopping=False,
     mrs_function=mrs_step,
     return_metrics=False,
@@ -211,7 +211,7 @@ def mrs(
             relative_bias_list.append(relative_bias)
 
         auc_difference = abs(auroc - 0.5)
-        if (auc_difference + delta) <= best_difference:
+        if auc_difference <= best_difference:
             best_weights = weights.copy().astype(np.float64)
             mrs_iteration = (i + 1) * drop
             best_difference = auc_difference
@@ -220,10 +220,10 @@ def mrs(
             current_patience += 1
 
         if (
-            ((best_difference <= delta) and early_stopping)
+            (best_difference <= delta and early_stopping)
             or len(dropped_N) <= drop
             or len(dropped_N) <= n_test_splits
-            or current_patience >= max_patience
+            or (current_patience >= max_patience and early_stopping)
         ):
             break
         else:

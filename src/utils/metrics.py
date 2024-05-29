@@ -289,9 +289,9 @@ def compute_classification_metrics_random_forest(
                 splitter=splitter,
                 n_estimators=n_estimators,
             )
-        if score > best_score:
-            best_score = score
-            best_clf = clf
+            if score > best_score:
+                best_score = score
+                best_clf = clf
     else:
         best_clf, _ = train_random_forest_classifier(
             N[columns].values,
@@ -693,6 +693,7 @@ def train_random_forest_classifier(
     """
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    feature_weights = np.array(feature_weights)
     scorer = ReverseScorer(R, feature_weights).set_score_request(sample_weight=True)
     param_grid = {
         "min_samples_split": [2, 4, 10, 20, 40],
@@ -707,11 +708,12 @@ def train_random_forest_classifier(
     grid_cv = GridSearchCV(
         clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
     )
+
     grid_cv.fit(
         X,
         y,
-        sample_weight=np.array(sample_weights),
-        feature_weights=np.array(feature_weights),
+        sample_weight=sample_weights,
+        feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
 

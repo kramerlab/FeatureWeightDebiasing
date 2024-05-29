@@ -23,4 +23,6 @@ class ReverseScorer(BaseEstimator, ClassifierMixin):
         reverse_probs = estimator.predict_proba(X)
         if reverse_probs.shape[1] == 2:
             reverse_probs = reverse_probs[:, 1]
-        return roc_auc_score(y, reverse_probs, sample_weight=sample_weight)
+        auroc = roc_auc_score(y, reverse_probs, sample_weight=sample_weight)
+        
+        return auroc

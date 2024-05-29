@@ -86,8 +86,8 @@ def downstream_experiment_with_test_set(
     sample_df = df.copy()
 
     if method_name == "fw-mrs-temperature":
-        draw_with_feature_weights = True
         splitter = "feature_weighted_best"
+        draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01]
     else:
         splitter = "best"
@@ -128,19 +128,19 @@ def downstream_experiment_with_test_set(
                 )
             )
 
+            feature_weight_list.append(feature_weights)
+            inverse_feature_weight_list.append(inverse_feature_weights)
+            sample_weight_list.append(sample_weights)
+            save_weights(sample_weights_save_path, sample_weight_list)
+            save_weights(feature_weights_save_path, feature_weight_list)
+            save_weights(inverse_feature_weights_save_path, inverse_feature_weight_list)
+
         dropped_samples = np.count_nonzero(sample_weights == 0.0)
+        dropped_samples_list.append(dropped_samples)
 
         if feature_weights is None:
             feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
             inverse_feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
-
-        feature_weight_list.append(feature_weights)
-        inverse_feature_weight_list.append(inverse_feature_weights)
-        sample_weight_list.append(sample_weights)
-        dropped_samples_list.append(dropped_samples)
-
-        save_weights(sample_weights_save_path, sample_weight_list)
-        save_weights(feature_weights_save_path, feature_weight_list)
 
         gradient_ascent_auroc, gradient_ascent_auprc = (
             compute_classification_metrics_gradient_descent(
@@ -152,7 +152,7 @@ def downstream_experiment_with_test_set(
                 inverse_feature_weights,
                 target,
                 random_state=seed,
-                n_splits=10,
+                n_splits=5,
             )
         )
 
@@ -168,14 +168,14 @@ def downstream_experiment_with_test_set(
             draw_with_feature_weights=draw_with_feature_weights,
             splitter=splitter,
             n_estimators=500,
-            n_splits=10,
+            n_splits=5,
         )
 
         tree_auroc = 0
         tree_auprc = 0
 
-        plot_sample_weights(sample_weights, sample_weights_save_path, i)
-        plot_feature_weights(feature_weights, feature_weights_save_path, i)
+        # plot_sample_weights(sample_weights, sample_weights_save_path, i)
+        # plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)

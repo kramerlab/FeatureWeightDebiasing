@@ -15,7 +15,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.02,
+    delta=0.01,
     drop=1,
     budgets=[1.0],
     random_generator=None,
@@ -106,7 +106,7 @@ def feature_weighted_repeated_MRS(
 
             auc_difference = abs(auroc - 0.5)
 
-            if (auc_difference + delta) <= best_difference_dict[
+            if auc_difference <= best_difference_dict[
                 temperature
             ] and not finished_dict[temperature]:
                 best_difference_dict[temperature] = auc_difference

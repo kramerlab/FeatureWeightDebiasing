@@ -25,7 +25,7 @@ def feature_weighted_repeated_MRS(
     splitter="feature_weighted_best",
     n_estimators=100,
     method_name=None,
-    max_patience=10,
+    max_patience=20,
     *args,
     **attributes,
 ):

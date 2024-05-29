@@ -150,7 +150,7 @@ def feature_weighted_repeated_MRS(
     return_auroc=False,
     n_test_splits=10,
     n_pu_splits=5,
-    max_patience=10,
+    max_patience=20,
     validation_method="random_forest",
     splitter="feature_weighted_best",
     n_estimators=100,

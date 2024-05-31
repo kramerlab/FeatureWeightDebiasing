@@ -24,7 +24,9 @@ def compute_classification_metrics_gradient_descent(
     if isinstance(sample_weights, dict):
         best_clf = None
         best_score = -1
-        for sample_weight, feature_weight in zip(sample_weights.values(), feature_weights.values()):
+        for sample_weight, feature_weight in zip(
+            sample_weights.values(), feature_weights.values()
+        ):
             clf, score = train_gradient_descent_classifier(
                 N[columns].values,
                 N[label].values,
@@ -47,7 +49,7 @@ def compute_classification_metrics_gradient_descent(
             random_state,
             n_splits=n_splits,
         )
-
+    
     y_predictions = best_clf.predict_proba(T[columns])[:, 1]
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
@@ -66,7 +68,7 @@ def train_gradient_descent_classifier(
 ):
 
     param_grid = {
-        "lambda_value": [10, 1, 0.1, 0.01, 0.001],
+        "lambda_value": [0.1, 0.5, 0.01, 0.05, 0.001],
         "learning_rate": [0.01],
         "regularization_name": ["scad", "l1", "l2"],
     }

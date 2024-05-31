@@ -5,6 +5,7 @@ from experiments import (
     downstream_experiment_with_test_set,
     feature_weight_budget_comparison_experiment,
     feature_weight_downstream_comparison_experiment,
+    perform_statistical_analysis,
 )
 
 
@@ -24,8 +25,7 @@ sample_weighting_method_list = [
     "psa",
     "uniform",
     "soft-mrs-linear",
-    "soft-mrs-exponential"
-    "mrs",
+    "soft-mrs-exponential" "mrs",
     "fw-mrs-temperature",
     "fw-mrs-budget",
     "kmm",
@@ -147,5 +147,7 @@ def get_experiment_function(experiment_name=""):
         return feature_weight_budget_comparison_experiment
     elif experiment_name == "feature_weight_dropped_downstream_comparison":
         return feature_weight_downstream_comparison_experiment
+    elif experiment_name == "statistical_analysis":
+        return perform_statistical_analysis
     else:
         return downstream_experiment

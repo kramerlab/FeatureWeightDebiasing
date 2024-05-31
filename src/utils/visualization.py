@@ -12,10 +12,8 @@ def plot_cumulative_distribution_function(
     N,
     R,
     file_name: str,
-    weights_one_list,
-    weights_two_list,
-    method_one,
-    method_two,
+    sample_weights,
+    method_name,
     wide=True,
 ):
     """Plots the cumulative distribution functions of two methods.
@@ -39,25 +37,16 @@ def plot_cumulative_distribution_function(
         sns.ecdfplot(
             N,
             x=column_name,
-            weights=weights_one_list,
-            label=method_one,
+            weights=sample_weights,
+            label=method_name,
             linestyle="dotted",
-        )
-        sns.ecdfplot(
-            N,
-            x=column_name,
-            weights=weights_two_list,
-            label=method_two,
-            linestyle="dashdot",
         )
         plt.legend()
         plt.savefig(plot_directory / f"{column_name}.pdf")
         plt.clf()
 
 
-def plot_feature_histograms(
-    N, R, file_name, bins, weights_one, weights_two, method_one, method_two
-):
+def plot_feature_histograms(N, R, file_name, bins, sample_weights, method_name):
     """Plot and saves the feature histograms of two methods
 
     :param N: Features of the first data set
@@ -71,34 +60,28 @@ def plot_feature_histograms(
     """
     plot_directory = file_name / "histograms"
     plot_directory.mkdir(exist_ok=True)
-    fig, ax = plt.subplots(1, 4, sharey=True, sharex=True, figsize=(10, 5))
+    fig, ax = plt.subplots(1, 1, sharey=True, sharex=True, figsize=(10, 5))
     for column_name in N.columns:
         sns.histplot(
-            N, x=column_name, ax=ax[0], bins=bins, stat="probability", kde=True
+            N, x=column_name, bins=bins, stat="probability", kde=True
         ).set_title("GBS")
+        fig.savefig(plot_directory / f"{column_name}_gbs.pdf")
+        ax.clear()
         sns.histplot(
-            R, x=column_name, ax=ax[1], bins=bins, stat="probability", kde=True
+            R, x=column_name, bins=bins, stat="probability", kde=True
         ).set_title("Allensbach")
+        fig.savefig(plot_directory / f"{column_name}_allensbach.pdf")
+        ax.clear()
         sns.histplot(
             N,
             x=column_name,
-            weights=weights_one,
-            ax=ax[2],
+            weights=sample_weights,
             bins=bins,
             stat="probability",
             kde=True,
-        ).set_title(method_one)
-        sns.histplot(
-            N,
-            x=column_name,
-            weights=weights_two,
-            ax=ax[3],
-            bins=bins,
-            stat="probability",
-            kde=True,
-        ).set_title(method_two)
-        fig.savefig(plot_directory / f"{column_name}.pdf")
-        [axis.clear() for axis in ax]
+        ).set_title(method_name)
+        fig.savefig(plot_directory / f"{column_name}_{method_name}.pdf")
+        ax.clear()
     plt.clf()
 
 
@@ -137,10 +120,8 @@ def plot_statistical_analysis(
     N: np.ndarray,
     R: np.ndarray,
     visualisation_path: Path,
-    weights_one: list[float],
-    weights_two: list[float],
-    method_one: str = "",
-    method_two: str = "",
+    sample_weights: list[float],
+    method_name: str = "",
 ):
     """Plots the statistical analysis for two methods
 
@@ -154,10 +135,19 @@ def plot_statistical_analysis(
     :param method_two: Name of the second method, defaults to ""
     """
     plot_cumulative_distribution_function(
-        N, R, visualisation_path, weights_one, weights_two, method_one, method_two
+        N,
+        R,
+        visualisation_path,
+        sample_weights,
+        method_name,
     )
     plot_feature_histograms(
-        N, R, visualisation_path, bins, weights_one, weights_two, method_one, method_two
+        N,
+        R,
+        visualisation_path,
+        bins,
+        sample_weights,
+        method_name,
     )
 
 

@@ -50,6 +50,7 @@ def downstream_experiment(
     """
     weighted_mmds_list = []
     biases_list = []
+    wasserstein_distance_list = []
     rf_auroc_list = []
     rf_auprc_list = []
 
@@ -70,12 +71,14 @@ def downstream_experiment(
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
+    inverse_feature_weights_save_path = result_path / "inverse_feature_weights"
 
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weights_list = load_weights(feature_weights_save_path)
+    inverse_feature_weight_list = load_weights(inverse_feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -104,77 +107,83 @@ def downstream_experiment(
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
             feature_weights = np.array(feature_weights_list[i])
+            inverse_feature_weights = np.array(inverse_feature_weight_list[i])
         else:
-            sample_weights, feature_weights, inverse_feature_weights = sample_weighting_method(
-                N=N,
-                R=R,
-                columns=columns,
-                save_path=result_path,
-                bias_variable=target,
-                drop=drop,
-                early_stopping=True,
-                random_generator=random_generator,
-                target=target,
-                budgets=[budget],
-                validation_method=validation_method,
-                method_name=method_name,
-            )
-            save_weights(sample_weights_save_path, sample_weight_list)
-            save_weights(feature_weights_save_path, feature_weights_list)
-
-        dropped_samples = np.count_nonzero(sample_weights == 0.0)
-        dropped_samples_list.append(dropped_samples)
-        if not feature_weights is None:
-            feature_weights_list.append(feature_weights.tolist())
-        sample_weight_list.append(sample_weights.tolist())
-
-        if explicit_weights:
-            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                columns,
-                sample_weights,
-                gamma,
-            )
-
-            if feature_weights is None:
-                feature_weights = np.ones(len(columns)) / len(columns)
-
-            gradient_ascent_auroc, gradient_ascent_auprc = (
-                compute_classification_metrics_gradient_descent(
-                    N,
-                    R,
-                    R,
-                    columns,
-                    sample_weights,
-                    inverse_feature_weights,
-                    target,
-                    random_state=seed,
+            sample_weights, feature_weights, inverse_feature_weights = (
+                sample_weighting_method(
+                    N=N,
+                    R=R,
+                    columns=columns,
+                    save_path=result_path,
+                    bias_variable=target,
+                    drop=drop,
+                    early_stopping=True,
+                    random_generator=random_generator,
+                    target=target,
+                    budgets=[budget],
+                    validation_method=validation_method,
+                    method_name=method_name,
                 )
             )
 
-            rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
+            feature_weights_list.append(feature_weights)
+            inverse_feature_weight_list.append(inverse_feature_weights)
+            sample_weight_list.append(sample_weights)
+
+            save_weights(sample_weights_save_path, sample_weight_list)
+            save_weights(feature_weights_save_path, feature_weights_list)
+            save_weights(inverse_feature_weights_save_path, inverse_feature_weight_list)
+
+        dropped_samples = np.count_nonzero(sample_weights == 0.0)
+        dropped_samples_list.append(dropped_samples)
+        if feature_weights is None:
+            feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
+            inverse_feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
+
+        weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+            N,
+            R,
+            scaler,
+            columns,
+            columns,
+            sample_weights,
+            gamma,
+        )
+
+
+        gradient_ascent_auroc, gradient_ascent_auprc = (
+            compute_classification_metrics_gradient_descent(
                 N,
                 R,
                 R,
                 columns,
                 sample_weights,
-                feature_weights,
+                inverse_feature_weights,
                 target,
                 random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
             )
+        )
 
+        rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
+            N,
+            R,
+            R,
+            columns,
+            sample_weights,
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+        )
 
-            plot_sample_weights(sample_weights, sample_weights_save_path, i)
-            if not feature_weights is None:
-                plot_feature_weights(feature_weights, feature_weights_save_path, i)
+        plot_sample_weights(sample_weights, sample_weights_save_path, i)
+        if not feature_weights is None:
+            plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
             weighted_mmds_list.append(weighted_mmd)
             biases_list.append(relative_bias)
+            wasserstein_distance_list.append(wasserstein_distances)
             rf_auroc_list.append(rf_auroc)
             rf_auprc_list.append(rf_auprc)
             tree_auroc_list.append(0)

@@ -103,7 +103,7 @@ def feature_weighted_repeated_MRS(
 
             auc_difference = abs(auroc - 0.5)
 
-            if auc_difference <= best_difference_dict[
+            if (auc_difference + delta) <= best_difference_dict[
                 temperature
             ] and not finished_dict[temperature]:
                 best_difference_dict[temperature] = auc_difference

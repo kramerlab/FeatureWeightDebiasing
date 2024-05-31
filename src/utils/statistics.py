@@ -3,14 +3,16 @@ import numpy as np
 import statsmodels.api as sm
 
 
-def logistic_regression(allensbach_gbs, weights):
+def logistic_regression(allensbach_gbs, sample_weights):
     """Performs a logisti regression
 
     :param allensbach_gbs: Allensbach and gbs data set
     :param weights: Sample weights
     :return: p values
     """
-    weights = weights * len(weights)
+    sample_weights = (np.array(sample_weights) / np.sum(sample_weights)) * len(
+        sample_weights
+    )
     y = allensbach_gbs["Wahlteilnahme"]
     X = allensbach_gbs["Resilienz"]
     X = sm.add_constant(X)
@@ -19,10 +21,10 @@ def logistic_regression(allensbach_gbs, weights):
         y,
         X,
         family=sm.families.Binomial(sm.families.links.Logit()),
-        freq_weights=weights,
+        freq_weights=sample_weights,
     )
     results_weighted = model_all.fit()
-    lr_pvalue_weighted = results_weighted.pvalues[1]
+    lr_pvalue_weighted = results_weighted.pvalues["Resilienz"]
 
     return lr_pvalue_weighted
 

@@ -124,7 +124,7 @@ def feature_weight_downstream_comparison_experiment(
                     inverse_feature_weights,
                     target,
                     random_state=seed,
-                    n_splits=10,
+                    n_splits=5,
                 )
             )
             gradient_ascent_auroc_dict[temperature].append(gradient_ascent_auroc)
@@ -142,7 +142,7 @@ def feature_weight_downstream_comparison_experiment(
                 draw_with_feature_weights=True,
                 splitter="feature_weighted_best",
                 n_estimators=500,
-                n_splits=10,
+                n_splits=5,
             )
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)

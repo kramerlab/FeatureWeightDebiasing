@@ -105,7 +105,7 @@ def downstream_experiment(
             sample_weights = np.array(sample_weight_list[i])
             feature_weights = np.array(feature_weights_list[i])
         else:
-            sample_weights, feature_weights, negative_feature_weights = sample_weighting_method(
+            sample_weights, feature_weights, inverse_feature_weights = sample_weighting_method(
                 N=N,
                 R=R,
                 columns=columns,
@@ -149,7 +149,7 @@ def downstream_experiment(
                     R,
                     columns,
                     sample_weights,
-                    negative_feature_weights,
+                    inverse_feature_weights,
                     target,
                     random_state=seed,
                 )

@@ -8,7 +8,6 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from utils.reverse_validation import ReverseScorer
-from sklearn import set_config
 
 
 def compute_classification_metrics_gradient_descent(
@@ -22,7 +21,6 @@ def compute_classification_metrics_gradient_descent(
     random_state=None,
     n_splits=5,
 ):
-    set_config(enable_metadata_routing=True)
     if isinstance(sample_weights, dict):
         best_clf = None
         best_score = -1
@@ -54,7 +52,6 @@ def compute_classification_metrics_gradient_descent(
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
 
-    set_config(enable_metadata_routing=False)
     return auroc_score, auprc
 
 
@@ -75,11 +72,8 @@ def train_gradient_descent_classifier(
     }
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    scorer = ReverseScorer(R, feature_weights).set_score_request(sample_weight=True)
-    clf = GradientDescentModel().set_fit_request(
-        sample_weight=True,
-        feature_weights=True,
-    )
+    scorer = ReverseScorer(R)
+    clf = GradientDescentModel()
     grid_cv = GridSearchCV(
         clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
     )

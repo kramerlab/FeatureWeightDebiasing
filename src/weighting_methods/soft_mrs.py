@@ -27,7 +27,15 @@ min_weight_fraction_leaf = [
 
 
 def soft_mrs_weighting(
-    N, R, columns, random_generator=None, exponential=False, patience=50, *args, **kwargs
+    N,
+    R,
+    columns,
+    random_generator=None,
+    exponential=False,
+    patience=50,
+    method_name="",
+    *args,
+    **kwargs
 ):
     """Soft MRS method
 
@@ -45,6 +53,7 @@ def soft_mrs_weighting(
 
     gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
     loss_function = WeightedMMDLoss(gamma, N[columns], R[columns])
+    exponential = True if method_name == "soft-mrs-exponential" else False
 
     # Optimize until MMD stagnates
     while True:

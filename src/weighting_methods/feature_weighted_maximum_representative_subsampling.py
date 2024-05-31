@@ -141,7 +141,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.01,
+    delta=0.001,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
@@ -150,7 +150,6 @@ def feature_weighted_repeated_MRS(
     return_auroc=False,
     n_test_splits=10,
     n_pu_splits=5,
-    max_patience=20,
     validation_method="random_forest",
     splitter="feature_weighted_best",
     n_estimators=100,
@@ -190,7 +189,6 @@ def feature_weighted_repeated_MRS(
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
-    current_patience_dict = {}
 
     finished_dict = {}
     for temperature in budgets:
@@ -198,7 +196,6 @@ def feature_weighted_repeated_MRS(
         best_difference_dict[temperature] = np.inf
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
-        current_patience_dict[temperature] = 0
 
     feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
@@ -244,7 +241,7 @@ def feature_weighted_repeated_MRS(
 
             auc_difference = abs(auroc - 0.5)
 
-            if auc_difference <= best_difference_dict[
+            if (auc_difference + delta) <= best_difference_dict[
                 temperature
             ] and not finished_dict[temperature]:
                 best_difference_dict[temperature] = auc_difference
@@ -258,16 +255,9 @@ def feature_weighted_repeated_MRS(
                         temperature, -feature_importance
                     )
                 ).tolist()
-                current_patience_dict[temperature] += 0
-            else:
-                current_patience_dict[temperature] += 1
             if (
                 len(dropped_N) <= drop
                 or len(dropped_N) <= n_test_splits
-                or (
-                    current_patience_dict[temperature] >= max_patience
-                    and early_stopping
-                )
                 or (auc_difference <= delta and early_stopping)
             ):
                 finished_dict[temperature] = True

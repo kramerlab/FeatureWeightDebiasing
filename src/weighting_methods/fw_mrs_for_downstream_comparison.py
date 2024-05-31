@@ -15,7 +15,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.01,
+    delta=0.001,
     drop=1,
     budgets=[1.0],
     random_generator=None,
@@ -25,7 +25,6 @@ def feature_weighted_repeated_MRS(
     splitter="feature_weighted_best",
     n_estimators=100,
     method_name=None,
-    max_patience=20,
     *args,
     **attributes,
 ):
@@ -55,7 +54,6 @@ def feature_weighted_repeated_MRS(
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
-    current_patience_dict = {}
 
     finished_dict = {}
     for temperature in budgets:
@@ -63,7 +61,6 @@ def feature_weighted_repeated_MRS(
         best_difference_dict[temperature] = np.inf
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
-        current_patience_dict[temperature] = 0
 
     if method_name == "fw-mrs-temperature":
         draw_with_feature_weights = True
@@ -118,13 +115,9 @@ def feature_weighted_repeated_MRS(
                 best_inverse_feature_weights_dict[temperature] = feature_weight_method(
                     temperature, -feature_importance
                 ).copy()
-                current_patience_dict[temperature] = 0
-            else:
-                current_patience_dict[temperature] += 1
             if (
                 len(dropped_N) <= drop
                 or len(dropped_N) <= n_test_splits
-                or current_patience_dict[temperature] >= max_patience
                 or auc_difference <= delta
             ):
                 finished_dict[temperature] = True

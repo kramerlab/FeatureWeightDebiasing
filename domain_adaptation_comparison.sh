@@ -1,9 +1,9 @@
 NUMBER_OF_REPETETIONS=10
 
-DROP=5
+DROP=10
 for BIAS_FRACTION in 0.1 0.25 0.5
 do
-    for BIAS_TYPE in  less_negative_class less_positive_class mean_difference
+    for BIAS_TYPE in  less_positive_class less_negative_class mean_difference
     do
         for SAMPLE_WEIGHTING_METHOD in uniform psa kmm fw-mrs-temperature mrs
         do

@@ -147,25 +147,25 @@ def feature_weight_downstream_comparison_experiment(
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)
 
-    # Visualize dropped samples and auroc comparison results
-    for data_dict, y_label, file_name in zip(
-        (
-            dropped_samples_list_dict,
-            gradient_ascent_auroc_dict,
-            gradient_ascent_auprc_dict,
-            rf_auroc_dict,
-            rf_auprc_dict,
-        ),
-        ("Dropped Samples", "AUROC", "AUPRC", "AUROC", "AUPRC"),
-        (
-            "dropped_samples_comparison",
-            "gradient_ascent_auroc",
-            "gradient_ascent_auprc",
-            "rf_auroc",
-            "rf_auprc",
-        ),
-    ):
-        visualize_boxplot(data_dict, y_label, file_name=result_path / file_name)
+        # Visualize dropped samples and auroc comparison results
+        for data_dict, y_label, file_name in zip(
+            (
+                dropped_samples_list_dict,
+                gradient_ascent_auroc_dict,
+                gradient_ascent_auprc_dict,
+                rf_auroc_dict,
+                rf_auprc_dict,
+            ),
+            ("Dropped Samples", "AUROC", "AUPRC", "AUROC", "AUPRC"),
+            (
+                "dropped_samples_comparison",
+                "gradient_ascent_auroc",
+                "gradient_ascent_auprc",
+                "rf_auroc",
+                "rf_auprc",
+            ),
+        ):
+            visualize_boxplot(data_dict, y_label, file_name=result_path / file_name)
 
     for data, file_name in zip(
         (

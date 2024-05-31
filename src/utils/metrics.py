@@ -12,7 +12,6 @@ from sklearn.metrics import (
     roc_curve,
     average_precision_score,
 )
-from sklearn import set_config
 from utils.reverse_validation import ReverseScorer
 
 
@@ -272,11 +271,12 @@ def compute_classification_metrics_random_forest(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
-    set_config(enable_metadata_routing=True)
     if isinstance(sample_weights, dict):
         best_clf = None
         best_score = -1
-        for sample_weight, feature_weight in zip(sample_weights.values(), feature_weights.values()):
+        for sample_weight, feature_weight in zip(
+            sample_weights.values(), feature_weights.values()
+        ):
             clf, score = train_random_forest_classifier(
                 N[columns].values,
                 N[label].values,
@@ -309,7 +309,6 @@ def compute_classification_metrics_random_forest(
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
 
-    set_config(enable_metadata_routing=False)
     return auroc_score, auprc
 
 
@@ -334,7 +333,6 @@ def train_feature_weighted_random_forest(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-    set_config(enable_metadata_routing=False)
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
@@ -344,7 +342,6 @@ def train_feature_weighted_random_forest(
     )
     parameter_grid = {
         "min_impurity_decrease": [
-            0.0,
             0.001,
             0.01,
             0.1,
@@ -513,7 +510,6 @@ def train_fw_mrs_pu_classifier(
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
-    set_config(enable_metadata_routing=False)
     clf = RandomForestClassifier(
         class_weight=class_weight,
         n_estimators=500,
@@ -694,16 +690,13 @@ def train_random_forest_classifier(
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     feature_weights = np.array(feature_weights)
-    scorer = ReverseScorer(R, feature_weights).set_score_request(sample_weight=True)
+    scorer = ReverseScorer(R)
     param_grid = {
-        "min_samples_split": [2, 4, 10, 20, 40],
-        "min_samples_leaf": [1, 2, 5, 10, 20],
+        "min_weight_fraction_leaf": [0, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25],
         "class_weight": ["balanced", None],
     }
     clf = RandomForestClassifier(
         random_state=random_state, splitter=splitter, n_estimators=n_estimators
-    ).set_fit_request(
-        sample_weight=True, feature_weights=True, draw_with_feature_weights=True
     )
     grid_cv = GridSearchCV(
         clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True

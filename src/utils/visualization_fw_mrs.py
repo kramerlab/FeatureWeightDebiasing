@@ -98,8 +98,8 @@ def visualize_boxplot(
     file_name="",
 ):
     tmp_dict = {"Uniform": values_dict[None]}
-    values_dict.pop(None)
     tmp_dict.update(values_dict)
+    tmp_dict.pop(None)
     ax = sns.boxplot(data=tmp_dict)
     ax.set_ylabel(y_label)
     if y_lim is not None:

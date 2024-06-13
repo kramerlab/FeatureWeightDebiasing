@@ -22,8 +22,10 @@ def sample(
     # Sample from the data set because the complete one is too big.
     if len(df) > 5000:
         df = df.sample(5000, random_state=sampling_random_generator, replace=False)
-    train = df.sample(
-        frac=train_fraction, replace=False, random_state=sampling_random_generator
+    train = df.groupby(bias_variable, group_keys=False).apply(
+        lambda x: x.sample(
+            frac=train_fraction, random_state=sampling_random_generator, replace=False
+        )
     )
     R = df.drop(train.index).reset_index(drop=True)
     N = sample_N(
@@ -113,7 +115,9 @@ def sample_with_test_set(
     df_without_T = df.drop(T.index)
     R = df_without_T.groupby(bias_variable, group_keys=False).apply(
         lambda x: x.sample(
-            frac=test_fraction, random_state=sampling_random_generator, replace=False
+            frac=1 - train_fraction,
+            random_state=sampling_random_generator,
+            replace=False,
         )
     )
     train = df_without_T.drop(R.index)

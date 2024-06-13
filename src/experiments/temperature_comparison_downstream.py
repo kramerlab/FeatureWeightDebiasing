@@ -1,14 +1,12 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
-from utils.gradient_descent import compute_classification_metrics_gradient_descent
-from utils.metrics import compute_classification_metrics_random_forest
+from utils.metrics import compute_classification_metrics_random_forest, compute_classification_metrics_tree
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
 from weighting_methods.fw_mrs_for_downstream_comparison import (
     feature_weighted_repeated_MRS,
 )
-import numpy as np
 
 from utils.visualization_fw_mrs import (
     visualize_boxplot,
@@ -45,7 +43,7 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    temperatures = [None, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001]
+    temperatures = [None, 0.1, 0.05, 0.01, 0.005]
 
     result_path = create_result_path(
         method_name,
@@ -63,17 +61,27 @@ def feature_weight_downstream_comparison_experiment(
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
-    gradient_ascent_auroc_dict = {}
-    gradient_ascent_auprc_dict = {}
+    tree_auroc_dict = {}
+    tree_auprc_dict = {}
     rf_auroc_dict = {}
     rf_auprc_dict = {}
 
     for temperature in temperatures:
-        gradient_ascent_auroc_dict[temperature] = []
-        gradient_ascent_auprc_dict[temperature] = []
+        tree_auroc_dict[temperature] = []
+        tree_auprc_dict[temperature] = []
         rf_auroc_dict[temperature] = []
         rf_auprc_dict[temperature] = []
         dropped_samples_list_dict[temperature] = []
+
+    _, _, T = sample_with_test_set(
+            bias_type,
+            sample_df,
+            target,
+            train_fraction=0.5,
+            bias_fraction=bias_fraction,
+            test_fraction=0.2,
+            columns=columns,
+        )
 
     for _ in trange(number_of_repetitions):
         N, R, _ = sample_with_test_set(
@@ -114,11 +122,11 @@ def feature_weight_downstream_comparison_experiment(
 
             best_feature_weights_dict,
             best_inverse_feature_weights_dict,
-            gradient_ascent_auroc, gradient_ascent_auprc = (
-                compute_classification_metrics_gradient_descent(
+            tree_auroc, tree_auprc = (
+                compute_classification_metrics_tree(
                     N,
                     R,
-                    R,
+                    T,
                     columns,
                     sample_weights,
                     inverse_feature_weights,
@@ -127,13 +135,14 @@ def feature_weight_downstream_comparison_experiment(
                     n_splits=5,
                 )
             )
-            gradient_ascent_auroc_dict[temperature].append(gradient_ascent_auroc)
-            gradient_ascent_auprc_dict[temperature].append(gradient_ascent_auprc)
+
+            tree_auroc_dict[temperature].append(tree_auroc)
+            tree_auprc_dict[temperature].append(tree_auprc)
 
             rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
                 N,
                 R,
-                R,
+                T,
                 columns,
                 sample_weights,
                 feature_weights,
@@ -151,16 +160,16 @@ def feature_weight_downstream_comparison_experiment(
         for data_dict, y_label, file_name in zip(
             (
                 dropped_samples_list_dict,
-                gradient_ascent_auroc_dict,
-                gradient_ascent_auprc_dict,
+                tree_auroc_dict,
+                tree_auprc_dict,
                 rf_auroc_dict,
                 rf_auprc_dict,
             ),
             ("Dropped Samples", "AUROC", "AUPRC", "AUROC", "AUPRC"),
             (
                 "dropped_samples_comparison",
-                "gradient_ascent_auroc",
-                "gradient_ascent_auprc",
+                "tree_auroc",
+                "tree_auprc",
                 "rf_auroc",
                 "rf_auprc",
             ),
@@ -170,15 +179,15 @@ def feature_weight_downstream_comparison_experiment(
     for data, file_name in zip(
         (
             dropped_samples_list_dict,
-            gradient_ascent_auroc_dict,
-            gradient_ascent_auprc_dict,
+            tree_auroc_dict,
+            tree_auprc_dict,
             rf_auroc_dict,
             rf_auprc_dict,
         ),
         (
             "dropped_samples_dict",
-            "gradient_ascent_auroc_dict",
-            "gradient_ascent_auprc_dict",
+            "tree_auroc_dict",
+            "tree_auprc_dict",
             "rf_auroc_dict",
             "rf_auprc_dict",
         ),

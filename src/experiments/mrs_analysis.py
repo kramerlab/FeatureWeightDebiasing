@@ -12,7 +12,7 @@ from utils.visualization import (
     plot_auc_average,
     plot_relative_bias,
     plot_mmds_average,
-    plot_rocs,
+    plot_rocs_mrs,
 )
 
 seed = 5
@@ -111,7 +111,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
         mrs_iteration_list,
     )
 
-    plot_rocs(mean_rocs, result_path / "rocs")
+    plot_rocs_mrs(mean_rocs, result_path / "rocs")
     plot_relative_bias(
         mean_relative_bias,
         std_relative_bias,

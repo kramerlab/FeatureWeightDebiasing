@@ -15,7 +15,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.001,
+    delta=0.005,
     drop=1,
     budgets=[1.0],
     random_generator=None,

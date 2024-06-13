@@ -10,8 +10,10 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_relative_bias,
     compute_test_metrics_mrs,
-    train_mrs_pu_classifier,
+    train_pu_classifier,
     weighted_maximum_mean_discrepancy,
+    train_tree_classifier_mrs,
+    train_random_forest_classifier_mrs,
 )
 
 # Used to draw random states
@@ -45,7 +47,7 @@ def mrs_step(
     for train_index, test_index in kf.split(N):
         N_train, N_test = N.iloc[train_index], N.iloc[test_index]
         data = pd.concat([N_train, R])
-        clf = train_mrs_pu_classifier(
+        clf = train_pu_classifier(
             data[columns],
             data.label,
             class_weight=class_weights,
@@ -80,7 +82,7 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf = train_mrs_pu_classifier(
+    clf = train_pu_classifier(
         data[columns],
         data.label,
         class_weight=class_weights,
@@ -97,18 +99,20 @@ def mrs(
     N,
     R,
     columns,
-    delta=0.01,
+    delta=0.005,
     early_stopping=False,
     mrs_function=mrs_step,
     return_metrics=False,
     compute_bias=True,
     bias_variable=None,
     n_pu_cv=5,
-    n_test_splits=10,
+    n_test_splits=5,
     class_weights="balanced",
     drop=1,
     random_generator=None,
+    method_name="",
     max_patience=20,
+    validation_iteration=10,
     *args,
     **attributes
 ):
@@ -142,6 +146,11 @@ def mrs(
     best_difference = np.inf
     current_patience = 0
 
+    validation_method = (
+        train_tree_classifier_mrs
+        if method_name == "mrs-tree"
+        else train_random_forest_classifier_mrs
+    )
     # Compute and save mmd inputs to save time
     # Start values
     if return_metrics:
@@ -173,25 +182,28 @@ def mrs(
             random_state=random_generator.randint(max_int),
         )
 
-        if i % roc_iteration == 0:
+        if i % roc_iteration == 0 and return_metrics:
             auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-                pd.concat([dropped_N, R]),
+                dropped_N,
+                R,
                 columns,
                 calculate_roc=True,
                 n_test_splits=n_test_splits,
+                validation_method=validation_method,
             )
             roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
-        else:
+        elif ((i + 1) % validation_iteration) == 0:
             auroc = compute_test_metrics_mrs(
-                pd.concat([dropped_N, R]),
+                dropped_N,
+                R,
                 columns,
                 random_state=random_generator.randint(max_int),
                 n_test_splits=n_test_splits,
+                validation_method=validation_method,
             )
 
-        auc_list.append(auroc)
-
         if return_metrics:
+            auc_list.append(auroc)
             mmd_list.append(
                 weighted_maximum_mean_discrepancy(
                     N[columns],
@@ -223,7 +235,7 @@ def mrs(
             (best_difference <= delta and early_stopping)
             or len(dropped_N) <= drop
             or len(dropped_N) <= n_test_splits
-            or (current_patience >= max_patience and early_stopping)
+            or (current_patience == max_patience and early_stopping)
         ):
             break
         else:

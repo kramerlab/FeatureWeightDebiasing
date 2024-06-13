@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 from tqdm import trange
-import shap
 
 from sklearn.model_selection import KFold
 from utils.metrics import (
+    calculate_feature_importance,
+    compute_feature_weights_with_temperature,
     compute_test_metrics_fw_mrs,
-    train_fw_mrs_pu_classifier,
+    train_pu_classifier,
     train_feature_weighted_random_forest,
 )
 
@@ -42,7 +43,7 @@ def mrs(
     for N_train_index, N_test_index in kf.split(N):
         N_train, N_test = N.iloc[N_train_index], N.iloc[N_test_index]
         train = pd.concat([N_train, R])
-        clf = train_fw_mrs_pu_classifier(
+        clf = train_pu_classifier(
             train[columns],
             train.label,
             class_weight=class_weights,
@@ -85,7 +86,7 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf = train_fw_mrs_pu_classifier(
+    clf = train_pu_classifier(
         data[columns],
         data.label,
         class_weight=class_weight,
@@ -102,25 +103,6 @@ def mrs_without_cv(
     drop_index = N.index[drop_ids]
 
     return drop_index, feature_importance
-
-
-def calculate_feature_importance(columns, test_N, clf):
-    explainer = shap.TreeExplainer(clf)
-    shap_values = explainer.shap_values(test_N[columns], tree_limit=-1)
-    return np.average(np.abs(shap_values[1]), axis=0)
-
-
-def compute_feature_weights_with_temperature(temperature, feature_importance):
-    """_summary_
-
-    :param temperature: _description_
-    :param feature_importance: _description_
-    :return: _description_
-    """
-    if temperature is None or temperature == 0.0:
-        return np.ones(len(feature_importance)) / len(feature_importance)
-    feature_weights = np.exp(-feature_importance / temperature)
-    return feature_weights / np.sum(feature_weights)
 
 
 def compute_feature_weights_with_budget(budget, feature_importance):
@@ -141,7 +123,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.001,
+    delta=0.005,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
@@ -150,10 +132,10 @@ def feature_weighted_repeated_MRS(
     return_auroc=False,
     n_test_splits=10,
     n_pu_splits=5,
-    validation_method="random_forest",
     splitter="feature_weighted_best",
-    n_estimators=100,
-    method_name=None,
+    n_estimators=200,
+    max_patience=20,
+    validate_iteration=10,
     *args,
     **attributes,
 ):
@@ -189,6 +171,7 @@ def feature_weighted_repeated_MRS(
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
+    current_patience = {}
 
     finished_dict = {}
     for temperature in budgets:
@@ -196,6 +179,7 @@ def feature_weighted_repeated_MRS(
         best_difference_dict[temperature] = np.inf
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
+        current_patience[temperature] = 0
 
     feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
@@ -213,57 +197,66 @@ def feature_weighted_repeated_MRS(
         )
         feature_importance_list.append(feature_importance.tolist())
 
-        for temperature in budgets:
-            feature_weights = compute_feature_weights_with_temperature(
-                temperature, feature_importance
-            )
+        if ((i + 1) % validate_iteration) == 0:
+            for temperature in budgets:
+                feature_weights = compute_feature_weights_with_temperature(
+                    temperature, feature_importance
+                )
 
-            auroc = compute_test_metrics_fw_mrs(
-                dropped_N,
-                R,
-                columns,
-                random_state=rand_int,
-                feature_weights=feature_weights,
-                method=train_feature_weighted_random_forest,
-                class_weight="balanced",
-                max_features="sqrt",
-                splitter=splitter,
-                n_splits_test=n_test_splits,
-                n_estimators=n_estimators,
-                draw_with_feature_weights=True,
-            )
+                auroc = compute_test_metrics_fw_mrs(
+                    dropped_N,
+                    R,
+                    columns,
+                    random_state=rand_int,
+                    feature_weights=feature_weights,
+                    method=train_feature_weighted_random_forest,
+                    class_weight="balanced",
+                    max_features="sqrt",
+                    splitter=splitter,
+                    n_splits_test=n_test_splits,
+                    n_estimators=n_estimators,
+                    draw_with_feature_weights=True,
+                )
 
-            if temperature not in feature_weighted_aurocs_dict:
-                feature_weighted_aurocs_dict[temperature] = []
-                feature_weights_dict[temperature] = []
-            feature_weighted_aurocs_dict[temperature].append(auroc)
-            feature_weights_dict[temperature].append(list(feature_weights))
+                if temperature not in feature_weighted_aurocs_dict:
+                    feature_weighted_aurocs_dict[temperature] = []
+                    feature_weights_dict[temperature] = []
+                feature_weighted_aurocs_dict[temperature].append(auroc)
+                feature_weights_dict[temperature].append(list(feature_weights))
 
-            auc_difference = abs(auroc - 0.5)
+                auc_difference = abs(auroc - 0.5)
 
-            if (auc_difference + delta) <= best_difference_dict[
-                temperature
-            ] and not finished_dict[temperature]:
-                best_difference_dict[temperature] = auc_difference
-                dropped_samples_dict[temperature] = i * drop
-                best_sample_weights_dict[temperature] = (
-                    sample_weights / np.sum(sample_weights)
-                ).tolist()
-                best_feature_weights_dict[temperature] = feature_weights.tolist().copy()
-                best_inverse_feature_weights_dict[temperature] = (
-                    compute_feature_weights_with_temperature(
-                        temperature, -feature_importance
+                if (auc_difference + delta) <= best_difference_dict[
+                    temperature
+                ] and not finished_dict[temperature]:
+                    best_difference_dict[temperature] = auc_difference
+                    dropped_samples_dict[temperature] = i * drop
+                    best_sample_weights_dict[temperature] = (
+                        sample_weights / np.sum(sample_weights)
+                    ).tolist()
+                    best_feature_weights_dict[temperature] = (
+                        feature_weights.tolist().copy()
                     )
-                ).tolist()
-            if (
-                len(dropped_N) <= drop
-                or len(dropped_N) <= n_test_splits
-                or (auc_difference <= delta and early_stopping)
-            ):
-                finished_dict[temperature] = True
+                    best_inverse_feature_weights_dict[temperature] = (
+                        compute_feature_weights_with_temperature(
+                            temperature, -feature_importance
+                        )
+                    ).tolist()
+                    current_patience[temperature] = 0
+                else:
+                    current_patience[temperature] += 1
+                if (
+                    len(dropped_N) <= drop
+                    or len(dropped_N) <= n_test_splits
+                    or (auc_difference <= delta and early_stopping)
+                    or (
+                        current_patience[temperature] == max_patience and early_stopping
+                    )
+                ):
+                    finished_dict[temperature] = True
 
-        if all(finished_dict.values()):
-            break
+            if all(finished_dict.values()):
+                break
 
         dropped_N = dropped_N.drop(drop_ids)
         sample_weights[drop_ids] = 0.0

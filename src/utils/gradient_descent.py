@@ -49,7 +49,7 @@ def compute_classification_metrics_gradient_descent(
             random_state,
             n_splits=n_splits,
         )
-    
+
     y_predictions = best_clf.predict_proba(T[columns])[:, 1]
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
@@ -68,16 +68,16 @@ def train_gradient_descent_classifier(
 ):
 
     param_grid = {
-        "lambda_value": [0.1, 0.5, 0.01, 0.05, 0.001],
+        "lambda_value": [10, 1, 0.1, 0.5, 0.01, 0.05, 0.001],
         "learning_rate": [0.01],
-        "regularization_name": ["scad", "l1", "l2"],
+        "regularization_name": ["l1", "l2"],
     }
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    scorer = ReverseScorer(R)
+    # scorer = ReverseScorer(R)
     clf = GradientDescentModel()
     grid_cv = GridSearchCV(
-        clf, param_grid, cv=skf, n_jobs=-1, scoring=scorer, refit=True
+        clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
     )
     grid_cv.fit(X, y, sample_weight=sample_weights, feature_weights=feature_weights)
     return grid_cv, grid_cv.best_score_
@@ -207,11 +207,11 @@ class GradientDescentModel(ClassifierMixin, BaseEstimator):
 
         return gradients
 
-    def l1(self, weights, lambda_value):
-        return np.sign(weights) * lambda_value
+    def l1(self, coefficients, lambda_value):
+        return np.sign(coefficients) * lambda_value
 
-    def l2(self, weights, lambda_value):
-        return weights * lambda_value
+    def l2(self, coefficients, lambda_value):
+        return coefficients * lambda_value
 
     def predict_proba(self, X):
         if X.shape[1] < len(self.coefficients_):

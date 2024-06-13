@@ -411,7 +411,7 @@ default_cycle = cycler(
 ) + cycler(color=["blue", "orange", "orangered", "cyan"])
 
 
-def plot_rocs(roc_list, file_name):
+def plot_rocs_mrs(roc_list, file_name):
     """Plots rocs
 
     :param roc_list: Roc list
@@ -424,6 +424,27 @@ def plot_rocs(roc_list, file_name):
         tpfrs_lower = np.maximum(tper - std, 0)
         plt.plot(fper, tper, label=f"{deleted_elements} samples removed")
         plt.fill_between(fper, tpfrs_lower, tpfrs_higher, alpha=0.2)
+    plt.plot(
+        [0, 1], [0, 1], color="black", linestyle="--", label="Random", linewidth=0.8
+    )
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.legend()
+    plt.savefig(f"{file_name}.pdf")
+    plt.close()
+
+
+def plot_rocs_downstream(roc_list, file_name):
+    """Plots rocs
+
+    :param roc_list: Roc list
+    :param file_name: File name for the plot
+    """
+    plt.rc("")
+    plt.rc("axes", prop_cycle=default_cycle)
+    fpr = roc_list[0]
+    tpr = roc_list[1]
+    plt.plot(fpr, tpr)
     plt.plot(
         [0, 1], [0, 1], color="black", linestyle="--", label="Random", linewidth=0.8
     )

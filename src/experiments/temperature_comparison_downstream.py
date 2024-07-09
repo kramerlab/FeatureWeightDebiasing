@@ -43,7 +43,7 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    temperatures = [None, 0.1, 0.05, 0.01, 0.005]
+    temperatures = [None, 0.1, 0.05, 0.01, 0.005, 0.001]
 
     result_path = create_result_path(
         method_name,

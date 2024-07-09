@@ -38,6 +38,7 @@ def mrs(
     :return: _description_
     """
     all_predictions = np.zeros(len(N))
+    abs_feature_importance_list = []
     feature_importance_list = []
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for N_train_index, N_test_index in kf.split(N):
@@ -51,18 +52,21 @@ def mrs(
         )
         predictions = clf.predict_proba(N_test[columns])[:, 1]
         all_predictions[N_test_index] = predictions
-        feature_importance = calculate_feature_importance(
+        abs_feature_importance, feature_importance = calculate_feature_importance(
             columns,
             test_N=N_test,
             clf=clf,
         )
+        abs_feature_importance_list.append(abs_feature_importance)
         feature_importance_list.append(feature_importance)
 
+    abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
     mean_feature_importance = np.mean(feature_importance_list, axis=0)
+
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
     drop_index = N.index[drop_ids]
 
-    return drop_index, mean_feature_importance
+    return drop_index, abs_mean_feature_importance, mean_feature_importance
 
 
 def mrs_without_cv(
@@ -160,6 +164,7 @@ def feature_weighted_repeated_MRS(
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
     feature_weights = np.ones(len(columns))
+    abs_feature_importance_list = []
     feature_importance_list = []
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
@@ -186,7 +191,7 @@ def feature_weighted_repeated_MRS(
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        drop_ids, feature_importance = mrs(
+        drop_ids, abs_feature_importance, feature_importance = mrs(
             N=dropped_N,
             R=R,
             columns=columns,
@@ -195,12 +200,13 @@ def feature_weighted_repeated_MRS(
             class_weight=class_weight,
             n_splits=n_pu_splits,
         )
+        abs_feature_importance_list.append(abs_feature_importance.tolist())
         feature_importance_list.append(feature_importance.tolist())
 
         if ((i + 1) % validate_iteration) == 0:
             for temperature in budgets:
                 feature_weights = compute_feature_weights_with_temperature(
-                    temperature, feature_importance
+                    temperature, abs_feature_importance
                 )
 
                 auroc = compute_test_metrics_fw_mrs(
@@ -239,7 +245,7 @@ def feature_weighted_repeated_MRS(
                     )
                     best_inverse_feature_weights_dict[temperature] = (
                         compute_feature_weights_with_temperature(
-                            temperature, -feature_importance
+                            temperature, -abs_feature_importance
                         )
                     ).tolist()
                     current_patience[temperature] = 0
@@ -264,6 +270,7 @@ def feature_weighted_repeated_MRS(
     if return_auroc:
         return (
             feature_weighted_aurocs_dict,
+            abs_feature_importance_list,
             feature_importance_list,
             feature_weights_dict,
             dropped_samples_dict,

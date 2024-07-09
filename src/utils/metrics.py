@@ -883,4 +883,7 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
 def calculate_feature_importance(columns, test_N, clf):
     explainer = shap.TreeExplainer(clf)
     shap_values = explainer.shap_values(test_N[columns], tree_limit=-1)
-    return np.average(np.abs(shap_values[1]), axis=0)
+    abs_feature_importance = np.average(np.abs(shap_values[1]), axis=0)
+    feature_importance = np.average(shap_values[1], axis=0)
+
+    return abs_feature_importance, feature_importance

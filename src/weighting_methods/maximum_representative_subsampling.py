@@ -201,8 +201,34 @@ def mrs(
                 n_test_splits=n_test_splits,
                 validation_method=validation_method,
             )
+            if compute_bias and bias_variable is not None:
+                relative_bias = compute_relative_bias(
+                    N[bias_variable], R[bias_variable], weights
+                )
+                relative_bias_list.append(relative_bias)
 
-        if return_metrics:
+            auc_difference = abs(auroc - 0.5)
+            if auc_difference <= best_difference:
+                best_weights = weights.copy().astype(np.float64)
+                mrs_iteration = (i + 1) * drop
+                best_difference = auc_difference
+                current_patience = 0
+            else:
+                current_patience += 1
+
+            if (
+                (best_difference <= delta and early_stopping)
+                or len(dropped_N) <= drop
+                or len(dropped_N) <= n_test_splits
+                or (current_patience == max_patience and early_stopping)
+            ):
+                break
+            
+        weights[drop_ids] = 0.0
+
+        if return_metrics and (
+            (((i + 1) % validation_iteration) == 0) or (i % roc_iteration == 0)
+        ):
             auc_list.append(auroc)
             mmd_list.append(
                 weighted_maximum_mean_discrepancy(
@@ -215,31 +241,6 @@ def mrs(
                     y_y_rbf_matrix=y_y_rbf_matrix,
                 )
             )
-
-        if compute_bias and bias_variable is not None:
-            relative_bias = compute_relative_bias(
-                N[bias_variable], R[bias_variable], weights
-            )
-            relative_bias_list.append(relative_bias)
-
-        auc_difference = abs(auroc - 0.5)
-        if auc_difference <= best_difference:
-            best_weights = weights.copy().astype(np.float64)
-            mrs_iteration = (i + 1) * drop
-            best_difference = auc_difference
-            current_patience = 0
-        else:
-            current_patience += 1
-
-        if (
-            (best_difference <= delta and early_stopping)
-            or len(dropped_N) <= drop
-            or len(dropped_N) <= n_test_splits
-            or (current_patience == max_patience and early_stopping)
-        ):
-            break
-        else:
-            weights[drop_ids] = 0.0
 
     best_weights = best_weights.astype(np.float64)
 

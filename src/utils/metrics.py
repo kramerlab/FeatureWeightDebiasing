@@ -314,10 +314,14 @@ def compute_classification_metrics_random_forest(
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
 
     if compute_feature_importance:
-        feature_importance = calculate_feature_importance(
-            columns, T, best_clf.best_estimator_
+        abs_feature_importance, feature_importance = calculate_feature_importance(
+            T[columns].values,
+            best_clf.best_estimator_,
+            label,
+            N[columns].values,
         )
     else:
+        abs_feature_importance = None
         feature_importance = None
 
     auroc_score = roc_auc_score(T[label], y_predictions)
@@ -327,6 +331,7 @@ def compute_classification_metrics_random_forest(
         auroc_score,
         auprc,
         best_weights,
+        abs_feature_importance,
         feature_importance,
         (fpr.tolist(), tpr.tolist()),
     )
@@ -469,12 +474,12 @@ def train_random_forest_classifier_mrs(
     }
 
     grid = GridSearchCV(
-       param_grid=parameter_grid,
-       estimator=clf,
+        param_grid=parameter_grid,
+        estimator=clf,
         cv=n_splits,
-       refit=True,
-       scoring="roc_auc",
-       n_jobs=-1,
+        refit=True,
+        scoring="roc_auc",
+        n_jobs=-1,
     )
 
     return grid.fit(
@@ -880,10 +885,16 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     return feature_weights / np.sum(feature_weights)
 
 
-def calculate_feature_importance(columns, test_N, clf):
-    explainer = shap.TreeExplainer(clf)
-    shap_values = explainer.shap_values(test_N[columns], tree_limit=-1)
-    abs_feature_importance = np.average(np.abs(shap_values[1]), axis=0)
-    feature_importance = np.average(shap_values[1], axis=0)
+def calculate_feature_importance(test_N, clf, target=None, background=None):
+
+    explainer = shap.TreeExplainer(clf, data=background)
+    shap_values = explainer.shap_values(test_N, check_additivity=False)
+    shap_values = shap_values[1]
+    abs_feature_importance = np.average(np.abs(shap_values), axis=0)
+
+    if target is not None:
+        feature_importance = np.average(shap_values, axis=0)
+    else:
+        feature_importance = None
 
     return abs_feature_importance, feature_importance

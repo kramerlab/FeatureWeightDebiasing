@@ -39,7 +39,6 @@ def mrs(
     """
     all_predictions = np.zeros(len(N))
     abs_feature_importance_list = []
-    feature_importance_list = []
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for N_train_index, N_test_index in kf.split(N):
         N_train, N_test = N.iloc[N_train_index], N.iloc[N_test_index]
@@ -52,21 +51,18 @@ def mrs(
         )
         predictions = clf.predict_proba(N_test[columns])[:, 1]
         all_predictions[N_test_index] = predictions
-        abs_feature_importance, feature_importance = calculate_feature_importance(
-            columns,
-            test_N=N_test,
+        abs_feature_importance, _ = calculate_feature_importance(
+            test_N=N_test[columns].values,
             clf=clf,
         )
         abs_feature_importance_list.append(abs_feature_importance)
-        feature_importance_list.append(feature_importance)
 
     abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
-    mean_feature_importance = np.mean(feature_importance_list, axis=0)
 
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
     drop_index = N.index[drop_ids]
 
-    return drop_index, abs_mean_feature_importance, mean_feature_importance
+    return drop_index, abs_mean_feature_importance
 
 
 def mrs_without_cv(
@@ -98,8 +94,7 @@ def mrs_without_cv(
     )
     predictions = clf.predict_proba(N[columns])[:, 1]
     feature_importance = calculate_feature_importance(
-        columns,
-        test_N=N,
+        test_N=N[columns].values,
         clf=clf,
     )
 
@@ -163,9 +158,7 @@ def feature_weighted_repeated_MRS(
     number_of_iterations = (len(N) - (n_test_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
-    feature_weights = np.ones(len(columns))
     abs_feature_importance_list = []
-    feature_importance_list = []
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
@@ -186,12 +179,11 @@ def feature_weighted_repeated_MRS(
         dropped_samples_dict[temperature] = 0
         current_patience[temperature] = 0
 
-    feature_weights = np.ones(len(columns))
     rand_int = random_generator.randint(max_int)
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        drop_ids, abs_feature_importance, feature_importance = mrs(
+        drop_ids, abs_feature_importance = mrs(
             N=dropped_N,
             R=R,
             columns=columns,
@@ -201,7 +193,6 @@ def feature_weighted_repeated_MRS(
             n_splits=n_pu_splits,
         )
         abs_feature_importance_list.append(abs_feature_importance.tolist())
-        feature_importance_list.append(feature_importance.tolist())
 
         if ((i + 1) % validate_iteration) == 0:
             for temperature in budgets:
@@ -238,8 +229,8 @@ def feature_weighted_repeated_MRS(
                     best_difference_dict[temperature] = auc_difference
                     dropped_samples_dict[temperature] = i * drop
                     best_sample_weights_dict[temperature] = (
-                        sample_weights / np.sum(sample_weights)
-                    ).tolist()
+                        (sample_weights / np.sum(sample_weights)).tolist().copy()
+                    )
                     best_feature_weights_dict[temperature] = (
                         feature_weights.tolist().copy()
                     )
@@ -271,10 +262,8 @@ def feature_weighted_repeated_MRS(
         return (
             feature_weighted_aurocs_dict,
             abs_feature_importance_list,
-            feature_importance_list,
             feature_weights_dict,
             dropped_samples_dict,
-            sample_weights,
         )
 
     else:

@@ -27,7 +27,6 @@ def downstream_experiment_with_test_set(
     random_generator=None,
     explicit_weights=True,
     load_previous_results=True,
-    budget="",
     bias_fraction=0.75,
     drop=1,
     validation_method="random_forest",
@@ -56,6 +55,7 @@ def downstream_experiment_with_test_set(
     gradient_ascent_auroc_list = []
     gradient_ascent_auprc_list = []
 
+    abs_feature_importance_list = []
     feature_importance_list = []
     roc_curves_list = []
 
@@ -162,21 +162,26 @@ def downstream_experiment_with_test_set(
         gradient_ascent_auroc = 0
         gradient_ascent_auprc = 0
 
-        rf_auroc, rf_auprc, sample_weights, feature_importance, roc_curve_values = (
-            compute_classification_metrics_random_forest(
-                N,
-                R,
-                T,
-                columns,
-                sample_weights,
-                feature_weights,
-                target,
-                random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
-                n_estimators=200,
-                n_splits=10,
-            )
+        (
+            rf_auroc,
+            rf_auprc,
+            sample_weights,
+            abs_feature_importance,
+            feature_importance,
+            roc_curve_values,
+        ) = compute_classification_metrics_random_forest(
+            N,
+            R,
+            T,
+            columns,
+            sample_weights,
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=500,
+            n_splits=10,
         )
         dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
@@ -194,6 +199,7 @@ def downstream_experiment_with_test_set(
         gradient_ascent_auroc_list.append(gradient_ascent_auroc)
         gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
+        abs_feature_importance_list.append(abs_feature_importance.tolist())
         feature_importance_list.append(feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
 
@@ -207,6 +213,7 @@ def downstream_experiment_with_test_set(
                 gradient_ascent_auroc_list,
                 gradient_ascent_auprc_list,
                 dropped_samples_list,
+                abs_feature_importance_list,
                 feature_importance_list,
                 roc_curves_list,
             ),
@@ -218,6 +225,7 @@ def downstream_experiment_with_test_set(
                 "gradient_ascent_auroc",
                 "gradient_ascent_auprc",
                 "dropped_samples",
+                "abs_feature_importance",
                 "feature_importance",
                 "roc_curves",
             ),

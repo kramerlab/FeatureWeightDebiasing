@@ -47,7 +47,6 @@ def feature_weight_budget_comparison_experiment(
     """
 
     temperatures = [None, 0.1, 0.01, 0.005, 0.001]
-    
 
     result_path = create_result_path(
         method_name,
@@ -73,6 +72,7 @@ def feature_weight_budget_comparison_experiment(
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
     feature_weighted_aurocs_list = []
+    abs_feature_importances_list = []
     feature_importances_list = []
 
     if data_set_name in ("gbs_gesis", "gbs_allensbach"):
@@ -93,10 +93,9 @@ def feature_weight_budget_comparison_experiment(
 
         (
             random_forest_feature_weighted_aurocs,
-            feature_importances,
+            abs_feature_importances,
             feature_weights,
             dropped_samples,
-            _,
         ) = feature_weighted_repeated_MRS(
             N=N,
             R=R,
@@ -112,10 +111,12 @@ def feature_weight_budget_comparison_experiment(
             return_auroc=True,
             validation_method=validation_method,
             method_name=method_name,
+            validate_iteration=1,
         )
 
         number_of_samples = len(N)
         feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
+        abs_feature_importances_list.append(abs_feature_importances)
         feature_importances_list.append(feature_importances)
         feature_weights_list.append(feature_weights)
         dropped_samples_list.append(dropped_samples)
@@ -133,7 +134,7 @@ def feature_weight_budget_comparison_experiment(
 
         feature_importance_path = result_path / f"feature_importance" / str(i)
         feature_importance_path.mkdir(exist_ok=True, parents=True)
-        plot_feature_importance(feature_importances, feature_importance_path)
+        plot_feature_importance(abs_feature_importances, feature_importance_path)
 
     # Visualize mean results
     plot_budget_comparison_auroc_mean(
@@ -143,21 +144,30 @@ def feature_weight_budget_comparison_experiment(
         result_path / "mean_auroc_comparison",
     )
 
-    with open(
-        result_path / "feature_weighted_aurocs.json", "w", encoding="utf-8"
-    ) as file:
-        json.dump(feature_weighted_aurocs_list, file, indent=4)
-
-    with open(result_path / "feature_importances.json", "w", encoding="utf-8") as file:
-        json.dump(feature_importances_list, file, indent=4)
-
-    with open(result_path / "feature_weights.json", "w", encoding="utf-8") as file:
-        json.dump(feature_weights_list, file, indent=4)
-
-    with open(result_path / "dropped_samples", "w", encoding="utf-8") as file:
-        json.dump(dropped_samples_list, file, indent=4)
+    for data, file_name in zip(
+        (
+            feature_weighted_aurocs_list,
+            abs_feature_importances_list,
+            feature_importances_list,
+            feature_weights_list,
+            dropped_samples_list,
+        ),
+        (
+            "feature_weighted_aurocs.json",
+            "abs_feature_importances.json",
+            "feature_importances.json",
+            "feature_weights.json",
+            "dropped_samples.json",
+        ),
+    ):
+        save_list_to_json(result_path, data, file_name)
 
     save_mean_dropped_elements(result_path, dropped_samples_list)
+
+
+def save_list_to_json(result_path, data, file_name):
+    with open(result_path / file_name, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4)
 
 
 def save_mean_dropped_elements(result_path, dropped_samples_list):

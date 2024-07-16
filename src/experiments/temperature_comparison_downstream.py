@@ -1,7 +1,10 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
-from utils.metrics import compute_classification_metrics_random_forest, compute_classification_metrics_tree
+from utils.metrics import (
+    compute_classification_metrics_random_forest,
+    compute_classification_metrics_tree,
+)
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
 from weighting_methods.fw_mrs_for_downstream_comparison import (
@@ -74,14 +77,14 @@ def feature_weight_downstream_comparison_experiment(
         dropped_samples_list_dict[temperature] = []
 
     _, _, T = sample_with_test_set(
-            bias_type,
-            sample_df,
-            target,
-            train_fraction=0.5,
-            bias_fraction=bias_fraction,
-            test_fraction=0.2,
-            columns=columns,
-        )
+        bias_type,
+        sample_df,
+        target,
+        train_fraction=0.5,
+        bias_fraction=bias_fraction,
+        test_fraction=0.2,
+        columns=columns,
+    )
 
     for _ in trange(number_of_repetitions):
         N, R, _ = sample_with_test_set(
@@ -122,24 +125,22 @@ def feature_weight_downstream_comparison_experiment(
 
             best_feature_weights_dict,
             best_inverse_feature_weights_dict,
-            tree_auroc, tree_auprc = (
-                compute_classification_metrics_tree(
-                    N,
-                    R,
-                    T,
-                    columns,
-                    sample_weights,
-                    inverse_feature_weights,
-                    target,
-                    random_state=seed,
-                    n_splits=5,
-                )
+            tree_auroc, tree_auprc = compute_classification_metrics_tree(
+                N,
+                R,
+                T,
+                columns,
+                sample_weights,
+                inverse_feature_weights,
+                target,
+                random_state=seed,
+                n_splits=5,
             )
 
             tree_auroc_dict[temperature].append(tree_auroc)
             tree_auprc_dict[temperature].append(tree_auprc)
 
-            rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
+            rf_auroc, rf_auprc, _, _, _ = compute_classification_metrics_random_forest(
                 N,
                 R,
                 T,

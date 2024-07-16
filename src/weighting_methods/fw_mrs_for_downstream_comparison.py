@@ -109,8 +109,8 @@ def feature_weighted_repeated_MRS(
                 best_difference_dict[temperature] = auc_difference
                 dropped_samples_dict[temperature] = i * drop
                 best_sample_weights_dict[temperature] = (
-                    sample_weights / np.sum(sample_weights).copy()
-                )
+                    sample_weights / np.sum(sample_weights)
+                ).copy()
                 best_feature_weights_dict[temperature] = feature_weights.copy()
                 best_inverse_feature_weights_dict[temperature] = feature_weight_method(
                     temperature, -feature_importance

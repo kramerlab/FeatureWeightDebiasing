@@ -105,22 +105,23 @@ def sample_with_test_set(
     :return: A biased and a representative data set
     """
     # Sample from the data set because the complete one is too big.
-    if len(df) > 7500:
-        df = df.sample(7500, random_state=sampling_random_generator).copy()
+    upper_sample_limit = 8000 
+    if len(df) > upper_sample_limit:
+        df = df.sample(upper_sample_limit, random_state=sampling_random_generator).copy()
     T = df.groupby(bias_variable, group_keys=False).apply(
         lambda x: x.sample(
             frac=test_fraction, random_state=sampling_random_generator, replace=False
         )
-    )
-    df_without_T = df.drop(T.index)
+    ).copy()
+    df_without_T = df.drop(T.index).copy()
     R = df_without_T.groupby(bias_variable, group_keys=False).apply(
         lambda x: x.sample(
             frac=1 - train_fraction,
             random_state=sampling_random_generator,
             replace=False,
         )
-    )
-    train = df_without_T.drop(R.index)
+    ).copy()
+    train = df_without_T.drop(R.index).copy()
 
     N = sample_N(
         bias_type,

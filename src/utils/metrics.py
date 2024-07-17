@@ -336,6 +336,93 @@ def compute_classification_metrics_random_forest(
         (fpr.tolist(), tpr.tolist()),
     )
 
+def compute_classification_metrics_random_forest_gbs(
+    N,
+    R,
+    T,
+    columns,
+    sample_weights_list,
+    feature_weights,
+    label,
+    random_state=None,
+    n_splits=5,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    max_depth=None,
+    compute_feature_importance=True,
+    draw_with_feature_weights=False,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    if isinstance(sample_weights_list, dict):
+        best_clf = None
+        best_score = -1
+        for sample_weights, feature_weight in zip(
+            sample_weights_list.values(), feature_weights.values()
+        ):
+            clf, score = train_random_forest_classifier(
+                N[columns].values,
+                N[label].values,
+                R[columns].values,
+                sample_weights,
+                feature_weight,
+                random_state=random_state,
+                n_splits=n_splits,
+                draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
+                n_estimators=n_estimators,
+            )
+            if score > best_score:
+                best_score = score
+                best_clf = clf
+                best_weights = sample_weights
+    else:
+        best_clf, _ = train_random_forest_classifier(
+            N[columns].values,
+            N[label].values,
+            R[columns].values,
+            sample_weights_list,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=n_estimators,
+        )
+        best_weights = sample_weights_list
+    y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
+    fpr, tpr, _ = roc_curve(T[label], y_predictions)
+
+    if compute_feature_importance:
+        abs_feature_importance, feature_importance = calculate_feature_importance(
+            T[columns].values,
+            best_clf.best_estimator_,
+            label,
+            N[columns].values,
+        )
+    else:
+        abs_feature_importance = None
+        feature_importance = None
+
+    auroc_score = roc_auc_score(T[label], y_predictions)
+    auprc = average_precision_score(T[label], y_predictions)
+
+    return (
+        auroc_score,
+        auprc,
+        best_weights,
+        abs_feature_importance,
+        feature_importance,
+        (fpr.tolist(), tpr.tolist()),
+    )
+
 
 def train_feature_weighted_random_forest(
     X,

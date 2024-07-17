@@ -1,16 +1,16 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
-from utils.metrics import (
-    compute_classification_metrics_random_forest,
-    compute_classification_metrics_tree,
-)
+
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
 from weighting_methods.fw_mrs_for_downstream_comparison import (
     feature_weighted_repeated_MRS,
 )
-
+from utils.metrics import (
+    compute_classification_metrics_random_forest,
+    compute_classification_metrics_tree,
+)
 from utils.visualization_fw_mrs import (
     visualize_boxplot,
 )
@@ -55,7 +55,7 @@ def feature_weight_downstream_comparison_experiment(
         experiment_name="drop_auroc_comparison",
         bias_fraction=bias_fraction,
     )
-    result_path = result_path / method_name / validation_method
+    result_path = result_path / validation_method
     result_path.mkdir(parents=True, exist_ok=True)
 
     dropped_samples_list_dict = {}
@@ -140,7 +140,7 @@ def feature_weight_downstream_comparison_experiment(
             tree_auroc_dict[temperature].append(tree_auroc)
             tree_auprc_dict[temperature].append(tree_auprc)
 
-            rf_auroc, rf_auprc, _, _, _ = compute_classification_metrics_random_forest(
+            rf_auroc, rf_auprc, _, _, _, _ = compute_classification_metrics_random_forest(
                 N,
                 R,
                 T,

@@ -58,7 +58,7 @@ def load_gbs_allensbach():
         "woechentlicheArbeitszeit",
         "Resilienz",
     ]
-    return allensbach, allensbach_columns, ""
+    return allensbach, allensbach_columns, "Wahlteilnahme"
 
 
 def load_gbs_gesis():
@@ -83,7 +83,6 @@ def load_gbs_gesis():
         "Nervoes",
         "Phantasievoll",
         "Berufsgruppe",
-        "Wahlteilnahme",
         "BRS6",
     ]
 
@@ -94,12 +93,13 @@ def load_gbs_gesis():
     R = gesis.copy()
     N["BRS6"] = 6 - N["BRS6"]
     N[N["Erwerbstaetigkeit"] == 4] = 3
+    N = N.drop(N[N["Wahlteilnahme"] == 3].index)
 
     N["label"] = 1
     R["label"] = 0
 
     gesis_gbs = pd.concat([N, R], ignore_index=True)
-    return gesis_gbs, gesis_columns, ""
+    return gesis_gbs, gesis_columns, "Wahlteilnahme"
 
 
 def load_folktables_income_data():

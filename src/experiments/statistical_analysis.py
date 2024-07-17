@@ -6,14 +6,13 @@ from pathlib import Path
 from sklearn.discriminant_analysis import StandardScaler
 from tqdm import trange
 
-from utils.metrics import (
-    calculate_rbf_gamma,
-    compute_classification_metrics_random_forest,
-    compute_metrics,
-)
 from utils.statistics import logistic_regression
 from utils.visualization import plot_statistical_analysis
-
+from utils.metrics import (
+    calculate_rbf_gamma,
+    compute_classification_metrics_random_forest_gbs,
+    compute_metrics,
+)
 
 bins = 25
 seed = 5
@@ -29,6 +28,7 @@ def perform_statistical_analysis(
     target: str,
     number_of_repetitions=1000,
     drop=1,
+    data_set_name=None,
     **args,
 ):
     """Analyze GBS corrected with Allensbach with two methods.
@@ -40,7 +40,8 @@ def perform_statistical_analysis(
     random.seed(seed)
     file_directory = Path(__file__).parent
     result_path = Path(
-        file_directory, f"../../results/statistical analysis/{method_name}"
+        file_directory,
+        f"../../results/statistical_analysis/{data_set_name}/{method_name}",
     )
     iterations_path = result_path / "iteration"
     iterations_path.mkdir(exist_ok=True, parents=True)
@@ -66,8 +67,6 @@ def perform_statistical_analysis(
     abs_feature_importance_list = []
     feature_importance_list = []
     roc_curves_list = []
-
-    target = "Wahlteilnahme"
 
     for i in trange(number_of_repetitions):
         if method_name == "fw-mrs-temperature":
@@ -99,7 +98,7 @@ def perform_statistical_analysis(
             abs_feature_importance,
             feature_importance,
             roc_curve_values,
-        ) = compute_classification_metrics_random_forest(
+        ) = compute_classification_metrics_random_forest_gbs(
             scaled_N,
             scaled_N,
             scaled_N,
@@ -143,10 +142,12 @@ def perform_statistical_analysis(
         relative_biases_list.append(relative_biases)
         mmd_list.append(mmd)
 
-        pvalue = logistic_regression(
-            scaled_N[columns + ["Wahlteilnahme"]], sample_weights
-        )
-        pvalue_list.append(pvalue)
+        if data_set_name == "gbs_allensbach":
+            pvalue = logistic_regression(
+                scaled_N[columns + ["Wahlteilnahme"]], sample_weights
+            )
+            pvalue_list.append(pvalue)
+
 
         result_dict_mrs_iteration = {}
         for index, column in enumerate(columns):

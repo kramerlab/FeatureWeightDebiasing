@@ -4,14 +4,10 @@ import numpy as np
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
-from utils.gradient_descent import compute_classification_metrics_gradient_descent
 from utils.statistics import create_result_path, write_result_dict_test_set
 from utils.sampling import sample_with_test_set
 from utils.visualization import plot_rocs_downstream
-from utils.metrics import (
-    compute_classification_metrics_random_forest,
-    compute_classification_metrics_tree,
-)
+from utils.metrics import compute_classification_metrics_random_forest
 
 seed = 5
 

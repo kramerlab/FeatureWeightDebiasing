@@ -134,7 +134,7 @@ def feature_weighted_repeated_MRS(
     splitter="feature_weighted_best",
     n_estimators=200,
     max_patience=20,
-    validate_iteration=10,
+    validate_iteration=5,
     *args,
     **attributes,
 ):
@@ -219,7 +219,7 @@ def feature_weighted_repeated_MRS(
                     feature_weighted_aurocs_dict[temperature] = []
                     feature_weights_dict[temperature] = []
                 feature_weighted_aurocs_dict[temperature].append(auroc)
-                feature_weights_dict[temperature].append(list(feature_weights))
+                feature_weights_dict[temperature].append(list(feature_weights).copy())
 
                 auc_difference = abs(auroc - 0.5)
 

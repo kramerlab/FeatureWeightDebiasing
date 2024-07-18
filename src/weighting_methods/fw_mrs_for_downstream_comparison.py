@@ -25,7 +25,6 @@ def feature_weighted_repeated_MRS(
     splitter="feature_weighted_best",
     n_estimators=100,
     method_name=None,
-    validate_iteration=5,
     *args,
     **attributes,
 ):
@@ -81,48 +80,47 @@ def feature_weighted_repeated_MRS(
             n_splits=n_pu_splits,
         )
 
-        if ((i + 1) % validate_iteration) == 0:
-            for temperature in budgets:
-                feature_weights = (
-                    np.ones(len(feature_importance))
-                    if temperature is None or temperature == 0.0
-                    else feature_weight_method(temperature, feature_importance)
-                )
+        for temperature in budgets:
+            feature_weights = (
+                np.ones(len(feature_importance))
+                if temperature is None or temperature == 0.0
+                else feature_weight_method(temperature, feature_importance)
+            )
 
-                auroc = compute_test_metrics_fw_mrs(
-                    dropped_N,
-                    R,
-                    columns,
-                    random_state=rand_int,
-                    feature_weights=feature_weights,
-                    class_weight="balanced",
-                    max_features="sqrt",
-                    splitter=splitter,
-                    n_splits_test=n_test_splits,
-                    n_estimators=n_estimators,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                )
+            auroc = compute_test_metrics_fw_mrs(
+                dropped_N,
+                R,
+                columns,
+                random_state=rand_int,
+                feature_weights=feature_weights,
+                class_weight="balanced",
+                max_features="sqrt",
+                splitter=splitter,
+                n_splits_test=n_test_splits,
+                n_estimators=n_estimators,
+                draw_with_feature_weights=draw_with_feature_weights,
+            )
 
-                auc_difference = abs(auroc - 0.5)
+            auc_difference = abs(auroc - 0.5)
 
-                if (auc_difference + delta) <= best_difference_dict[
-                    temperature
-                ] and not finished_dict[temperature]:
-                    best_difference_dict[temperature] = auc_difference
-                    dropped_samples_dict[temperature] = i * drop
-                    best_sample_weights_dict[temperature] = (
-                        sample_weights / np.sum(sample_weights)
-                    ).copy()
-                    best_feature_weights_dict[temperature] = feature_weights.copy()
-                    best_inverse_feature_weights_dict[temperature] = feature_weight_method(
-                        temperature, -feature_importance
-                    ).copy()
-                if (
-                    len(dropped_N) <= drop
-                    or len(dropped_N) <= n_test_splits
-                    or auc_difference <= delta
-                ):
-                    finished_dict[temperature] = True
+            if (auc_difference + delta) <= best_difference_dict[
+                temperature
+            ] and not finished_dict[temperature]:
+                best_difference_dict[temperature] = auc_difference
+                dropped_samples_dict[temperature] = i * drop
+                best_sample_weights_dict[temperature] = (
+                    sample_weights / np.sum(sample_weights)
+                ).copy()
+                best_feature_weights_dict[temperature] = feature_weights.copy()
+                best_inverse_feature_weights_dict[temperature] = feature_weight_method(
+                    temperature, -feature_importance
+                ).copy()
+            if (
+                len(dropped_N) <= drop
+                or len(dropped_N) <= n_test_splits
+                or auc_difference <= delta
+            ):
+                finished_dict[temperature] = True
 
         if all(finished_dict.values()):
             break

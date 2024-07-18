@@ -264,6 +264,7 @@ def compute_classification_metrics_random_forest(
     max_depth=None,
     compute_feature_importance=True,
     draw_with_feature_weights=False,
+    drop_samples=False,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -274,17 +275,27 @@ def compute_classification_metrics_random_forest(
     :param label: Name of the target variable
     :return: Downstream classification metrics
     """
+
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
         for sample_weights, feature_weight in zip(
             sample_weights_list.values(), feature_weights.values()
         ):
+            if drop_samples:
+                sample_weights = np.array(sample_weights)
+                not_dropped = np.nonzero(sample_weights != 0.0)
+                N_train = N.iloc[not_dropped].copy()
+                train_sample_weights = sample_weights[not_dropped].copy()
+            else:
+                N_train = N.copy()
+                train_sample_weights = sample_weights_list.copy()
+
             clf, score = train_random_forest_classifier(
-                N[columns].values,
-                N[label].values,
+                N_train[columns].values,
+                N_train[label].values,
                 R[columns].values,
-                sample_weights,
+                train_sample_weights,
                 feature_weight,
                 random_state=random_state,
                 n_splits=n_splits,
@@ -297,11 +308,19 @@ def compute_classification_metrics_random_forest(
                 best_clf = clf
                 best_weights = sample_weights
     else:
+        if drop_samples:
+            not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
+            N_train = N.iloc[not_dropped].copy()
+            train_sample_weights = sample_weights_list[not_dropped].copy()
+        else:
+            N_train = N.copy()
+            train_sample_weights = sample_weights_list.copy()
+
         best_clf, _ = train_random_forest_classifier(
-            N[columns].values,
-            N[label].values,
+            N_train[columns].values,
+            N_train[label].values,
             R[columns].values,
-            sample_weights_list,
+            train_sample_weights,
             feature_weights,
             random_state=random_state,
             n_splits=n_splits,
@@ -314,11 +333,16 @@ def compute_classification_metrics_random_forest(
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
 
     if compute_feature_importance:
+        if drop_samples:
+            not_dropped = np.nonzero(np.array(best_weights) != 0.0)
+            N_train = N.iloc[not_dropped].copy()
+        else:
+            N_train = N.copy()
         abs_feature_importance, feature_importance = calculate_feature_importance(
             T[columns].values,
             best_clf.best_estimator_,
             label,
-            N[columns].values,
+            N_train[columns].values,
         )
     else:
         abs_feature_importance = None
@@ -335,6 +359,7 @@ def compute_classification_metrics_random_forest(
         feature_importance,
         (fpr.tolist(), tpr.tolist()),
     )
+
 
 def compute_classification_metrics_random_forest_gbs(
     N,

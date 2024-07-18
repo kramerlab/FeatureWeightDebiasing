@@ -85,6 +85,11 @@ def downstream_experiment(
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
 
+    if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest"):
+        drop_samples = True
+    else:
+        drop_samples = False
+
     draw_with_feature_weights = True if method_name == "fw-mrs-temperature" else False
     splitter = (
         "feature_weighted_best"
@@ -150,7 +155,6 @@ def downstream_experiment(
             gamma,
         )
 
-
         gradient_ascent_auroc, gradient_ascent_auprc = (
             compute_classification_metrics_gradient_descent(
                 N,
@@ -175,6 +179,7 @@ def downstream_experiment(
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
             splitter=splitter,
+            drop_samples=drop_samples,
         )
 
         plot_sample_weights(sample_weights, sample_weights_save_path, i)

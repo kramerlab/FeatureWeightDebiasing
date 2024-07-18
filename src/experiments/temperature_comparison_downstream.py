@@ -69,6 +69,11 @@ def feature_weight_downstream_comparison_experiment(
     rf_auroc_dict = {}
     rf_auprc_dict = {}
 
+    if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest"):
+        drop_samples = True
+    else:
+        drop_samples = False
+
     for temperature in temperatures:
         tree_auroc_dict[temperature] = []
         tree_auprc_dict[temperature] = []
@@ -153,6 +158,7 @@ def feature_weight_downstream_comparison_experiment(
                 splitter="feature_weighted_best",
                 n_estimators=500,
                 n_splits=5,
+                drop_samples=drop_samples,
             )
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)

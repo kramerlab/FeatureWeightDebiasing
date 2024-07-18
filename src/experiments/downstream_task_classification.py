@@ -85,6 +85,10 @@ def downstream_experiment_with_test_set(
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
+    if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest"):
+        drop_samples = True
+    else:
+        drop_samples = False
 
     if method_name == "fw-mrs-temperature":
         splitter = "feature_weighted_best"
@@ -178,6 +182,7 @@ def downstream_experiment_with_test_set(
             splitter=splitter,
             n_estimators=500,
             n_splits=10,
+            drop_samples=drop_samples,
         )
         dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)

@@ -122,7 +122,7 @@ def feature_weighted_repeated_MRS(
     N,
     R,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
@@ -250,8 +250,8 @@ def feature_weighted_repeated_MRS(
             ):
                 finished_dict[temperature] = True
 
-            if all(finished_dict.values()):
-                break
+        if all(finished_dict.values()):
+            break
 
         dropped_N = dropped_N.drop(drop_ids)
         sample_weights[drop_ids] = 0.0

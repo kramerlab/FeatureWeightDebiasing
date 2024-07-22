@@ -1,6 +1,6 @@
 NUMBER_OF_REPETETIONS=10
 
-DROP=1
+DROP=5
 for BIAS_FRACTION in 0.1 0.2 0.3
 do
     for BIAS_TYPE in less_positive_class less_negative_class 

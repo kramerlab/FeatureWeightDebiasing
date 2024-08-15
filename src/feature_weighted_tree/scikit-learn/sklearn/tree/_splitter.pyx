@@ -1909,10 +1909,6 @@ cdef inline int node_split_feature_weighted_best(
 
                 current_proxy_improvement = criterion.proxy_impurity_improvement()
 
-                # Added
-                if not draw_with_feature_weights:
-                    current_proxy_improvement *= current_feature_weight
-
                 if current_proxy_improvement > best_proxy_improvement:
                     best_proxy_improvement = current_proxy_improvement
                     # sum of halves is used to avoid infinite value
@@ -1949,10 +1945,6 @@ cdef inline int node_split_feature_weighted_best(
                 if not ((criterion.weighted_n_left < min_weight_leaf) or
                         (criterion.weighted_n_right < min_weight_leaf)):
                     current_proxy_improvement = criterion.proxy_impurity_improvement()
-
-                    # Added
-                    if not draw_with_feature_weights:
-                        current_proxy_improvement *= current_feature_weight
 
                     if current_proxy_improvement > best_proxy_improvement:
                         best_proxy_improvement = current_proxy_improvement

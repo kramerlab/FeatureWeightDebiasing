@@ -649,7 +649,9 @@ def compute_test_metrics_mrs(
         return np.mean(auroc_scores)
 
 
-def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=None):
+def train_pu_classifier(
+    X_train, y_train, class_weight="balanced", feature_weight=None, random_state=None
+):
     """Train the positive unlabeled classifier
 
     :param X_train: Training features
@@ -657,14 +659,21 @@ def train_pu_classifier(X_train, y_train, class_weight="balanced", random_state=
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
+    draw_with_feature_weight = False if feature_weight is None else True
     clf = RandomForestClassifier(
         class_weight=class_weight,
         n_estimators=200,
         n_jobs=-1,
         random_state=random_state,
         min_weight_fraction_leaf=0.02,
+        splitter="feature_weighted_best"
     )
-    return clf.fit(X_train, y_train)
+    return clf.fit(
+        X_train,
+        y_train,
+        draw_with_feature_weights=draw_with_feature_weight,
+        feature_weights=feature_weight,
+    )
 
 
 def interpolate_roc(y_test, y_predict):

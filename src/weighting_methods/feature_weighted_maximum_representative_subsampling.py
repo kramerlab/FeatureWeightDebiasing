@@ -23,6 +23,7 @@ def mrs(
     n_splits=5,
     class_weights="balanced",
     random_state=None,
+    feature_weight=None,
     *args,
     **attributes,
 ):
@@ -48,6 +49,7 @@ def mrs(
             train.label,
             class_weight=class_weights,
             random_state=random_state,
+            feature_weight=feature_weight,
         )
         predictions = clf.predict_proba(N_test[columns])[:, 1]
         all_predictions[N_test_index] = predictions

@@ -74,6 +74,7 @@ def mrs_without_cv(
     n_drop: int = 1,
     class_weight="balanced",
     random_state=None,
+    feature_weights=None,
     *args,
     **attributes,
 ):
@@ -93,9 +94,10 @@ def mrs_without_cv(
         data.label,
         class_weight=class_weight,
         random_state=random_state,
+        feature_weight=feature_weights
     )
     predictions = clf.predict_proba(N[columns])[:, 1]
-    feature_importance = calculate_feature_importance(
+    feature_importance, _ = calculate_feature_importance(
         test_N=N[columns].values,
         clf=clf,
     )

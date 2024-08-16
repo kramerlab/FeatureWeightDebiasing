@@ -265,6 +265,7 @@ def compute_classification_metrics_random_forest(
     compute_feature_importance=True,
     draw_with_feature_weights=False,
     drop_samples=False,
+    max_features="sqrt",
 ):
     """Computes classification metrics for downstream tasks
 
@@ -302,6 +303,7 @@ def compute_classification_metrics_random_forest(
                 draw_with_feature_weights=draw_with_feature_weights,
                 splitter=splitter,
                 n_estimators=n_estimators,
+                max_features=max_features,
             )
             if score > best_score:
                 best_score = score
@@ -327,6 +329,7 @@ def compute_classification_metrics_random_forest(
             draw_with_feature_weights=draw_with_feature_weights,
             splitter=splitter,
             n_estimators=n_estimators,
+            max_features=max_features,
         )
         best_weights = sample_weights_list
     y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
@@ -666,7 +669,7 @@ def train_pu_classifier(
         n_jobs=-1,
         random_state=random_state,
         min_weight_fraction_leaf=0.02,
-        splitter="feature_weighted_best"
+        splitter="feature_weighted_best",
     )
     return clf.fit(
         X_train,
@@ -811,6 +814,7 @@ def train_random_forest_classifier(
     random_state=None,
     splitter="feature_weighted_best",
     n_estimators=500,
+    max_features="sqrt",
     **kwargs,
 ):
     """Train a classifier to measure the auroc
@@ -837,7 +841,10 @@ def train_random_forest_classifier(
         "class_weight": ["balanced", None],
     }
     clf = RandomForestClassifier(
-        random_state=random_state, splitter=splitter, n_estimators=n_estimators
+        random_state=random_state,
+        splitter=splitter,
+        n_estimators=n_estimators,
+        max_features=max_features,
     )
     grid_cv = GridSearchCV(
         clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True

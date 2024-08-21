@@ -101,6 +101,7 @@ def parse_mrs_analysis_command_line_arguments():
     parser.add_argument("--number_of_repetitions", default=10, type=int)
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--drop", default=1, type=int)
+    parser.add_argument("--bias_fraction", default=0.1, type=float)
 
     return parser.parse_args()
 

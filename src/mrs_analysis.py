@@ -6,7 +6,7 @@ from tqdm import trange
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
-from utils.sampling import sample
+from utils.sampling import sample, sample_with_test_set
 from utils.metrics import calculate_mean_rocs, scale_df
 from utils.visualization import (
     plot_auc_average,
@@ -18,7 +18,7 @@ from utils.visualization import (
 seed = 5
 
 
-def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
+def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop, bias_fraction):
     """Run mrs on different data sets
 
     :param number_of_repetitions: Number of repetitions
@@ -34,28 +34,28 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
     mrs_iteration_list = []
     rocs_list_list = []
     relative_bias_list_list = []
-    data, columns, bias_variable = load_dataset(data_set_name)
+    data, columns, target = load_dataset(data_set_name)
     data = data.sample(frac=1)
     result_path = create_save_path(data_set_name, bias_type)
     mmd_list = []
 
+    sample_df, _ = scale_df(data, columns)
     if data_set_name in ["folktables_income", "breast_cancer"]:
-        scaled_df, _ = scale_df(data, columns)
-        scaled_N, scaled_R = sample(
+        N, R, _ = sample_with_test_set(
             bias_type,
-            scaled_df,
-            bias_variable,
+            sample_df,
+            target,
             train_fraction=0.5,
-            bias_fraction=0.25,
+            bias_fraction=bias_fraction,
+            test_fraction=0.2,
             columns=columns,
         )
         use_bias_mean = True
     else:
-        scaled_df, _ = scale_df(data, columns)
-        scaled_N = scaled_df[scaled_df["label"] == 1]
-        scaled_R = scaled_df[scaled_df["label"] == 0]
+        N = sample_df[sample_df["label"] == 1]
+        R = sample_df[sample_df["label"] == 0]
         use_bias_mean = False
-    number_of_samples = len(scaled_N)
+    number_of_samples = len(N)
 
     for _ in trange(number_of_repetitions):
         (
@@ -65,14 +65,14 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop):
             mrs_iteration,
             roc_list,
         ) = maximum_representative_subsampling.mrs(
-            scaled_N,
-            scaled_R,
+            N,
+            R,
             columns,
             drop=drop,
             save_path=result_path,
             return_metrics=True,
             compute_bias=use_bias_mean,
-            bias_variable=bias_variable,
+            bias_variable=target,
             random_generator=random_generator,
             early_stopping=False,
         )
@@ -139,5 +139,9 @@ def create_save_path(data_set_name, bias_type):
 if __name__ == "__main__":
     args = parse_mrs_analysis_command_line_arguments()
     analyse_mrs(
-        args.number_of_repetitions, args.data_set_name, args.bias_type, args.drop
+        args.number_of_repetitions,
+        args.data_set_name,
+        args.bias_type,
+        args.drop,
+        args.bias_fraction,
     )

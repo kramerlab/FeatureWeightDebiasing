@@ -9,6 +9,7 @@ line_styles = [
     "dashdot",
     "dashed",
     (5, (10, 3)),
+    (0, (3, 1, 1, 1, 1, 1)),
 ]
 
 

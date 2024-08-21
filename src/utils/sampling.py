@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)

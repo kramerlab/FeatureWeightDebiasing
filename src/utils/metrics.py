@@ -313,7 +313,7 @@ def compute_classification_metrics_random_forest(
         if drop_samples:
             not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
             N_train = N.iloc[not_dropped].copy()
-            train_sample_weights = sample_weights_list[not_dropped].copy()
+            train_sample_weights = np.array(sample_weights_list)[not_dropped].copy()
         else:
             N_train = N.copy()
             train_sample_weights = sample_weights_list.copy()
@@ -572,12 +572,10 @@ def train_random_forest_classifier_mrs(
     :param n_splits: Number of cross-validation iterations, defaults to 3
     :return: Trained classifier
     """
-    n_jobs = 3 if X.shape[1] > 15 else 1
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
         class_weight="balanced",
-        n_jobs=n_jobs,
     )
     parameter_grid = {
         "min_weight_fraction_leaf": [
@@ -653,7 +651,13 @@ def compute_test_metrics_mrs(
 
 
 def train_pu_classifier(
-    X_train, y_train, class_weight="balanced", feature_weight=None, random_state=None
+    X,
+    y,
+    class_weight="balanced",
+    n_estimators=200,
+    feature_weight=None,
+    random_state=None,
+    splitter="feature_weighted_best"
 ):
     """Train the positive unlabeled classifier
 
@@ -665,17 +669,44 @@ def train_pu_classifier(
     draw_with_feature_weight = False if feature_weight is None else True
     clf = RandomForestClassifier(
         class_weight=class_weight,
-        n_estimators=200,
+        n_estimators=n_estimators,
         n_jobs=-1,
         random_state=random_state,
-        min_weight_fraction_leaf=0.02,
-        splitter="feature_weighted_best",
+        # min_weight_fraction_leaf=0.01,
+        splitter=splitter,
     )
     return clf.fit(
-        X_train,
-        y_train,
+        X,
+        y,
         draw_with_feature_weights=draw_with_feature_weight,
         feature_weights=feature_weight,
+    )
+
+
+def train_pu_classifier_mrs(
+    X,
+    y,
+    class_weight="balanced",
+    n_estimators=200,
+    random_state=None,
+):
+    """Train the positive unlabeled classifier
+
+    :param X_train: Training features
+    :param y_train: Training target
+    :param class_weight: Sample weights, defaults to "balanced"
+    :return: Trained positive unlabeled classifier
+    """
+    clf = RandomForestClassifier(
+        n_estimators=n_estimators,
+        random_state=random_state,
+        class_weight=class_weight,
+        min_weight_fraction_leaf=0.01,
+    )
+
+    return clf.fit(
+        X,
+        y,
     )
 
 
@@ -1009,7 +1040,7 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     """
     if temperature is None or temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
-    feature_weights = np.exp(-feature_importance / temperature)
+    feature_weights = np.exp(-np.array(feature_importance) / temperature)
     return feature_weights / np.sum(feature_weights)
 
 
@@ -1018,6 +1049,22 @@ def calculate_feature_importance(test_N, clf, target=None, background=None):
     explainer = shap.TreeExplainer(clf, data=background)
     shap_values = explainer.shap_values(test_N, check_additivity=False)
     shap_values = shap_values[1]
+    abs_feature_importance = np.average(np.abs(shap_values), axis=0)
+
+    if target is not None:
+        feature_importance = np.average(shap_values, axis=0)
+    else:
+        feature_importance = None
+
+    return abs_feature_importance, feature_importance
+
+
+def calculate_undersampled_feature_importance(test_N, clf, target=None, background=None):
+
+    explainer = shap.TreeExplainer(clf, data=background)
+    shap_values = explainer.shap_values(test_N, check_additivity=False)
+    shap_values = shap_values[1]
+    shap_values[shap_values >= 0] = 0
     abs_feature_importance = np.average(np.abs(shap_values), axis=0)
 
     if target is not None:

@@ -46,7 +46,8 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    temperatures = [None, 0.1, 0.05, 0.01, 0.005, 0.001]
+    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
+    temperatures = [None, 0.01, 0.005]
 
     result_path = create_result_path(
         method_name,
@@ -81,18 +82,8 @@ def feature_weight_downstream_comparison_experiment(
         rf_auprc_dict[temperature] = []
         dropped_samples_list_dict[temperature] = []
 
-    _, _, T = sample_with_test_set(
-        bias_type,
-        sample_df,
-        target,
-        train_fraction=0.5,
-        bias_fraction=bias_fraction,
-        test_fraction=0.2,
-        columns=columns,
-    )
-
     for _ in trange(number_of_repetitions):
-        N, R, _ = sample_with_test_set(
+        N, R, T = sample_with_test_set(
             bias_type,
             sample_df,
             target,
@@ -105,7 +96,6 @@ def feature_weight_downstream_comparison_experiment(
             best_sample_weights_dict,
             dropped_samples_dict,
             best_feature_weights_dict,
-            best_inverse_feature_weights_dict,
         ) = feature_weighted_repeated_MRS(
             N=N,
             R=R,
@@ -126,17 +116,15 @@ def feature_weight_downstream_comparison_experiment(
             )
             sample_weights = best_sample_weights_dict[temperature]
             feature_weights = best_feature_weights_dict[temperature]
-            inverse_feature_weights = best_inverse_feature_weights_dict[temperature]
 
             best_feature_weights_dict,
-            best_inverse_feature_weights_dict,
             tree_auroc, tree_auprc = compute_classification_metrics_tree(
                 N,
                 R,
                 T,
                 columns,
                 sample_weights,
-                inverse_feature_weights,
+                feature_weights,
                 target,
                 random_state=seed,
                 n_splits=5,

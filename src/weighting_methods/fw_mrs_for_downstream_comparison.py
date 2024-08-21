@@ -20,9 +20,7 @@ def feature_weighted_repeated_MRS(
     budgets=[1.0],
     random_generator=None,
     class_weight="balanced",
-    n_test_splits=10,
-    n_pu_splits=5,
-    splitter="feature_weighted_best",
+    n_pu_splits=10,
     n_estimators=100,
     method_name=None,
     *args,
@@ -45,15 +43,15 @@ def feature_weighted_repeated_MRS(
     :param random_generator: Random generator to create random_states to make results reproducible
     :return: Sample weights or test metrics
     """
-    number_of_iterations = (len(N) - (n_test_splits + 1)) // drop
+    number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
     best_difference_dict = {}
-    best_inverse_feature_weights_dict = {}
     best_sample_weights_dict = {}
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
+    abs_feature_importance_dict = {}
 
     finished_dict = {}
     for temperature in budgets:
@@ -61,45 +59,32 @@ def feature_weighted_repeated_MRS(
         best_difference_dict[temperature] = np.inf
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
-
-    if method_name == "fw-mrs-temperature":
-        draw_with_feature_weights = True
-        feature_weight_method = compute_feature_weights_with_temperature
+        abs_feature_importance_dict[temperature] = np.ones(len(columns)).tolist()
 
     rand_int = random_generator.randint(max_int)
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        drop_ids, feature_importance = mrs(
-            N=dropped_N,
-            R=R,
-            columns=columns,
-            n_drop=drop,
-            random_state=rand_int,
-            class_weight=class_weight,
-            n_splits=n_pu_splits,
-        )
-
         for temperature in budgets:
-            feature_weights = (
-                np.ones(len(feature_importance))
-                if temperature is None or temperature == 0.0
-                else feature_weight_method(temperature, feature_importance)
+            current_feature_importance = abs_feature_importance_dict[temperature]
+            feature_weights = compute_feature_weights_with_temperature(
+                temperature, current_feature_importance
+            )
+            drop_ids, abs_feature_importance, auroc = mrs(
+                N=dropped_N,
+                R=R,
+                columns=columns,
+                n_drop=drop,
+                random_state=rand_int,
+                class_weight=class_weight,
+                n_splits=n_pu_splits,
+                feature_weight=feature_weights
             )
 
-            auroc = compute_test_metrics_fw_mrs(
-                dropped_N,
-                R,
-                columns,
-                random_state=rand_int,
-                feature_weights=feature_weights,
-                class_weight="balanced",
-                max_features="sqrt",
-                splitter=splitter,
-                n_splits_test=n_test_splits,
-                n_estimators=n_estimators,
-                draw_with_feature_weights=draw_with_feature_weights,
-            )
+            if i == 0:
+                abs_feature_importance_dict[temperature] = (
+                    abs_feature_importance.tolist()
+                )
 
             auc_difference = abs(auroc - 0.5)
 
@@ -112,12 +97,9 @@ def feature_weighted_repeated_MRS(
                     sample_weights / np.sum(sample_weights)
                 ).copy()
                 best_feature_weights_dict[temperature] = feature_weights.copy()
-                best_inverse_feature_weights_dict[temperature] = feature_weight_method(
-                    temperature, -feature_importance
-                ).copy()
             if (
                 len(dropped_N) <= drop
-                or len(dropped_N) <= n_test_splits
+                or len(dropped_N) <= n_pu_splits
                 or auc_difference <= delta
             ):
                 finished_dict[temperature] = True
@@ -132,5 +114,4 @@ def feature_weighted_repeated_MRS(
         best_sample_weights_dict,
         dropped_samples_dict,
         best_feature_weights_dict,
-        best_inverse_feature_weights_dict,
     )

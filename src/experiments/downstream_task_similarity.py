@@ -71,14 +71,12 @@ def downstream_experiment(
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
-    inverse_feature_weights_save_path = result_path / "inverse_feature_weights"
 
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weights_list = load_weights(feature_weights_save_path)
-    inverse_feature_weight_list = load_weights(inverse_feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -112,9 +110,8 @@ def downstream_experiment(
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = np.array(sample_weight_list[i])
             feature_weights = np.array(feature_weights_list[i])
-            inverse_feature_weights = np.array(inverse_feature_weight_list[i])
         else:
-            sample_weights, feature_weights, inverse_feature_weights = (
+            sample_weights, feature_weights = (
                 sample_weighting_method(
                     N=N,
                     R=R,
@@ -132,18 +129,15 @@ def downstream_experiment(
             )
 
             feature_weights_list.append(feature_weights)
-            inverse_feature_weight_list.append(inverse_feature_weights)
             sample_weight_list.append(sample_weights)
 
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weights_list)
-            save_weights(inverse_feature_weights_save_path, inverse_feature_weight_list)
 
-        dropped_samples = np.count_nonzero(sample_weights == 0.0)
+        dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
         if feature_weights is None:
             feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
-            inverse_feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
 
         weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
             N,
@@ -155,20 +149,9 @@ def downstream_experiment(
             gamma,
         )
 
-        gradient_ascent_auroc, gradient_ascent_auprc = (
-            compute_classification_metrics_gradient_descent(
-                N,
-                R,
-                R,
-                columns,
-                sample_weights,
-                inverse_feature_weights,
-                target,
-                random_state=seed,
-            )
-        )
+        gradient_ascent_auroc, gradient_ascent_auprc = 0, 0
 
-        rf_auroc, rf_auprc = compute_classification_metrics_random_forest(
+        rf_auroc, rf_auprc, _, _, _, _ = compute_classification_metrics_random_forest(
             N,
             R,
             R,

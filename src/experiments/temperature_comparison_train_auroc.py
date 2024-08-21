@@ -46,7 +46,8 @@ def feature_weight_budget_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    temperatures = [None, 0.1, 0.05, 0.01, 0.005, 0.001]
+    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
+    temperatures = [None, 0.05, 0.01, 0.005]
 
     result_path = create_result_path(
         method_name,
@@ -117,7 +118,7 @@ def feature_weight_budget_comparison_experiment(
         number_of_samples = len(N)
         feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
         abs_feature_importances_list.append(abs_feature_importances)
-        feature_importances_list.append(feature_importances)
+        #feature_importances_list.append(feature_importances)
         feature_weights_list.append(feature_weights)
         dropped_samples_list.append(dropped_samples)
 
@@ -134,7 +135,7 @@ def feature_weight_budget_comparison_experiment(
 
         feature_importance_path = result_path / f"feature_importance" / str(i)
         feature_importance_path.mkdir(exist_ok=True, parents=True)
-        plot_feature_importance(abs_feature_importances, feature_importance_path)
+       # plot_feature_importance(abs_feature_importances, feature_importance_path)
 
     # Visualize mean results
     plot_budget_comparison_auroc_mean(

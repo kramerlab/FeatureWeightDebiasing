@@ -24,4 +24,4 @@ def kernel_mean_matching(N, R, columns, *args, **attributes):
         tol=1e-5,
     )
     weights = model.fit_weights(N_columns, R_columns)
-    return (np.squeeze(weights) / np.sum(weights)).tolist(), None, None
+    return (np.squeeze(weights) / np.sum(weights)).tolist(), None

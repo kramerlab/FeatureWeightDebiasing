@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
 from sklearn.model_selection import KFold
@@ -24,6 +25,7 @@ def mrs(
     class_weights="balanced",
     random_state=None,
     feature_weight=None,
+    splitter="feature_weighted_best",
     *args,
     **attributes,
 ):
@@ -39,20 +41,28 @@ def mrs(
     :return: _description_
     """
     all_predictions = np.zeros(len(N))
+    auroc_list = []
     abs_feature_importance_list = []
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for N_train_index, N_test_index in kf.split(N):
-        N_train, N_test = N.iloc[N_train_index], N.iloc[N_test_index]
-        train = pd.concat([N_train, R])
+    for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
+        kf.split(N), kf.split(R)
+    ):
+        N_train, N_test = N.iloc[train_indices_N], N.iloc[test_indices_N]
+        R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
+        train_data = pd.concat([N_train, R_train])
         clf = train_pu_classifier(
-            train[columns],
-            train.label,
+            train_data[columns],
+            train_data.label,
             class_weight=class_weights,
             random_state=random_state,
             feature_weight=feature_weight,
+            splitter=splitter
         )
-        predictions = clf.predict_proba(N_test[columns])[:, 1]
-        all_predictions[N_test_index] = predictions
+        test_data = pd.concat([N_test, R_test])
+        predictions = clf.predict_proba(test_data[columns])[:, 1]
+        all_predictions[test_indices_N] = predictions[: len(N_test)]
+        auroc_list.append(roc_auc_score(test_data.label, predictions))
+
         abs_feature_importance, _ = calculate_feature_importance(
             test_N=N_test[columns].values,
             clf=clf,
@@ -60,11 +70,10 @@ def mrs(
         abs_feature_importance_list.append(abs_feature_importance)
 
     abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
-
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
     drop_index = N.index[drop_ids]
 
-    return drop_index, abs_mean_feature_importance
+    return drop_index, abs_mean_feature_importance, np.mean(auroc_list)
 
 
 def mrs_without_cv(
@@ -94,18 +103,20 @@ def mrs_without_cv(
         data.label,
         class_weight=class_weight,
         random_state=random_state,
-        feature_weight=feature_weights
+        feature_weight=feature_weights,
     )
-    predictions = clf.predict_proba(N[columns])[:, 1]
+    predictions_N = clf.predict_proba(N[columns])[:, 1]
     feature_importance, _ = calculate_feature_importance(
         test_N=N[columns].values,
         clf=clf,
     )
+    predictions = clf.predict_proba(data[columns])[:, 1]
+    auroc = roc_auc_score(data.label, predictions)
 
-    drop_ids = np.argpartition(predictions, -n_drop)[-n_drop:]
+    drop_ids = np.argpartition(predictions_N, -n_drop)[-n_drop:]
     drop_index = N.index[drop_ids]
 
-    return drop_index, feature_importance
+    return drop_index, feature_importance, auroc
 
 
 def compute_feature_weights_with_budget(budget, feature_importance):
@@ -133,10 +144,8 @@ def feature_weighted_repeated_MRS(
     random_generator=None,
     class_weight="balanced",
     return_auroc=False,
-    n_test_splits=10,
-    n_pu_splits=5,
+    n_pu_splits=10,
     splitter="feature_weighted_best",
-    n_estimators=200,
     max_patience=20,
     *args,
     **attributes,
@@ -158,21 +167,21 @@ def feature_weighted_repeated_MRS(
     :param random_generator: Random generator to create random_states to make results reproducible
     :return: Sample weights or test metrics
     """
-    number_of_iterations = (len(N) - (n_test_splits + 1)) // drop
+    number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights = np.ones(len(N))
-    abs_feature_importance_list = []
+    abs_feature_importance_dict = {}
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
     finished_dict = {}
     best_difference_dict = {}
-    best_inverse_feature_weights_dict = {}
     best_sample_weights_dict = {}
     dropped_samples_dict = {}
     best_feature_weights_dict = {}
     auc_difference_dict = {}
     current_patience = {}
+    switched = False
 
     finished_dict = {}
     for temperature in budgets:
@@ -181,80 +190,64 @@ def feature_weighted_repeated_MRS(
         auc_difference_dict[temperature] = 1
         dropped_samples_dict[temperature] = 0
         current_patience[temperature] = 0
-
-    rand_int = random_generator.randint(max_int)
+        feature_weighted_aurocs_dict[temperature] = []
+        feature_weights_dict[temperature] = []
+        abs_feature_importance_dict[temperature] = np.ones(len(columns)).tolist()
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        drop_ids, abs_feature_importance = mrs(
-            N=dropped_N,
-            R=R,
-            columns=columns,
-            n_drop=drop,
-            random_state=rand_int,
-            class_weight=class_weight,
-            n_splits=n_pu_splits,
-        )
-        abs_feature_importance_list.append(abs_feature_importance.tolist())
-
         for temperature in budgets:
+            current_feature_importance = abs_feature_importance_dict[temperature]
             feature_weights = compute_feature_weights_with_temperature(
-                temperature, abs_feature_importance
+                temperature, current_feature_importance
             )
-
-            auroc = compute_test_metrics_fw_mrs(
-                dropped_N,
-                R,
-                columns,
+            splitter = "best" if temperature in (0.0, None) else "feature_weighted_best"
+            drop_ids, abs_feature_importance, auroc = mrs(
+                N=dropped_N,
+                R=R,
+                columns=columns,
+                n_drop=drop,
                 random_state=rand_int,
-                feature_weights=feature_weights,
-                method=train_feature_weighted_random_forest,
-                class_weight="balanced",
-                max_features="sqrt",
+                class_weight=class_weight,
+                n_splits=n_pu_splits,
+                feature_weight=feature_weights,
                 splitter=splitter,
-                n_splits_test=n_test_splits,
-                n_estimators=n_estimators,
-                draw_with_feature_weights=True,
             )
+            if i == 0:
+                abs_feature_importance_dict[temperature] = (
+                    abs_feature_importance.tolist()
+                )
 
-            if temperature not in feature_weighted_aurocs_dict:
-                feature_weighted_aurocs_dict[temperature] = []
-                feature_weights_dict[temperature] = []
             feature_weighted_aurocs_dict[temperature].append(auroc)
             feature_weights_dict[temperature].append(list(feature_weights).copy())
 
             auc_difference = abs(auroc - 0.5)
 
-            if (auc_difference + delta) <= best_difference_dict[
-                temperature
-            ] and not finished_dict[temperature]:
+            if (
+                (auc_difference + delta) <= best_difference_dict[temperature]
+                or (not switched and auroc < 0.5)
+            ) and not finished_dict[temperature]:
                 best_difference_dict[temperature] = auc_difference
                 dropped_samples_dict[temperature] = i * drop
                 best_sample_weights_dict[temperature] = (
                     (sample_weights / np.sum(sample_weights)).tolist().copy()
                 )
-                best_feature_weights_dict[temperature] = (
-                    feature_weights.tolist().copy()
-                )
-                best_inverse_feature_weights_dict[temperature] = (
-                    compute_feature_weights_with_temperature(
-                        temperature, -abs_feature_importance
-                    )
-                ).tolist()
+                best_feature_weights_dict[temperature] = feature_weights.tolist().copy()
                 current_patience[temperature] = 0
+                if not switched and auroc < 0.5:
+                    switched = True
             else:
                 current_patience[temperature] += 1
             if (
                 len(dropped_N) <= drop
-                or len(dropped_N) <= n_test_splits
+                or len(dropped_N) <= n_pu_splits
                 or (auc_difference <= delta and early_stopping)
-                or (
-                    current_patience[temperature] == max_patience and early_stopping
-                )
+                or (current_patience[temperature] == max_patience and early_stopping)
+                or auroc < 0.5
             ):
                 finished_dict[temperature] = True
 
-        if all(finished_dict.values()):
+        if all(finished_dict.values()) and early_stopping:
             break
 
         dropped_N = dropped_N.drop(drop_ids)
@@ -263,7 +256,7 @@ def feature_weighted_repeated_MRS(
     if return_auroc:
         return (
             feature_weighted_aurocs_dict,
-            abs_feature_importance_list,
+            abs_feature_importance_dict,
             feature_weights_dict,
             dropped_samples_dict,
         )
@@ -272,5 +265,4 @@ def feature_weighted_repeated_MRS(
         return (
             best_sample_weights_dict,
             best_feature_weights_dict,
-            best_inverse_feature_weights_dict,
         )

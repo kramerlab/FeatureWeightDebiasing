@@ -80,7 +80,7 @@ def soft_mrs_weighting(
         predictions_N = predictions[: len(N), 1]
         weights_N = update_weights(weights_N, predictions_N, exponential=exponential)
 
-    return best_weights.tolist(), None, None
+    return best_weights.tolist(), None
 
 
 def train_weighted_random_forest(

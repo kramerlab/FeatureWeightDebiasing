@@ -1752,9 +1752,7 @@ cdef inline int node_split_feature_weighted_best(
     # Own variables
     cdef float64_t weight_sum
     cdef float64_t current_weight_sum
-    cdef float64_t feature_weight 
     cdef float64_t drawn_probability
-    cdef float64_t current_feature_weight
     
     _init_split(&best_split, end)
     partitioner.init_node_split(start, end)
@@ -1788,21 +1786,20 @@ cdef inline int node_split_feature_weighted_best(
         #   and aren't constant.
 
 
-        # Draw a features at random with feature weights
+        # Draw a feature at random with feature weights
         if draw_with_feature_weights: 
             weight_sum = 0.0
             for i in range(f_i):
-                if (n_drawn_constants <= i < n_known_constants) or ((n_known_constants + n_found_constants) <= i):
-                    feature_weight = feature_weights[features[i]]
-                    possible_weights[i] = feature_weight
-                    weight_sum += feature_weight 
+                if (n_drawn_constants <= i < n_known_constants) or (n_total_constants <= i):
+                    possible_weights[i] = feature_weights[features[i]]
+                    weight_sum += feature_weights[features[i]] 
                 else:
                     possible_weights[i] = 0.0
             if weight_sum == 0.0:
-                    weight_sum = (n_known_constants - n_drawn_constants) + (f_i - (n_found_constants + n_known_constants))
                     for i in range(f_i):
-                        if (n_drawn_constants <= i < n_known_constants) or ((n_known_constants + n_found_constants) <= i):
-                            possible_weights[i] = 1
+                        if (n_drawn_constants <= i < n_known_constants) or (n_total_constants <= i):
+                            possible_weights[i] = 1.0
+                            weight_sum += 1.0
             drawn_probability = rand_uniform(0, weight_sum, random_state)
             current_weight_sum = 0.0
             for i in range(n_drawn_constants, f_i):
@@ -1826,7 +1823,6 @@ cdef inline int node_split_feature_weighted_best(
         # f_j in the interval [n_known_constants, f_i - n_found_constants[
         if not draw_with_feature_weights:
             f_j += n_found_constants
-            current_feature_weight = feature_weights[features[f_j]]
 
         # f_j in the interval [n_total_constants, f_i[
         current_split.feature = features[f_j]

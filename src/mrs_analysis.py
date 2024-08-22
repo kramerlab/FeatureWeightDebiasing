@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from pathlib import Path
+from sklearn.discriminant_analysis import StandardScaler
 from tqdm import trange
 
 from weighting_methods import maximum_representative_subsampling
@@ -34,13 +35,19 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop, bias_frac
     mrs_iteration_list = []
     rocs_list_list = []
     relative_bias_list_list = []
-    data, columns, target = load_dataset(data_set_name)
-    data = data.sample(frac=1)
-    result_path = create_save_path(data_set_name, bias_type)
+    result_path = create_save_path(
+        data_set_name, bias_type, bias_fraction=bias_fraction
+    )
     mmd_list = []
 
-    sample_df, _ = scale_df(data, columns)
-    if data_set_name in ["folktables_income", "breast_cancer"]:
+    df, columns, target = load_dataset(data_set_name)
+    sample_df, _ = scale_df(df, columns)
+
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+        N = sample_df[sample_df["label"] == 1]
+        R = sample_df[sample_df["label"] == 0]
+        use_bias_mean = False
+    else:
         N, R, _ = sample_with_test_set(
             bias_type,
             sample_df,
@@ -51,10 +58,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop, bias_frac
             columns=columns,
         )
         use_bias_mean = True
-    else:
-        N = sample_df[sample_df["label"] == 1]
-        R = sample_df[sample_df["label"] == 0]
-        use_bias_mean = False
+
     number_of_samples = len(N)
 
     for _ in trange(number_of_repetitions):
@@ -122,7 +126,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop, bias_frac
     )
 
 
-def create_save_path(data_set_name, bias_type):
+def create_save_path(data_set_name, bias_type, bias_fraction):
     """Creates the path for result files
 
     :param data_set_name: Data set name
@@ -131,7 +135,9 @@ def create_save_path(data_set_name, bias_type):
     """
     file_directory = Path(__file__).parent
     result_path = Path(file_directory, "../results")
-    result_path = result_path / "mrs_analysis" / data_set_name / bias_type
+    result_path = (
+        result_path / "mrs_analysis" / data_set_name / bias_type / str(bias_fraction)
+    )
     result_path.mkdir(exist_ok=True, parents=True)
     return result_path
 

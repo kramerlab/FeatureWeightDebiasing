@@ -1,6 +1,7 @@
 import json
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
+from utils.metrics import scale_df
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
 from weighting_methods.feature_weighted_maximum_representative_subsampling import (
@@ -10,7 +11,6 @@ import numpy as np
 
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
-    plot_feature_importance,
     plot_feature_weights,
     plot_budget_comparison_auroc_mean,
 )
@@ -28,7 +28,7 @@ def feature_weight_budget_comparison_experiment(
     random_generator=None,
     method_name=None,
     drop=1,
-    bias_fraction=0.25,
+    bias_fraction=0.1,
     validation_method="",
     **args,
 ):
@@ -68,10 +68,7 @@ def feature_weight_budget_comparison_experiment(
     feature_weights_list = []
     dropped_samples_list = []
 
-    scaler = StandardScaler()
-    scaler = scaler.fit(df[columns])
-    df[columns] = scaler.transform(df[columns])
-    sample_df = df.copy()
+    sample_df, _ = scale_df(df, columns)
     feature_weighted_aurocs_list = []
     abs_feature_importances_list = []
     feature_importances_list = []

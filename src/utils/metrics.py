@@ -1,20 +1,20 @@
+import warnings
 import shap
 import numpy as np
 from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import pdist
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import rbf_kernel
 
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
-from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     roc_curve,
     roc_auc_score,
     roc_curve,
     average_precision_score,
 )
-from utils.reverse_validation import ReverseScorer
 
 
 def compute_weighted_means(N, weights):
@@ -261,7 +261,6 @@ def compute_classification_metrics_random_forest(
     n_splits=5,
     splitter="feature_weighted_best",
     n_estimators=500,
-    max_depth=None,
     compute_feature_importance=True,
     draw_with_feature_weights=False,
     drop_samples=False,
@@ -336,20 +335,12 @@ def compute_classification_metrics_random_forest(
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
 
     if compute_feature_importance:
-        if drop_samples:
-            not_dropped = np.nonzero(np.array(best_weights) != 0.0)
-            N_train = N.iloc[not_dropped].copy()
-        else:
-            N_train = N.copy()
-        abs_feature_importance, feature_importance = calculate_feature_importance(
+        abs_feature_importance = calculate_feature_importance(
             T[columns].values,
             best_clf.best_estimator_,
-            label,
-            N_train[columns].values,
         )
     else:
         abs_feature_importance = None
-        feature_importance = None
 
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
@@ -359,7 +350,6 @@ def compute_classification_metrics_random_forest(
         auprc,
         best_weights,
         abs_feature_importance,
-        feature_importance,
         (fpr.tolist(), tpr.tolist()),
     )
 
@@ -429,7 +419,7 @@ def compute_classification_metrics_random_forest_gbs(
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
 
     if compute_feature_importance:
-        abs_feature_importance, feature_importance = calculate_feature_importance(
+        abs_feature_importance = calculate_feature_importance(
             T[columns].values,
             best_clf.best_estimator_,
             label,
@@ -657,7 +647,7 @@ def train_pu_classifier(
     n_estimators=200,
     feature_weight=None,
     random_state=None,
-    splitter="feature_weighted_best"
+    splitter="feature_weighted_best",
 ):
     """Train the positive unlabeled classifier
 
@@ -672,7 +662,7 @@ def train_pu_classifier(
         n_estimators=n_estimators,
         n_jobs=-1,
         random_state=random_state,
-        # min_weight_fraction_leaf=0.01,
+        min_weight_fraction_leaf=0.03,
         splitter=splitter,
     )
     return clf.fit(
@@ -686,9 +676,10 @@ def train_pu_classifier(
 def train_pu_classifier_mrs(
     X,
     y,
-    class_weight="balanced",
+    class_weight=None,
     n_estimators=200,
     random_state=None,
+    n_splits=3,
 ):
     """Train the positive unlabeled classifier
 
@@ -697,14 +688,23 @@ def train_pu_classifier_mrs(
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
-        class_weight=class_weight,
-        min_weight_fraction_leaf=0.01,
+    )
+    param_grid = {
+        "min_weight_fraction_leaf": [
+            0.03,
+            0.5,
+        ]
+    }
+    grid = GridSearchCV(
+        clf, param_grid, cv=skf, scoring="roc_auc", refit=True, n_jobs=n_splits,
     )
 
-    return clf.fit(
+    return grid.fit(
         X,
         y,
     )
@@ -1044,32 +1044,15 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     return feature_weights / np.sum(feature_weights)
 
 
-def calculate_feature_importance(test_N, clf, target=None, background=None):
+def calculate_feature_importance(test_N, clf, background=None):
 
     explainer = shap.TreeExplainer(clf, data=background)
-    shap_values = explainer.shap_values(test_N, check_additivity=False)
-    shap_values = shap_values[1]
-    abs_feature_importance = np.average(np.abs(shap_values), axis=0)
+    explainer = explainer(test_N, check_additivity=False)
+    shap_values = explainer.values[:, :, 1]
+    shap_values[shap_values >= 0] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        abs_feature_importance = np.abs(np.nanmean(shap_values, axis=0))
+    abs_feature_importance = np.nan_to_num(abs_feature_importance)
 
-    if target is not None:
-        feature_importance = np.average(shap_values, axis=0)
-    else:
-        feature_importance = None
-
-    return abs_feature_importance, feature_importance
-
-
-def calculate_undersampled_feature_importance(test_N, clf, target=None, background=None):
-
-    explainer = shap.TreeExplainer(clf, data=background)
-    shap_values = explainer.shap_values(test_N, check_additivity=False)
-    shap_values = shap_values[1]
-    shap_values[shap_values >= 0] = 0
-    abs_feature_importance = np.average(np.abs(shap_values), axis=0)
-
-    if target is not None:
-        feature_importance = np.average(shap_values, axis=0)
-    else:
-        feature_importance = None
-
-    return abs_feature_importance, feature_importance
+    return abs_feature_importance

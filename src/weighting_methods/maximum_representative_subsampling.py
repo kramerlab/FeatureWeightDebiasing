@@ -30,9 +30,10 @@ def mrs_step(
     columns,
     n_drop: int = 1,
     n_splits=5,
-    class_weights="balanced",
+    class_weight=None,
     random_state=None,
     calculate_roc=False,
+    sample_weights=None,
     *args,
     **attributes
 ):
@@ -43,32 +44,34 @@ def mrs_step(
     :param columns: Columns names used for training
     :param n_drop: Number of samples to drop every iteration, defaults to 1
     :param cv: Number of cross-validation iterations, defaults to 5
-    :param class_weights: Type of class weights, defaults to "balanced"
+    :param class_weight: Type of class weights, defaults to "balanced"
     :param random_state: Random state to make results reproducible
     :return: _description_
     """
-    all_predictions = np.zeros(len(N))
     auroc_list = []
     ifpr_list = []
     itpr_list = []
 
+    dropped_N = N[sample_weights != 0.0]
+    all_predictions = np.zeros(len(dropped_N))
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
-        kf.split(N), kf.split(R)
+        kf.split(dropped_N), kf.split(R)
     ):
-        N_train, N_test = N.iloc[train_indices_N], N.iloc[test_indices_N]
+        N_train, N_test = dropped_N.iloc[train_indices_N], dropped_N.iloc[test_indices_N]
         R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
         train_data = pd.concat([N_train, R_train])
         clf = train_pu_classifier_mrs(
             train_data[columns],
             train_data.label,
-            class_weight=class_weights,
+            class_weight=class_weight,
             random_state=random_state,
         )
         test_data = pd.concat([N_test, R_test])
         predictions = clf.predict_proba(test_data[columns])[:, 1]
         all_predictions[test_indices_N] = predictions[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, predictions))
+        
         if calculate_roc:
             interpolated_fpr, interpolated_tpr = interpolate_roc(
                 test_data.label, predictions
@@ -77,22 +80,20 @@ def mrs_step(
             itpr_list.append(interpolated_tpr)
 
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
-    drop_index = N.index[drop_ids]
 
     if calculate_roc:
         mean_ifpr_list, mean_itpr_list, std_tpr = calculate_mean_roc(
             ifpr_list, itpr_list
         )
         return (
-            N.drop(N.index[drop_ids]),
-            drop_index,
+            dropped_N.index[drop_ids],
             np.mean(auroc_list),
             mean_ifpr_list,
             mean_itpr_list,
             std_tpr,
         )
     else:
-        return N.index[drop_ids], drop_index, np.mean(auroc_list)
+        return dropped_N.index[drop_ids], np.mean(auroc_list)
 
 
 def mrs_without_cv(
@@ -100,7 +101,7 @@ def mrs_without_cv(
     R,
     columns,
     n_drop: int = 1,
-    class_weights="balanced",
+    class_weight="balanced",
     random_state=None,
     *args,
     **attributes
@@ -119,7 +120,7 @@ def mrs_without_cv(
     clf = train_pu_classifier_mrs(
         data[columns],
         data.label,
-        class_weight=class_weights,
+        class_weight=class_weight,
         random_state=random_state,
     )
     predictions = clf.predict_proba(N[columns])[:, 1]
@@ -140,10 +141,10 @@ def mrs(
     compute_bias=True,
     bias_variable=None,
     n_pu_splits=10,
-    class_weights="balanced",
+    class_weight="balanced",
     drop=1,
-    random_generator=None,
     max_patience=5,
+    random_generator=None,
     *args,
     **attributes
 ):
@@ -177,7 +178,7 @@ def mrs(
     best_difference = np.inf
     current_patience = 0
     switched = False
-
+    N = N.reset_index(drop=True)
     # Compute and save mmd inputs to save time
     # Start values
     if return_metrics:
@@ -200,32 +201,30 @@ def mrs(
 
     for i in trange(number_of_iterations):
         if i % roc_iteration == 0 and return_metrics:
-            drop_ids, auroc, mean_ifpr_list, mean_itpr_list, std_tpr = (
-                mrs(
-                    N=dropped_N,
-                    R=R,
-                    columns=columns,
-                    n_drop=drop,
-                    class_weights=class_weights,
-                    n_splits=n_pu_splits,
-                    random_state=random_generator.randint(max_int),
-                    calculate_roc=True,
-                )
-            )
-            roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
-        else:
-            dropped_N, drop_ids, auroc = mrs_function(
-                N=dropped_N,
+            drop_ids, auroc, mean_ifpr_list, mean_itpr_list, std_tpr = mrs_function(
+                N=N,
                 R=R,
                 columns=columns,
                 n_drop=drop,
-                class_weights=class_weights,
+                class_weight=class_weight,
                 n_splits=n_pu_splits,
                 random_state=random_generator.randint(max_int),
+                calculate_roc=True,
+                sample_weights=sample_weights
+            )
+            roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
+        else:
+            drop_ids, auroc = mrs_function(
+                N=N,
+                R=R,
+                columns=columns,
+                n_drop=drop,
+                class_weight=class_weight,
+                n_splits=n_pu_splits,
+                random_state=random_generator.randint(max_int),
+                sample_weights=sample_weights
             )
 
-        if i % roc_iteration == 0 and return_metrics:
-            pass
             # auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
         #     dropped_N,
         #    R,
@@ -235,7 +234,6 @@ def mrs(
         #     validation_method=validation_method,
         #  )
         #  roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
-        else:
             # auroc = compute_test_metrics_mrs(
             #   dropped_N,
             #    R,
@@ -244,33 +242,32 @@ def mrs(
             #    n_test_splits=n_test_splits,
             #    validation_method=validation_method,
             # )
-            if compute_bias and bias_variable is not None:
-                relative_bias = compute_relative_bias(
-                    N[bias_variable], R[bias_variable], sample_weights
-                )
-                relative_bias_list.append(relative_bias)
+        if compute_bias and bias_variable is not None:
+            relative_bias = compute_relative_bias(
+                N[bias_variable], R[bias_variable], sample_weights
+            )
+            relative_bias_list.append(relative_bias)
 
-            auc_difference = abs(auroc - 0.5)
-            if auc_difference <= best_difference or (not switched and auroc < 0.5):
-                
-                best_weights = sample_weights.copy().astype(np.float64)
-                mrs_iteration = (i + 1) * drop
-                best_difference = auc_difference
-                current_patience = 0
-                if not switched and auroc < 0.5:
-                    switched = True
-            else:
-                current_patience += 1
+        auc_difference = abs(auroc - 0.5)
+        if (auc_difference <= best_difference or auroc <= 0.5) and not switched:
+            best_weights = sample_weights.copy().astype(np.float64)
+            mrs_iteration = i * drop
+            best_difference = auc_difference
+            current_patience = 0
+            if auroc <= 0.5 and not switched:
+                switched = True
+        else:
+            current_patience += 1
 
-            if (
-                (best_difference <= delta and early_stopping)
-                or len(dropped_N) <= drop
-                or len(dropped_N) <= n_pu_splits
-                or (current_patience == max_patience and early_stopping)
-            ):
-                break
+        if (
+            ((best_difference <= delta or switched) and early_stopping)
+            or len(dropped_N) <= drop
+            or len(dropped_N) <= n_pu_splits
+            or ((current_patience == max_patience)
+            and early_stopping)
+        ):
+            break
 
-        dropped_N = dropped_N.drop(drop_ids)
         sample_weights[drop_ids] = 0.0
 
         if return_metrics:

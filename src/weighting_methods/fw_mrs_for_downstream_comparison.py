@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import trange
 from .feature_weighted_maximum_representative_subsampling import (
     compute_feature_weights_with_temperature,
-    mrs,
+    mrs_step,
 )
 from utils.metrics import compute_test_metrics_fw_mrs
 
@@ -70,7 +70,7 @@ def feature_weighted_repeated_MRS(
             feature_weights = compute_feature_weights_with_temperature(
                 temperature, current_feature_importance
             )
-            drop_ids, abs_feature_importance, auroc = mrs(
+            drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
                 columns=columns,
@@ -78,7 +78,7 @@ def feature_weighted_repeated_MRS(
                 random_state=rand_int,
                 class_weight=class_weight,
                 n_splits=n_pu_splits,
-                feature_weight=feature_weights
+                feature_weight=feature_weights,
             )
 
             if i == 0:

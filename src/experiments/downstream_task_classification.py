@@ -66,7 +66,6 @@ def downstream_experiment_with_test_set(
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
-    inverse_feature_weights_save_path = result_path / "inverse_feature_weights"
     classificiation_result_path = result_path / "classification_results"
     roc_path = result_path / "rocs"
 
@@ -74,12 +73,10 @@ def downstream_experiment_with_test_set(
     classificiation_result_path.mkdir(exist_ok=True)
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
-    inverse_feature_weights_save_path.mkdir(exist_ok=True)
     roc_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weight_list = load_weights(feature_weights_save_path)
-    inverse_feature_weight_list = load_weights(feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -113,10 +110,9 @@ def downstream_experiment_with_test_set(
         if len(sample_weight_list) > i and explicit_weights and load_previous_results:
             sample_weights = sample_weight_list[i]
             feature_weights = feature_weight_list[i]
-            inverse_feature_weights = inverse_feature_weight_list[i]
 
         else:
-            sample_weights, feature_weights, inverse_feature_weights = (
+            sample_weights, feature_weights = (
                 sample_weighting_method(
                     N=N,
                     R=R,
@@ -134,16 +130,13 @@ def downstream_experiment_with_test_set(
             )
 
             feature_weight_list.append(feature_weights)
-            inverse_feature_weight_list.append(inverse_feature_weights)
             sample_weight_list.append(sample_weights)
 
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
-            save_weights(inverse_feature_weights_save_path, inverse_feature_weight_list)
 
         if feature_weights is None:
             feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
-            inverse_feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
 
         """ gradient_ascent_auroc, gradient_ascent_auprc = (
             compute_classification_metrics_gradient_descent(
@@ -152,7 +145,6 @@ def downstream_experiment_with_test_set(
                 T,
                 columns,
                 sample_weights,
-                inverse_feature_weights,
                 target,
                 random_state=seed,
                 n_splits=10,
@@ -167,7 +159,6 @@ def downstream_experiment_with_test_set(
             rf_auprc,
             sample_weights,
             abs_feature_importance,
-            feature_importance,
             roc_curve_values,
         ) = compute_classification_metrics_random_forest(
             N,
@@ -201,7 +192,6 @@ def downstream_experiment_with_test_set(
         gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
         abs_feature_importance_list.append(abs_feature_importance.tolist())
-        feature_importance_list.append(feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
 
         plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")

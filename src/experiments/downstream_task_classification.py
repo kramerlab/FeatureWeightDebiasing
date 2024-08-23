@@ -90,7 +90,7 @@ def downstream_experiment_with_test_set(
     if method_name == "fw-mrs-temperature":
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
-        temperatures = [0.05, 0.01, 0.005]
+        temperatures = [0.01, 0.005]
     else:
         splitter = "best"
         draw_with_feature_weights = False

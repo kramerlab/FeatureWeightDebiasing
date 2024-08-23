@@ -143,7 +143,7 @@ def feature_weighted_repeated_MRS(
     drop=1,
     budgets=[1.0],
     random_generator=None,
-    class_weight="balanced",
+    class_weight=None,
     return_auroc=False,
     n_pu_splits=10,
     max_patience=5,
@@ -197,6 +197,28 @@ def feature_weighted_repeated_MRS(
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
+            if i == 0:
+                current_feature_importance = np.ones(len(columns)).tolist()
+                feature_weights = compute_feature_weights_with_temperature(
+                    temperature, np.array(current_feature_importance)
+                )
+                splitter = "best" if temperature is None else "feature_weighted_best"
+                _, abs_feature_importance, _ = mrs_step(
+                    N=dropped_N,
+                    R=R,
+                    columns=columns,
+                    n_drop=drop,
+                    random_state=random_generator.randint(max_int),
+                    class_weight=class_weight,
+                    n_splits=n_pu_splits,
+                    feature_weight=feature_weights,
+                    splitter=splitter,
+                    sample_weights=sample_weights_dict[temperature]
+                )
+                abs_feature_importance_dict[temperature] = (
+                    abs_feature_importance.tolist()
+                )
+
             current_feature_importance = abs_feature_importance_dict[temperature]
             feature_weights = compute_feature_weights_with_temperature(
                 temperature, np.array(current_feature_importance)
@@ -214,10 +236,6 @@ def feature_weighted_repeated_MRS(
                 splitter=splitter,
                 sample_weights=sample_weights_dict[temperature]
             )
-            if i == 0:
-                abs_feature_importance_dict[temperature] = (
-                    abs_feature_importance.tolist()
-                )
 
             feature_weighted_aurocs_dict[temperature].append(auroc)
             feature_weights_dict[temperature].append(list(feature_weights).copy())

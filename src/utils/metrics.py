@@ -1049,10 +1049,6 @@ def calculate_feature_importance(test_N, clf, background=None):
     explainer = shap.TreeExplainer(clf, data=background)
     explainer = explainer(test_N, check_additivity=False)
     shap_values = explainer.values[:, :, 1]
-    shap_values[shap_values >= 0] = np.nan
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        abs_feature_importance = np.abs(np.nanmean(shap_values, axis=0))
-    abs_feature_importance = np.nan_to_num(abs_feature_importance)
+    abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
 
     return abs_feature_importance

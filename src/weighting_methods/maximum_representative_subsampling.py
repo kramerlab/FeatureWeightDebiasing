@@ -225,23 +225,6 @@ def mrs(
                 sample_weights=sample_weights
             )
 
-            # auroc, mean_ifpr_list, mean_itpr_list, std_tpr = compute_test_metrics_mrs(
-        #     dropped_N,
-        #    R,
-        #    columns,
-        #     calculate_roc=True,
-        #     n_test_splits=n_test_splits,
-        #     validation_method=validation_method,
-        #  )
-        #  roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
-            # auroc = compute_test_metrics_mrs(
-            #   dropped_N,
-            #    R,
-            #    columns,
-            #    random_state=random_generator.randint(max_int),
-            #    n_test_splits=n_test_splits,
-            #    validation_method=validation_method,
-            # )
         if compute_bias and bias_variable is not None:
             relative_bias = compute_relative_bias(
                 N[bias_variable], R[bias_variable], sample_weights

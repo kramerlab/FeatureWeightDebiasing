@@ -1,7 +1,7 @@
 NUMBER_OF_REPETETIONS=1
 SAMPLE_WEIGHTING_METHOD=fw-mrs-temperature
 
-DROP=2
+#DROP=2
 #for DATASET in gbs_gesis gbs_allensbach
 #do
 #    python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
@@ -13,7 +13,7 @@ DROP=25
 for BIAS_FRACTION in 0.1
 do
     #for BIAS_TYPE in less_positive_class less_negative_class 
-    for BIAS_TYPE in less_positive_class 
+    for BIAS_TYPE in less_positive_class less_negative_class
     do
         for DATASET in folktables_income
         do

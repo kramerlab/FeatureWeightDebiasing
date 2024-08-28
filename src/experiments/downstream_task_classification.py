@@ -7,7 +7,10 @@ from sklearn.discriminant_analysis import StandardScaler
 from utils.statistics import create_result_path, write_result_dict_test_set
 from utils.sampling import sample_with_test_set
 from utils.visualization import plot_rocs_downstream
-from utils.metrics import compute_classification_metrics_random_forest
+from utils.metrics import (
+    compute_classification_metrics_random_forest,
+    compute_classification_metrics_svm,
+)
 
 seed = 5
 
@@ -45,15 +48,13 @@ def downstream_experiment_with_test_set(
     rf_auroc_list = []
     rf_auprc_list = []
 
-    tree_auroc_list = []
-    tree_auprc_list = []
-
-    gradient_ascent_auroc_list = []
-    gradient_ascent_auprc_list = []
+    svm_auroc_list = []
+    svm_auprc_list = []
 
     abs_feature_importance_list = []
     feature_importance_list = []
     roc_curves_list = []
+    best_temperature_list = []
 
     dropped_samples_list = []
 
@@ -82,15 +83,15 @@ def downstream_experiment_with_test_set(
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
-    if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest"):
+    if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest", "fw-mrs-svm"):
         drop_samples = True
     else:
         drop_samples = False
 
-    if method_name == "fw-mrs-temperature":
+    if method_name in ("fw-mrs-temperature", "fw-mrs-svm"):
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
-        temperatures = [0.01, 0.005]
+        temperatures = [0.1, 0.05, 0.01, 0.005]
     else:
         splitter = "best"
         draw_with_feature_weights = False
@@ -103,7 +104,7 @@ def downstream_experiment_with_test_set(
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.2,
+            test_fraction=0.1,
             columns=columns,
         )
 
@@ -112,21 +113,19 @@ def downstream_experiment_with_test_set(
             feature_weights = feature_weight_list[i]
 
         else:
-            sample_weights, feature_weights = (
-                sample_weighting_method(
-                    N=N,
-                    R=R,
-                    columns=columns,
-                    save_path=result_path,
-                    bias_variable=target,
-                    drop=drop,
-                    early_stopping=True,
-                    random_generator=random_generator,
-                    target=target,
-                    budgets=temperatures,
-                    validation_method=validation_method,
-                    method_name=method_name,
-                )
+            sample_weights, feature_weights = sample_weighting_method(
+                N=N,
+                R=R,
+                columns=columns,
+                save_path=result_path,
+                bias_variable=target,
+                drop=drop,
+                early_stopping=True,
+                random_generator=random_generator,
+                target=target,
+                budgets=temperatures,
+                validation_method=validation_method,
+                method_name=method_name,
             )
 
             feature_weight_list.append(feature_weights)
@@ -138,31 +137,15 @@ def downstream_experiment_with_test_set(
         if feature_weights is None:
             feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
 
-        """ gradient_ascent_auroc, gradient_ascent_auprc = (
-            compute_classification_metrics_gradient_descent(
-                N,
-                R,
-                T,
-                columns,
-                sample_weights,
-                target,
-                random_state=seed,
-                n_splits=10,
-            )
-        ) """
-
-        gradient_ascent_auroc = 0
-        gradient_ascent_auprc = 0
-
         (
             rf_auroc,
             rf_auprc,
-            sample_weights,
+            best_sample_weights,
             abs_feature_importance,
             roc_curve_values,
+            best_temperature,
         ) = compute_classification_metrics_random_forest(
             N,
-            R,
             T,
             columns,
             sample_weights,
@@ -175,21 +158,36 @@ def downstream_experiment_with_test_set(
             n_splits=10,
             drop_samples=drop_samples,
         )
-        dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
+        dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
+        best_temperature_list.append(best_temperature)
 
-        tree_auroc = 0
-        tree_auprc = 0
+        (
+            svm_auroc,
+            svm_auprc,
+            _,
+            abs_feature_importance,
+            roc_curve_values,
+        ) = compute_classification_metrics_svm(
+            N,
+            T,
+            columns,
+            sample_weights,
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            n_splits=10,
+            drop_samples=drop_samples,
+        )
 
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)
         # plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
-        tree_auroc_list.append(tree_auroc)
-        tree_auprc_list.append(tree_auprc)
-        gradient_ascent_auroc_list.append(gradient_ascent_auroc)
-        gradient_ascent_auprc_list.append(gradient_ascent_auprc)
+        svm_auroc_list.append(svm_auroc)
+        svm_auprc_list.append(svm_auprc)
 
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
@@ -199,26 +197,24 @@ def downstream_experiment_with_test_set(
             (
                 rf_auroc_list,
                 rf_auprc_list,
-                tree_auroc_list,
-                tree_auprc_list,
-                gradient_ascent_auroc_list,
-                gradient_ascent_auprc_list,
+                svm_auroc_list,
+                svm_auprc_list,
                 dropped_samples_list,
                 abs_feature_importance_list,
                 feature_importance_list,
                 roc_curves_list,
+                best_temperature_list
             ),
             (
                 "rf_auroc",
                 "rf_auprc",
-                "tree_auroc",
-                "tree_auprc",
-                "gradient_ascent_auroc",
-                "gradient_ascent_auprc",
+                "svm_auroc",
+                "svm_auprc",
                 "dropped_samples",
                 "abs_feature_importance",
                 "feature_importance",
                 "roc_curves",
+                "best_temperature"
             ),
         ):
             with open(
@@ -229,10 +225,8 @@ def downstream_experiment_with_test_set(
     result_dict = write_result_dict_test_set(
         rf_auroc_list,
         rf_auprc_list,
-        tree_auroc_list,
-        tree_auprc_list,
-        gradient_ascent_auroc_list,
-        gradient_ascent_auprc_list,
+        svm_auroc_list,
+        svm_auprc_list,
         dropped_samples_list,
         len(N),
     )

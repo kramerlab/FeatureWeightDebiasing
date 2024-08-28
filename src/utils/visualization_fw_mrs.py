@@ -44,10 +44,9 @@ def plot_feature_weights(feature_weights_list, save_path):
     for budget, feature_weights in feature_weights_list.items():
         budget_path = save_path / str(budget)
         budget_path.mkdir(parents=True, exist_ok=True)
-        for i, feature_weight in enumerate(feature_weights):
-            sns.barplot(feature_weight)
-            plt.savefig(budget_path / f"feature_weights_{i}.pdf")
-            plt.close()
+        sns.barplot(feature_weights)
+        plt.savefig(budget_path / f"feature_weights.pdf")
+        plt.close()
 
 
 def plot_feature_importance(feature_importance_list, save_path):

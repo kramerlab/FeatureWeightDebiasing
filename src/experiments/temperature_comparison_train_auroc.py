@@ -1,12 +1,8 @@
 import json
 from tqdm import trange
-from sklearn.discriminant_analysis import StandardScaler
 from utils.metrics import scale_df
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
-from weighting_methods.feature_weighted_maximum_representative_subsampling import (
-    feature_weighted_repeated_MRS,
-)
 import numpy as np
 
 from utils.visualization_fw_mrs import (
@@ -21,6 +17,7 @@ seed = 5
 def feature_weight_budget_comparison_experiment(
     df,
     columns,
+    sample_weighting_method,
     target: str,
     number_of_repetitions: int = 50,
     bias_type: str = None,
@@ -46,8 +43,7 @@ def feature_weight_budget_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
-    temperatures = [None, 0.05, 0.01, 0.005]
+    temperatures = [None, 0.1, 0.05, 0.01, 0.005]
 
     result_path = create_result_path(
         method_name,
@@ -83,7 +79,7 @@ def feature_weight_budget_comparison_experiment(
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.2,
+            test_fraction=0.0,
             columns=columns,
         )
 
@@ -94,7 +90,7 @@ def feature_weight_budget_comparison_experiment(
             abs_feature_importances,
             feature_weights,
             dropped_samples,
-        ) = feature_weighted_repeated_MRS(
+        ) = sample_weighting_method(
             N=N,
             R=R,
             columns=columns,

@@ -1,13 +1,12 @@
-DROP=20
+DROP=5
 NUMBER_OF_REPETETIONS=5
 
-for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature
+# for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature-downstream fw-mrs-svm-downstream
+for SAMPLE_WEIGHTING_METHOD in fw-mrs-svm-downstream
 do
-    # for BIAS_FRACTION in 0.1 0.2 0.3
-    for BIAS_FRACTION in 0.1
+    for BIAS_FRACTION in 0.1 0.2 0.3
     do
-        # for DATASET in folktables_income breast_cancer loan_prediction hr_analytics  folktables_employment 
-        for DATASET in folktables_income
+        for DATASET in folktables_income breast_cancer loan_prediction hr_analytics  folktables_employment 
         do
             for BIAS_TYPE in less_positive_class less_negative_class
             do

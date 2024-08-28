@@ -1,12 +1,13 @@
-NUMBER_OF_REPETETIONS=10
+NUMBER_OF_REPETETIONS=5
 
-DROP=2
+DROP=5
 # for BIAS_FRACTION in 0.1 0.2 0.3
 for BIAS_FRACTION in 0.1
 do
     for BIAS_TYPE in less_positive_class less_negative_class 
     do
-        for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform
+        # for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform fw-mrs-svm
+        for SAMPLE_WEIGHTING_METHOD in mrs-forest 
         do
             for DATASET in folktables_income breast_cancer loan_prediction hr_analytics folktables_employment gbs_gesis
             do

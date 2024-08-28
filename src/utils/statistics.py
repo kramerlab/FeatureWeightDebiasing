@@ -107,10 +107,8 @@ def write_result_dict(
 def write_result_dict_test_set(
     rf_auroc_list,
     rf_auprc_list,
-    tree_auroc_list,
-    tree_auprc_list,
-    gradient_ascent_auroc_list,
-    gradient_ascent_auprc_list,
+    svm_auroc_list,
+    svm_auprc_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -135,21 +133,13 @@ def write_result_dict_test_set(
             "mean": np.mean(rf_auprc_list),
             "sd": np.std(rf_auprc_list),
         },
-        "tree auroc": {
-            "mean": np.mean(tree_auroc_list),
-            "sd": np.std(tree_auroc_list),
+        "svm auroc": {
+            "mean": np.mean(svm_auroc_list),
+            "sd": np.std(svm_auroc_list),
         },
-        "tree auprc": {
-            "mean": np.mean(tree_auprc_list),
-            "sd": np.std(tree_auprc_list),
-        },
-        "gradient descent auroc": {
-            "mean": np.mean(gradient_ascent_auroc_list),
-            "sd": np.std(gradient_ascent_auroc_list),
-        },
-        "gradient descent auprc": {
-            "mean": np.mean(gradient_ascent_auprc_list),
-            "sd": np.std(gradient_ascent_auprc_list),
+        "svm auprc": {
+            "mean": np.mean(svm_auprc_list),
+            "sd": np.std(svm_auprc_list),
         },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),

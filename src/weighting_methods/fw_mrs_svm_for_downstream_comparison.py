@@ -1,17 +1,17 @@
 import numpy as np
 from tqdm import trange
-from .feature_weighted_maximum_representative_subsampling import (
+from .fw_mrs_svm import (
     compute_feature_weights_with_temperature,
     mrs_step,
 )
-from utils.metrics import compute_test_metrics_fw_mrs
+
 
 
 # Used to draw radom states
 max_int = 2**32 - 1
 
 
-def feature_weighted_repeated_MRS_downstream(
+def feature_weighted_repeated_MRS_svm_downstream(
     N,
     R,
     columns,

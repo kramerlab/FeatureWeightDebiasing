@@ -4,12 +4,9 @@ from sklearn.discriminant_analysis import StandardScaler
 
 from utils.statistics import create_result_path
 from utils.sampling import sample_with_test_set
-from weighting_methods.fw_mrs_for_downstream_comparison import (
-    feature_weighted_repeated_MRS,
-)
 from utils.metrics import (
     compute_classification_metrics_random_forest,
-    compute_classification_metrics_tree,
+    compute_classification_metrics_svm,
 )
 from utils.visualization_fw_mrs import (
     visualize_boxplot,
@@ -21,6 +18,7 @@ seed = 5
 def feature_weight_downstream_comparison_experiment(
     df,
     columns,
+    sample_weighting_method,
     target: str,
     number_of_repetitions: int = 50,
     bias_type: str = None,
@@ -46,8 +44,7 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
-    temperatures = [None, 0.01, 0.005]
+    temperatures = [None, 0.1, 0.05, 0.01, 0.005]
 
     result_path = create_result_path(
         method_name,
@@ -65,8 +62,8 @@ def feature_weight_downstream_comparison_experiment(
     scaler = scaler.fit(df[columns])
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
-    tree_auroc_dict = {}
-    tree_auprc_dict = {}
+    svm_auroc_dict = {}
+    svm_auprc_dict = {}
     rf_auroc_dict = {}
     rf_auprc_dict = {}
 
@@ -76,8 +73,8 @@ def feature_weight_downstream_comparison_experiment(
         drop_samples = False
 
     for temperature in temperatures:
-        tree_auroc_dict[temperature] = []
-        tree_auprc_dict[temperature] = []
+        svm_auroc_dict[temperature] = []
+        svm_auprc_dict[temperature] = []
         rf_auroc_dict[temperature] = []
         rf_auprc_dict[temperature] = []
         dropped_samples_list_dict[temperature] = []
@@ -89,14 +86,14 @@ def feature_weight_downstream_comparison_experiment(
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.2,
+            test_fraction=0.1,
             columns=columns,
         )
         (
             best_sample_weights_dict,
             dropped_samples_dict,
             best_feature_weights_dict,
-        ) = feature_weighted_repeated_MRS(
+        ) = sample_weighting_method(
             N=N,
             R=R,
             columns=columns,
@@ -118,24 +115,14 @@ def feature_weight_downstream_comparison_experiment(
             feature_weights = best_feature_weights_dict[temperature]
 
             best_feature_weights_dict,
-            tree_auroc, tree_auprc = compute_classification_metrics_tree(
+            (
+                svm_auroc,
+                svm_auprc,
+                _,
+                _,
+                _,
+            ) = compute_classification_metrics_svm(
                 N,
-                R,
-                T,
-                columns,
-                sample_weights,
-                feature_weights,
-                target,
-                random_state=seed,
-                n_splits=5,
-            )
-
-            tree_auroc_dict[temperature].append(tree_auroc)
-            tree_auprc_dict[temperature].append(tree_auprc)
-
-            rf_auroc, rf_auprc, _, _, _, _ = compute_classification_metrics_random_forest(
-                N,
-                R,
                 T,
                 columns,
                 sample_weights,
@@ -143,10 +130,28 @@ def feature_weight_downstream_comparison_experiment(
                 target,
                 random_state=seed,
                 draw_with_feature_weights=True,
-                splitter="feature_weighted_best",
-                n_estimators=500,
-                n_splits=5,
+                n_splits=10,
                 drop_samples=drop_samples,
+            )
+
+            svm_auroc_dict[temperature].append(svm_auroc)
+            svm_auprc_dict[temperature].append(svm_auprc)
+
+            rf_auroc, rf_auprc, _, _, _, _ = (
+                compute_classification_metrics_random_forest(
+                    N,
+                    T,
+                    columns,
+                    sample_weights,
+                    feature_weights,
+                    target,
+                    random_state=seed,
+                    draw_with_feature_weights=True,
+                    splitter="feature_weighted_best",
+                    n_estimators=500,
+                    n_splits=5,
+                    drop_samples=drop_samples,
+                )
             )
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)
@@ -155,16 +160,16 @@ def feature_weight_downstream_comparison_experiment(
         for data_dict, y_label, file_name in zip(
             (
                 dropped_samples_list_dict,
-                tree_auroc_dict,
-                tree_auprc_dict,
+                svm_auroc_dict,
+                svm_auprc_dict,
                 rf_auroc_dict,
                 rf_auprc_dict,
             ),
             ("Dropped Samples", "AUROC", "AUPRC", "AUROC", "AUPRC"),
             (
                 "dropped_samples_comparison",
-                "tree_auroc",
-                "tree_auprc",
+                "svm_auroc",
+                "svm_auprc",
                 "rf_auroc",
                 "rf_auprc",
             ),
@@ -174,15 +179,15 @@ def feature_weight_downstream_comparison_experiment(
     for data, file_name in zip(
         (
             dropped_samples_list_dict,
-            tree_auroc_dict,
-            tree_auprc_dict,
+            svm_auroc_dict,
+            svm_auprc_dict,
             rf_auroc_dict,
             rf_auprc_dict,
         ),
         (
             "dropped_samples_dict",
-            "tree_auroc_dict",
-            "tree_auprc_dict",
+            "svm_auroc_dict",
+            "svm_auprc_dict",
             "rf_auroc_dict",
             "rf_auprc_dict",
         ),

@@ -72,7 +72,7 @@ def perform_statistical_analysis(
         if method_name == "fw-mrs-temperature":
             splitter = "feature_weighted_best"
             draw_with_feature_weights = True
-            temperatures = [0.05, 0.01, 0.005]
+            temperatures = [None, 0.1, 0.05, 0.01, 0.005]
         else:
             splitter = "best"
             draw_with_feature_weights = False
@@ -147,7 +147,6 @@ def perform_statistical_analysis(
                 scaled_N[columns + ["Wahlteilnahme"]], sample_weights
             )
             pvalue_list.append(pvalue)
-
 
         result_dict_mrs_iteration = {}
         for index, column in enumerate(columns):

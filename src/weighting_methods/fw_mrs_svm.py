@@ -1,15 +1,13 @@
 import numpy as np
 import pandas as pd
+import shap
 from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
 from sklearn.model_selection import KFold
 from utils.metrics import (
-    calculate_feature_importance,
     compute_feature_weights_with_temperature,
-    compute_test_metrics_fw_mrs,
-    train_pu_classifier,
-    train_feature_weighted_random_forest,
+    train_svm_pu_classifier,
 )
 
 # Used to draw radom states
@@ -22,12 +20,9 @@ def mrs_step(
     columns,
     n_drop: int = 1,
     n_splits=5,
-    class_weight="balanced",
     random_state=None,
     feature_weight=None,
-    splitter=None,
     sample_weights=None,
-    compute_feature_importance=False,
     *args,
     **attributes,
 ):
@@ -56,35 +51,34 @@ def mrs_step(
         )
         R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
         train_data = pd.concat([N_train, R_train])
-        clf = train_pu_classifier(
+        train_data[columns] = train_data[columns] * feature_weight
+
+        clf = train_svm_pu_classifier(
             train_data[columns],
             train_data.label,
-            class_weight=class_weight,
             random_state=random_state,
             feature_weight=feature_weight,
-            splitter=splitter,
         )
         test_data = pd.concat([N_test, R_test])
-        predictions = clf.predict_proba(test_data[columns])[:, 1]
-        all_predictions[test_indices_N] = predictions[: len(N_test)]
-        auroc_list.append(roc_auc_score(test_data.label, predictions))
+        distances = clf.decision_function(test_data[columns])
+        all_predictions[test_indices_N] = distances[: len(N_test)]
+        auroc_list.append(roc_auc_score(test_data.label, distances))
 
-        if compute_feature_importance:
-            abs_feature_importance = calculate_feature_importance(
-                test_N=N_test[columns].values,
-                clf=clf,
-                background=train_data[columns],
-            )
-            abs_feature_importance_list.append(abs_feature_importance)
+        abs_feature_importance = np.abs(clf.coef_[0])
+        abs_feature_importance_list.append(abs_feature_importance)
 
-    if compute_feature_importance:
-        abs_mean_feature_importance = np.nanmean(abs_feature_importance_list, axis=0)
-    else:
-        abs_mean_feature_importance = None
+    abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     return dropped_N.index[drop_ids], abs_mean_feature_importance, np.mean(auroc_list)
 
+def calculate_feature_importance(test_N, clf, background=None):
+    explainer = shap.KernelExplainer(clf.predict, background)
+    explainer = explainer(test_N)
+    shap_values = explainer.values[:, 1]
+    abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
+
+    return abs_feature_importance
 
 def mrs_without_cv(
     N,
@@ -108,7 +102,7 @@ def mrs_without_cv(
     :return: The index of the element to drop
     """
     data = pd.concat([N, R])
-    clf = train_pu_classifier(
+    clf = train_svm_pu_classifier(
         data[columns],
         data.label,
         class_weight=class_weight,
@@ -143,7 +137,7 @@ def compute_feature_weights_with_budget(budget, feature_importance):
         return scaled_feature_importance
 
 
-def feature_weighted_repeated_MRS(
+def fw_MRS_SVM(
     N,
     R,
     columns,
@@ -204,7 +198,6 @@ def feature_weighted_repeated_MRS(
         feature_weight=np.ones(len(columns)),
         splitter="best",
         sample_weights=np.ones(len(N)),
-        compute_feature_importance=True
     )
 
     for temperature in budgets:
@@ -221,7 +214,6 @@ def feature_weighted_repeated_MRS(
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
-            splitter = "best" if temperature is None else "feature_weighted_best"
             drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
@@ -230,8 +222,7 @@ def feature_weighted_repeated_MRS(
                 random_state=random_generator.randint(max_int),
                 class_weight=class_weight,
                 n_splits=n_pu_splits,
-                feature_weight=np.array(feature_weights_dict[temperature]),
-                splitter=splitter,
+                feature_weight=feature_weights_dict[temperature],
                 sample_weights=sample_weights_dict[temperature],
             )
 

@@ -64,7 +64,6 @@ def mrs_step(
         clf = train_pu_classifier_mrs(
             train_data[columns],
             train_data.label,
-            class_weight=class_weight,
             random_state=random_state,
         )
         test_data = pd.concat([N_test, R_test])
@@ -272,7 +271,7 @@ def mrs(
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return (best_weights / best_weights.sum()).tolist(), None, None
+        return (best_weights / best_weights.sum()).tolist(), None
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

@@ -15,6 +15,14 @@ from sklearn.metrics import (
     roc_curve,
     average_precision_score,
 )
+from sklearn.svm import SVC, LinearSVC
+
+param_grid_mrs = {
+    "min_weight_fraction_leaf": [
+        0.03,
+        0.5,
+    ]
+}
 
 
 def compute_weighted_means(N, weights):
@@ -234,7 +242,7 @@ def compute_classification_metrics_tree(
         N[label].values,
         R[columns].values,
         sample_weights,
-        feature_weights,
+        np.array(feature_weights),
         random_state=random_state,
         n_splits=n_splits,
         speedup=speedup,
@@ -251,7 +259,6 @@ def compute_classification_metrics_tree(
 
 def compute_classification_metrics_random_forest(
     N,
-    R,
     T,
     columns,
     sample_weights_list,
@@ -279,8 +286,8 @@ def compute_classification_metrics_random_forest(
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
-        for sample_weights, feature_weight in zip(
-            sample_weights_list.values(), feature_weights.values()
+        for (temperature, sample_weights), feature_weight in zip(
+            sample_weights_list.items(), feature_weights.values()
         ):
             if drop_samples:
                 sample_weights = np.array(sample_weights)
@@ -289,12 +296,11 @@ def compute_classification_metrics_random_forest(
                 train_sample_weights = sample_weights[not_dropped].copy()
             else:
                 N_train = N.copy()
-                train_sample_weights = sample_weights_list.copy()
+                train_sample_weights = sample_weights.copy()
 
             clf, score = train_random_forest_classifier(
                 N_train[columns].values,
                 N_train[label].values,
-                R[columns].values,
                 train_sample_weights,
                 feature_weight,
                 random_state=random_state,
@@ -308,7 +314,9 @@ def compute_classification_metrics_random_forest(
                 best_score = score
                 best_clf = clf
                 best_weights = sample_weights
+                best_temperature = temperature
     else:
+        best_temperature = 0
         if drop_samples:
             not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
             N_train = N.iloc[not_dropped].copy()
@@ -320,7 +328,6 @@ def compute_classification_metrics_random_forest(
         best_clf, _ = train_random_forest_classifier(
             N_train[columns].values,
             N_train[label].values,
-            R[columns].values,
             train_sample_weights,
             feature_weights,
             random_state=random_state,
@@ -329,6 +336,103 @@ def compute_classification_metrics_random_forest(
             splitter=splitter,
             n_estimators=n_estimators,
             max_features=max_features,
+        )
+        best_weights = sample_weights_list
+    y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
+    fpr, tpr, _ = roc_curve(T[label], y_predictions)
+
+    if compute_feature_importance:
+        abs_feature_importance = calculate_feature_importance(
+            T[columns].values,
+            best_clf.best_estimator_,
+        )
+    else:
+        abs_feature_importance = None
+
+    auroc_score = roc_auc_score(T[label], y_predictions)
+    auprc = average_precision_score(T[label], y_predictions)
+
+    return (
+        auroc_score,
+        auprc,
+        best_weights,
+        abs_feature_importance,
+        (fpr.tolist(), tpr.tolist()),
+        best_temperature
+    )
+
+
+def compute_classification_metrics_svm(
+    N,
+    T,
+    columns,
+    sample_weights_list,
+    feature_weights,
+    label,
+    random_state=None,
+    n_splits=5,
+    compute_feature_importance=True,
+    draw_with_feature_weights=False,
+    drop_samples=False,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    if isinstance(sample_weights_list, dict):
+        best_clf = None
+        best_score = -1
+        for sample_weights, feature_weight in zip(
+            sample_weights_list.values(), feature_weights.values()
+        ):
+            if drop_samples:
+                sample_weights = np.array(sample_weights)
+                not_dropped = np.nonzero(sample_weights != 0.0)
+                N_train = N.iloc[not_dropped].copy()
+                N_train[columns] = N_train[columns] * feature_weight
+                train_sample_weights = sample_weights[not_dropped].copy()
+            else:
+                N_train = N.copy()
+                N_train[columns] = N_train[columns] * feature_weight
+                train_sample_weights = sample_weights_list.copy()
+
+            clf, score = train_random_forest_classifier(
+                N_train[columns].values,
+                N_train[label].values,
+                train_sample_weights,
+                feature_weight,
+                random_state=random_state,
+                n_splits=n_splits,
+                draw_with_feature_weights=draw_with_feature_weights,
+            )
+            if score > best_score:
+                best_score = score
+                best_clf = clf
+                best_weights = sample_weights
+    else:
+        if drop_samples:
+            not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
+            N_train = N.iloc[not_dropped].copy()
+            N_train[columns] = N_train[columns] * feature_weights
+            train_sample_weights = np.array(sample_weights_list)[not_dropped].copy()
+        else:
+            N_train = N.copy()
+            N_train[columns] = N_train[columns] * feature_weights
+            train_sample_weights = sample_weights_list.copy()
+
+        best_clf, _ = train_random_forest_classifier(
+            N_train[columns].values,
+            N_train[label].values,
+            train_sample_weights,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
         )
         best_weights = sample_weights_list
     y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
@@ -648,6 +752,7 @@ def train_pu_classifier(
     feature_weight=None,
     random_state=None,
     splitter="feature_weighted_best",
+    n_splits=3,
 ):
     """Train the positive unlabeled classifier
 
@@ -665,18 +770,66 @@ def train_pu_classifier(
         min_weight_fraction_leaf=0.03,
         splitter=splitter,
     )
-    return clf.fit(
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    grid = GridSearchCV(
+        clf,
+        param_grid_mrs,
+        cv=skf,
+        scoring="roc_auc",
+        refit=True,
+        n_jobs=n_splits,
+    )
+    clf.fit(
         X,
         y,
         draw_with_feature_weights=draw_with_feature_weight,
         feature_weights=feature_weight,
     )
 
+    # return grid.best_estimator_
+    return clf
+
+
+def train_svm_pu_classifier(
+    X,
+    y,
+    feature_weight=None,
+    random_state=None,
+    n_splits=3,
+):
+    """Train the positive unlabeled classifier
+
+    :param X_train: Training features
+    :param y_train: Training target
+    :param class_weight: Sample weights, defaults to "balanced"
+    :return: Trained positive unlabeled classifier
+    """
+    clf = LinearSVC(dual="auto", random_state=random_state)
+
+    param_grid_svm = {"C": [1, 1000]}
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    grid = GridSearchCV(
+        clf,
+        param_grid_svm,
+        cv=skf,
+        scoring="roc_auc",
+        refit=True,
+        n_jobs=n_splits,
+    )
+    clf.fit(
+        X,
+        y,
+    )
+
+    # return clf.best_estimator_
+    return clf
+
 
 def train_pu_classifier_mrs(
     X,
     y,
-    class_weight=None,
     n_estimators=200,
     random_state=None,
     n_splits=3,
@@ -689,19 +842,20 @@ def train_pu_classifier_mrs(
     :return: Trained positive unlabeled classifier
     """
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
     )
-    param_grid = {
-        "min_weight_fraction_leaf": [
-            0.03,
-            0.5,
-        ]
-    }
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
     grid = GridSearchCV(
-        clf, param_grid, cv=skf, scoring="roc_auc", refit=True, n_jobs=n_splits,
+        clf,
+        param_grid_mrs,
+        cv=skf,
+        scoring="roc_auc",
+        refit=True,
+        n_jobs=n_splits,
     )
 
     return grid.fit(
@@ -837,7 +991,6 @@ def train_tree_classifier_auroc(
 def train_random_forest_classifier(
     X,
     y,
-    R,
     sample_weights,
     feature_weights=None,
     n_splits=5,
@@ -860,7 +1013,6 @@ def train_random_forest_classifier(
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     feature_weights = np.array(feature_weights)
-    # scorer = ReverseScorer(R)
     param_grid = {
         "min_weight_fraction_leaf": [
             0.01,
@@ -868,8 +1020,7 @@ def train_random_forest_classifier(
             0.05,
             0.1,
             0.25,
-        ],
-        "class_weight": ["balanced", None],
+        ]
     }
     clf = RandomForestClassifier(
         random_state=random_state,
@@ -887,6 +1038,45 @@ def train_random_forest_classifier(
         sample_weight=sample_weights,
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
+    )
+
+    return grid_cv, grid_cv.best_score_
+
+
+def train_svc(
+    X,
+    y,
+    sample_weights,
+    feature_weights=None,
+    n_splits=5,
+    draw_with_feature_weights=False,
+    random_state=None,
+    **kwargs,
+):
+    """Train a classifier to measure the auroc
+
+    :param X_train: Training features
+    :param y_train: Training targets
+    :param weights: Sample weights, defaults to None
+    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param n_splits: Number of cross-validation iterations, defaults to 5
+    :return: Trained classifier
+    """
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    feature_weights = np.array(feature_weights)
+    param_grid = {"kernel": ["linear", "rbf"]}
+    clf = SVC(
+        random_state=random_state,
+    )
+    grid_cv = GridSearchCV(
+        clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
+    )
+
+    grid_cv.fit(
+        X,
+        y,
+        sample_weight=sample_weights,
     )
 
     return grid_cv, grid_cv.best_score_

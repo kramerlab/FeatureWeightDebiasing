@@ -1,13 +1,12 @@
 import random
 import numpy as np
 from pathlib import Path
-from sklearn.discriminant_analysis import StandardScaler
 from tqdm import trange
 
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
-from utils.sampling import sample, sample_with_test_set
+from utils.sampling import  sample_with_test_set
 from utils.metrics import calculate_mean_rocs, scale_df
 from utils.visualization import (
     plot_auc_average,
@@ -54,7 +53,7 @@ def analyse_mrs(number_of_repetitions, data_set_name, bias_type, drop, bias_frac
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.2,
+            test_fraction=0.0,
             columns=columns,
         )
         use_bias_mean = True

@@ -17,6 +17,9 @@ from weighting_methods import (
     uniform_sample_weighting,
     train_domain_adversarial_network,
     mrs,
+    fw_MRS_SVM,
+    feature_weighted_repeated_MRS_downstream,
+    feature_weighted_repeated_MRS_svm_downstream,
 )
 
 
@@ -31,6 +34,9 @@ sample_weighting_method_list = [
     "fw-mrs-temperature",
     "kmm",
     "dann",
+    "fw-mrs-svm",
+    "fw-mrs-temperature-downstream",
+    "fw-mrs-svm-downstream",
 ]
 
 
@@ -135,6 +141,12 @@ def get_sample_weighting_function(method_name):
         return kernel_mean_matching
     elif method_name == "dann":
         return train_domain_adversarial_network
+    elif method_name == "fw-mrs-svm":
+        return fw_MRS_SVM
+    elif method_name == "fw-mrs-temperature-downstream":
+        return feature_weighted_repeated_MRS_downstream
+    elif method_name == "fw-mrs-svm-downstream":
+        return  feature_weighted_repeated_MRS_svm_downstream
 
 
 def get_experiment_function(experiment_name=""):

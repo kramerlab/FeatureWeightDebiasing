@@ -33,14 +33,6 @@ def write_result_dict(
     columns,
     weighted_mmds_list,
     biases_list,
-    rf_auroc_list,
-    rf_auprc_list,
-    tree_auroc_list,
-    tree_auprc_list,
-    gradient_ascent_auroc_list,
-    gradient_ascent_auprc_list,
-    dropped_samples_list,
-    number_of_samples,
     explicit_weights,
 ):
     """Creates the result dictionary
@@ -60,35 +52,6 @@ def write_result_dict(
             "mean": np.mean(weighted_mmds_list),
             "sd": np.std(weighted_mmds_list),
         },
-        "random forest auroc": {
-            "mean": np.mean(rf_auroc_list),
-            "sd": np.std(rf_auroc_list),
-        },
-        "random forest auprc": {
-            "mean": np.mean(rf_auprc_list),
-            "sd": np.std(rf_auprc_list),
-        },
-        "tree auroc": {
-            "mean": np.mean(tree_auroc_list),
-            "sd": np.std(tree_auroc_list),
-        },
-        "tree auprc": {
-            "mean": np.mean(tree_auprc_list),
-            "sd": np.std(tree_auprc_list),
-        },
-        "gradient ascent auroc": {
-            "mean": np.mean(gradient_ascent_auroc_list),
-            "sd": np.std(gradient_ascent_auroc_list),
-        },
-        "gradient ascent auprc": {
-            "mean": np.mean(gradient_ascent_auprc_list),
-            "sd": np.std(gradient_ascent_auprc_list),
-        },
-        "dropped_samples": {
-            "mean": np.mean(dropped_samples_list),
-            "std": np.std(dropped_samples_list),
-        },
-        "all_samples": number_of_samples,
     }
 
     if explicit_weights:

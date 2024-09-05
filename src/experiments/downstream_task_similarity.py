@@ -12,7 +12,6 @@ from utils.metrics import (
     compute_metrics,
     calculate_rbf_gamma,
 )
-from utils.gradient_descent import compute_classification_metrics_gradient_descent
 
 seed = 5
 
@@ -57,16 +56,13 @@ def downstream_experiment(
     tree_auroc_list = []
     tree_auprc_list = []
 
-    gradient_ascent_auroc_list = []
-    gradient_ascent_auprc_list = []
-
     dropped_samples_list = []
 
     result_path = create_result_path(
         method_name,
         bias_type,
         data_set_name,
-        "R_classsification",
+        "downstream_task",
         bias_fraction=bias_fraction,
     )
     sample_weights_save_path = result_path / "sample_weights"
@@ -149,11 +145,8 @@ def downstream_experiment(
             gamma,
         )
 
-        gradient_ascent_auroc, gradient_ascent_auprc = 0, 0
-
         rf_auroc, rf_auprc, _, _, _, _ = compute_classification_metrics_random_forest(
             N,
-            R,
             R,
             columns,
             sample_weights,
@@ -168,7 +161,6 @@ def downstream_experiment(
         plot_sample_weights(sample_weights, sample_weights_save_path, i)
         if not feature_weights is None:
             plot_feature_weights(feature_weights, feature_weights_save_path, i)
-
             weighted_mmds_list.append(weighted_mmd)
             biases_list.append(relative_bias)
             wasserstein_distance_list.append(wasserstein_distances)
@@ -176,8 +168,6 @@ def downstream_experiment(
             rf_auprc_list.append(rf_auprc)
             tree_auroc_list.append(0)
             tree_auprc_list.append(0)
-            gradient_ascent_auroc_list.append(gradient_ascent_auroc)
-            gradient_ascent_auprc_list.append(gradient_ascent_auprc)
 
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,
@@ -187,8 +177,6 @@ def downstream_experiment(
         rf_auprc_list,
         tree_auroc_list,
         tree_auprc_list,
-        gradient_ascent_auroc_list,
-        gradient_ascent_auprc_list,
         dropped_samples_list,
         len(N),
         explicit_weights=explicit_weights,

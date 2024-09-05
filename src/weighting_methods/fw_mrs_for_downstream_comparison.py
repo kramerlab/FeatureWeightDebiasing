@@ -130,7 +130,9 @@ def feature_weighted_repeated_MRS_downstream(
             break
 
     return (
+        feature_weighted_aurocs_dict,
         best_sample_weights_dict,
         dropped_samples_dict,
         feature_weights_dict,
+        abs_feature_importance_dict,
     )

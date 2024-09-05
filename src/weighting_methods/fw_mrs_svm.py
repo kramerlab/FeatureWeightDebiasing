@@ -23,6 +23,7 @@ def mrs_step(
     random_state=None,
     feature_weight=None,
     sample_weights=None,
+    C=None,
     *args,
     **attributes,
 ):
@@ -51,13 +52,10 @@ def mrs_step(
         )
         R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
         train_data = pd.concat([N_train, R_train])
-        train_data[columns] = train_data[columns] * feature_weight
+        train_data[columns] = train_data[columns] * np.array(feature_weight)
 
         clf = train_svm_pu_classifier(
-            train_data[columns],
-            train_data.label,
-            random_state=random_state,
-            feature_weight=feature_weight,
+            train_data[columns], train_data.label, random_state=random_state, C=C
         )
         test_data = pd.concat([N_test, R_test])
         distances = clf.decision_function(test_data[columns])
@@ -72,6 +70,7 @@ def mrs_step(
 
     return dropped_N.index[drop_ids], abs_mean_feature_importance, np.mean(auroc_list)
 
+
 def calculate_feature_importance(test_N, clf, background=None):
     explainer = shap.KernelExplainer(clf.predict, background)
     explainer = explainer(test_N)
@@ -79,6 +78,7 @@ def calculate_feature_importance(test_N, clf, background=None):
     abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
 
     return abs_feature_importance
+
 
 def mrs_without_cv(
     N,
@@ -147,7 +147,6 @@ def fw_MRS_SVM(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    return_auroc=False,
     n_pu_splits=10,
     max_patience=5,
     *args,
@@ -173,7 +172,6 @@ def fw_MRS_SVM(
     number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights_dict = {}
-    abs_feature_importance_dict = {}
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
@@ -186,34 +184,35 @@ def fw_MRS_SVM(
     switched = False
 
     finished_dict = {}
+    temperature = 0.1
 
-    _, abs_feature_importance, _ = mrs_step(
-        N=dropped_N,
-        R=R,
-        columns=columns,
-        n_drop=drop,
-        random_state=random_generator.randint(max_int),
-        class_weight=class_weight,
-        n_splits=n_pu_splits,
-        feature_weight=np.ones(len(columns)),
-        splitter="best",
-        sample_weights=np.ones(len(N)),
-    )
-
-    for temperature in budgets:
-        finished_dict[temperature] = False
-        best_difference_dict[temperature] = np.inf
-        auc_difference_dict[temperature] = 1
-        dropped_samples_dict[temperature] = 0
-        current_patience[temperature] = 0
-        feature_weighted_aurocs_dict[temperature] = []
-        sample_weights_dict[temperature] = np.ones(len(N))
-        feature_weights_dict[temperature] = compute_feature_weights_with_temperature(
+    for C in budgets:
+        finished_dict[C] = False
+        best_difference_dict[C] = np.inf
+        auc_difference_dict[C] = 1
+        dropped_samples_dict[C] = 0
+        current_patience[C] = 0
+        feature_weighted_aurocs_dict[C] = []
+        sample_weights_dict[C] = np.ones(len(N))
+        _, abs_feature_importance, _ = mrs_step(
+            N=dropped_N,
+            R=R,
+            columns=columns,
+            n_drop=drop,
+            random_state=random_generator.randint(max_int),
+            class_weight=class_weight,
+            n_splits=n_pu_splits,
+            feature_weight=np.ones(len(columns)),
+            splitter="best",
+            sample_weights=np.ones(len(N)),
+            C=C,
+        )
+        feature_weights_dict[C] = compute_feature_weights_with_temperature(
             temperature, np.array(abs_feature_importance)
         ).tolist()
 
     for i in trange(number_of_iterations):
-        for temperature in budgets:
+        for C in budgets:
             drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
@@ -222,53 +221,45 @@ def fw_MRS_SVM(
                 random_state=random_generator.randint(max_int),
                 class_weight=class_weight,
                 n_splits=n_pu_splits,
-                feature_weight=feature_weights_dict[temperature],
-                sample_weights=sample_weights_dict[temperature],
+                feature_weight=feature_weights_dict[C],
+                sample_weights=sample_weights_dict[C],
+                C=C,
             )
 
-            feature_weighted_aurocs_dict[temperature].append(auroc)
+            feature_weighted_aurocs_dict[C].append(auroc)
 
             auc_difference = abs(auroc - 0.5)
 
             if (
-                (auc_difference + delta) <= best_difference_dict[temperature]
+                (auc_difference + delta) <= best_difference_dict[C]
                 or (not switched and auroc < 0.5)
-            ) and not finished_dict[temperature]:
-                best_difference_dict[temperature] = auc_difference
-                dropped_samples_dict[temperature] = i * drop
-                sample_weights = sample_weights_dict[temperature]
-                best_sample_weights_dict[temperature] = (
+            ) and not finished_dict[C]:
+                best_difference_dict[C] = auc_difference
+                dropped_samples_dict[C] = i * drop
+                sample_weights = sample_weights_dict[C]
+                best_sample_weights_dict[C] = (
                     (sample_weights / np.sum(sample_weights)).tolist().copy()
                 )
-                current_patience[temperature] = 0
+                current_patience[C] = 0
                 if not switched and auroc < 0.5:
                     switched = True
             else:
-                current_patience[temperature] += 1
+                current_patience[C] += 1
             if (
                 len(dropped_N) <= drop
                 or len(dropped_N) <= n_pu_splits
                 or (auc_difference <= delta and early_stopping)
-                or (current_patience[temperature] == max_patience and early_stopping)
+                or (current_patience[C] == max_patience and early_stopping)
                 or auroc < 0.5
             ):
-                finished_dict[temperature] = True
+                finished_dict[C] = True
 
-            sample_weights_dict[temperature][drop_ids] = 0
+            sample_weights_dict[C][drop_ids] = 0
 
         if all(finished_dict.values()) and early_stopping:
             break
 
-    if return_auroc:
-        return (
-            feature_weighted_aurocs_dict,
-            abs_feature_importance_dict,
-            feature_weights_dict,
-            dropped_samples_dict,
-        )
-
-    else:
-        return (
-            best_sample_weights_dict,
-            feature_weights_dict,
-        )
+    return (
+        best_sample_weights_dict,
+        feature_weights_dict,
+    )

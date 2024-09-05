@@ -40,13 +40,12 @@ def plot_budget_comparison_auroc(
     plt.close()
 
 
-def plot_feature_weights(feature_weights_list, save_path):
-    for budget, feature_weights in feature_weights_list.items():
-        budget_path = save_path / str(budget)
-        budget_path.mkdir(parents=True, exist_ok=True)
-        sns.barplot(feature_weights)
-        plt.savefig(budget_path / f"feature_weights.pdf")
-        plt.close()
+def plot_feature_weights(feature_weights_list, budget, save_path):
+    budget_path = save_path / str(budget)
+    budget_path.mkdir(parents=True, exist_ok=True)
+    sns.barplot(feature_weights_list)
+    plt.savefig(budget_path / f"feature_weights.pdf")
+    plt.close()
 
 
 def plot_feature_importance(feature_importance_list, save_path):
@@ -97,9 +96,10 @@ def visualize_boxplot(
     y_lim=None,
     file_name="",
 ):
-    tmp_dict = {"Uniform": values_dict[None]}
+    # tmp_dict = {"Uniform": values_dict[None]}
+    tmp_dict = {}
     tmp_dict.update(values_dict)
-    tmp_dict.pop(None)
+    # tmp_dict.pop(None)
     ax = sns.boxplot(data=tmp_dict)
     ax.set_ylabel(y_label)
     if y_lim is not None:

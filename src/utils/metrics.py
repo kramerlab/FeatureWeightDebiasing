@@ -270,7 +270,6 @@ def compute_classification_metrics_random_forest(
     n_estimators=500,
     compute_feature_importance=True,
     draw_with_feature_weights=False,
-    drop_samples=False,
     max_features="sqrt",
 ):
     """Computes classification metrics for downstream tasks
@@ -289,14 +288,8 @@ def compute_classification_metrics_random_forest(
         for (temperature, sample_weights), feature_weight in zip(
             sample_weights_list.items(), feature_weights.values()
         ):
-            if drop_samples:
-                sample_weights = np.array(sample_weights)
-                not_dropped = np.nonzero(sample_weights != 0.0)
-                N_train = N.iloc[not_dropped].copy()
-                train_sample_weights = sample_weights[not_dropped].copy()
-            else:
-                N_train = N.copy()
-                train_sample_weights = sample_weights.copy()
+            N_train = N.copy()
+            train_sample_weights = sample_weights.copy()
 
             clf, score = train_random_forest_classifier(
                 N_train[columns].values,
@@ -317,13 +310,8 @@ def compute_classification_metrics_random_forest(
                 best_temperature = temperature
     else:
         best_temperature = 0
-        if drop_samples:
-            not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
-            N_train = N.iloc[not_dropped].copy()
-            train_sample_weights = np.array(sample_weights_list)[not_dropped].copy()
-        else:
-            N_train = N.copy()
-            train_sample_weights = sample_weights_list.copy()
+        N_train = N.copy()
+        train_sample_weights = sample_weights_list.copy()
 
         best_clf, _ = train_random_forest_classifier(
             N_train[columns].values,
@@ -358,7 +346,8 @@ def compute_classification_metrics_random_forest(
         best_weights,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
-        best_temperature
+        best_temperature,
+        best_clf,
     )
 
 
@@ -373,7 +362,6 @@ def compute_classification_metrics_svm(
     n_splits=5,
     compute_feature_importance=True,
     draw_with_feature_weights=False,
-    drop_samples=False,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -390,18 +378,11 @@ def compute_classification_metrics_svm(
         for sample_weights, feature_weight in zip(
             sample_weights_list.values(), feature_weights.values()
         ):
-            if drop_samples:
-                sample_weights = np.array(sample_weights)
-                not_dropped = np.nonzero(sample_weights != 0.0)
-                N_train = N.iloc[not_dropped].copy()
-                N_train[columns] = N_train[columns] * feature_weight
-                train_sample_weights = sample_weights[not_dropped].copy()
-            else:
-                N_train = N.copy()
-                N_train[columns] = N_train[columns] * feature_weight
-                train_sample_weights = sample_weights_list.copy()
+            N_train = N.copy()
+            N_train[columns] = N_train[columns]
+            train_sample_weights = sample_weights.copy()
 
-            clf, score = train_random_forest_classifier(
+            clf, score = train_svc(
                 N_train[columns].values,
                 N_train[label].values,
                 train_sample_weights,
@@ -413,19 +394,12 @@ def compute_classification_metrics_svm(
             if score > best_score:
                 best_score = score
                 best_clf = clf
-                best_weights = sample_weights
     else:
-        if drop_samples:
-            not_dropped = np.nonzero(np.array(sample_weights_list) != 0.0)
-            N_train = N.iloc[not_dropped].copy()
-            N_train[columns] = N_train[columns] * feature_weights
-            train_sample_weights = np.array(sample_weights_list)[not_dropped].copy()
-        else:
-            N_train = N.copy()
-            N_train[columns] = N_train[columns] * feature_weights
-            train_sample_weights = sample_weights_list.copy()
+        N_train = N.copy()
+        N_train[columns] = N_train[columns]
+        train_sample_weights = sample_weights_list.copy()
 
-        best_clf, _ = train_random_forest_classifier(
+        best_clf, _ = train_svc(
             N_train[columns].values,
             N_train[label].values,
             train_sample_weights,
@@ -434,15 +408,11 @@ def compute_classification_metrics_svm(
             n_splits=n_splits,
             draw_with_feature_weights=draw_with_feature_weights,
         )
-        best_weights = sample_weights_list
-    y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
+    y_predictions = best_clf.decision_function(T[columns].values)
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
 
     if compute_feature_importance:
-        abs_feature_importance = calculate_feature_importance(
-            T[columns].values,
-            best_clf.best_estimator_,
-        )
+        abs_feature_importance = np.abs(best_clf.coef_[0])
     else:
         abs_feature_importance = None
 
@@ -452,10 +422,38 @@ def compute_classification_metrics_svm(
     return (
         auroc_score,
         auprc,
-        best_weights,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
     )
+
+
+def compute_classification_metrics_pseudo_labels(
+    R,
+    T,
+    columns,
+    best_clf,
+    target,
+    random_state,
+    n_splits=10,
+    n_estimators=500,
+):
+    pseudo_targets = best_clf.predict(R[columns])
+    clf, _ = train_random_forest_classifier(
+                R[columns].values,
+                pseudo_targets,
+                None,
+                None,
+                random_state=random_state,
+                n_splits=n_splits,
+                draw_with_feature_weights=False,
+                splitter="best",
+                n_estimators=n_estimators,
+            )
+    predictions = clf.predict_proba(T[columns].values)[:, 1]
+    auroc = roc_auc_score(T[target], predictions)
+    auprc = average_precision_score(T[target], predictions)
+
+    return auroc, auprc
 
 
 def compute_classification_metrics_random_forest_gbs(
@@ -794,9 +792,9 @@ def train_pu_classifier(
 def train_svm_pu_classifier(
     X,
     y,
-    feature_weight=None,
     random_state=None,
     n_splits=3,
+    C=1,
 ):
     """Train the positive unlabeled classifier
 
@@ -805,19 +803,19 @@ def train_svm_pu_classifier(
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
-    clf = LinearSVC(dual="auto", random_state=random_state)
+    clf = LinearSVC(dual="auto", random_state=random_state, C=C)
 
-    param_grid_svm = {"C": [1, 1000]}
+    # param_grid_svm = {"C": [1, 1000]}
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    grid = GridSearchCV(
-        clf,
-        param_grid_svm,
-        cv=skf,
-        scoring="roc_auc",
-        refit=True,
-        n_jobs=n_splits,
-    )
+    # skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    # grid = GridSearchCV(
+    #    clf,
+    #    param_grid_svm,
+    #    cv=skf,
+    #   scoring="roc_auc",
+    #   refit=True,
+    #    n_jobs=n_splits,
+    # )
     clf.fit(
         X,
         y,
@@ -1012,7 +1010,8 @@ def train_random_forest_classifier(
     """
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    feature_weights = np.array(feature_weights)
+    if draw_with_feature_weights:
+        feature_weights = np.array(feature_weights)
     param_grid = {
         "min_weight_fraction_leaf": [
             0.01,
@@ -1063,14 +1062,24 @@ def train_svc(
     :return: Trained classifier
     """
 
+    if draw_with_feature_weights:
+        X = X * feature_weights
+
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    feature_weights = np.array(feature_weights)
-    param_grid = {"kernel": ["linear", "rbf"]}
+    param_grid = {
+        "kernel": ["linear", "rbf"],
+        "C": [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e2],
+    }
     clf = SVC(
         random_state=random_state,
     )
     grid_cv = GridSearchCV(
-        clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
+        # clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
+        clf,
+        param_grid,
+        cv=skf,
+        n_jobs=-1,
+        refit=True,
     )
 
     grid_cv.fit(
@@ -1079,7 +1088,7 @@ def train_svc(
         sample_weight=sample_weights,
     )
 
-    return grid_cv, grid_cv.best_score_
+    return grid_cv.best_estimator_, grid_cv.best_score_
 
 
 def calculate_mean_rocs(rocs):

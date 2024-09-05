@@ -2,10 +2,9 @@ import argparse
 
 from experiments import (
     downstream_experiment,
-    downstream_experiment_with_test_set,
-    feature_weight_budget_comparison_experiment,
     feature_weight_downstream_comparison_experiment,
     perform_statistical_analysis,
+    downstream_experiment_with_test_set
 )
 
 
@@ -157,8 +156,6 @@ def get_experiment_function(experiment_name=""):
     """
     if experiment_name == "test_set":
         return downstream_experiment_with_test_set
-    elif experiment_name == "feature_weight_budget_comparison":
-        return feature_weight_budget_comparison_experiment
     elif experiment_name == "feature_weight_dropped_downstream_comparison":
         return feature_weight_downstream_comparison_experiment
     elif experiment_name == "statistical_analysis":

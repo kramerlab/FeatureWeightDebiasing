@@ -25,7 +25,7 @@ def mrs_step(
     class_weight="balanced",
     random_state=None,
     feature_weight=None,
-    splitter=None,
+    splitter="feature_weighted_best",
     sample_weights=None,
     compute_feature_importance=False,
     *args,
@@ -153,7 +153,6 @@ def feature_weighted_repeated_MRS(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    return_auroc=False,
     n_pu_splits=10,
     max_patience=5,
     *args,
@@ -179,7 +178,6 @@ def feature_weighted_repeated_MRS(
     number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
     sample_weights_dict = {}
-    abs_feature_importance_dict = {}
     feature_weighted_aurocs_dict = {}
     feature_weights_dict = {}
     dropped_samples_dict = {}
@@ -268,16 +266,7 @@ def feature_weighted_repeated_MRS(
         if all(finished_dict.values()) and early_stopping:
             break
 
-    if return_auroc:
-        return (
-            feature_weighted_aurocs_dict,
-            abs_feature_importance_dict,
-            feature_weights_dict,
-            dropped_samples_dict,
-        )
-
-    else:
-        return (
-            best_sample_weights_dict,
-            feature_weights_dict,
-        )
+    return (
+        best_sample_weights_dict,
+        feature_weights_dict,
+    )

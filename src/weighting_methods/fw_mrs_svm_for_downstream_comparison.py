@@ -6,7 +6,6 @@ from .fw_mrs_svm import (
 )
 
 
-
 # Used to draw radom states
 max_int = 2**32 - 1
 
@@ -21,6 +20,7 @@ def feature_weighted_repeated_MRS_svm_downstream(
     random_generator=None,
     class_weight=None,
     n_pu_splits=10,
+    return_auroc=True,
     *args,
     **attributes,
 ):
@@ -50,35 +50,36 @@ def feature_weighted_repeated_MRS_svm_downstream(
     auc_difference_dict = {}
     abs_feature_importance_dict = {}
     sample_weights_dict = {}
-    feature_weights_dict= {}
+    feature_weights_dict = {}
     feature_weighted_aurocs_dict = {}
     switched = False
 
     finished_dict = {}
+    temperature = 0.01
 
-    _, abs_feature_importance, _ = mrs_step(
-        N=dropped_N,
-        R=R,
-        columns=columns,
-        n_drop=drop,
-        random_state=random_generator.randint(max_int),
-        class_weight=class_weight,
-        n_splits=n_pu_splits,
-        feature_weight=np.ones(len(columns)),
-        splitter="best",
-        sample_weights=np.ones(len(N)),
-        compute_feature_importance=True
-    )
-
-    for temperature in budgets:
-        finished_dict[temperature] = False
-        best_difference_dict[temperature] = np.inf
-        auc_difference_dict[temperature] = 1
-        dropped_samples_dict[temperature] = 0
-        feature_weighted_aurocs_dict[temperature] = []
-        sample_weights_dict[temperature] = np.ones(len(N))
-        abs_feature_importance_dict[temperature] = np.ones(len(columns)).tolist()
-        feature_weights_dict[temperature] = compute_feature_weights_with_temperature(
+    for C in budgets:
+        finished_dict[C] = False
+        best_difference_dict[C] = np.inf
+        auc_difference_dict[C] = 1
+        dropped_samples_dict[C] = 0
+        feature_weighted_aurocs_dict[C] = []
+        sample_weights_dict[C] = np.ones(len(N))
+        abs_feature_importance_dict[C] = np.ones(len(columns)).tolist()
+        _, abs_feature_importance, _ = mrs_step(
+            N=dropped_N,
+            R=R,
+            columns=columns,
+            n_drop=drop,
+            random_state=random_generator.randint(max_int),
+            class_weight=class_weight,
+            n_splits=n_pu_splits,
+            feature_weight=np.ones(len(columns)),
+            splitter="best",
+            sample_weights=np.ones(len(N)),
+            compute_feature_importance=True,
+            C=C
+        )
+        feature_weights_dict[C] = compute_feature_weights_with_temperature(
             temperature, np.array(abs_feature_importance)
         ).tolist()
 
@@ -86,8 +87,8 @@ def feature_weighted_repeated_MRS_svm_downstream(
 
     for i in trange(number_of_iterations):
         rand_int = random_generator.randint(max_int)
-        for temperature in budgets:
-            splitter = "best" if temperature is None else "feature_weighted_best"
+        for C in budgets:
+            splitter = "best" if C is None else "feature_weighted_best"
             drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
@@ -96,41 +97,45 @@ def feature_weighted_repeated_MRS_svm_downstream(
                 random_state=rand_int,
                 class_weight=class_weight,
                 n_splits=n_pu_splits,
-                feature_weight=np.array(feature_weights_dict[temperature]),
+                feature_weight=np.array(feature_weights_dict[C]),
                 splitter=splitter,
-                sample_weights=sample_weights_dict[temperature],
+                sample_weights=sample_weights_dict[C],
+                C=C,
             )
 
-            feature_weighted_aurocs_dict[temperature].append(auroc)
+            feature_weighted_aurocs_dict[C].append(auroc)
             auc_difference = abs(auroc - 0.5)
 
             if (
-                (auc_difference + delta) <= best_difference_dict[temperature]
+                (auc_difference + delta) <= best_difference_dict[C]
                 or (not switched and auroc < 0.5)
-            ) and not finished_dict[temperature]:
-                best_difference_dict[temperature] = auc_difference
-                dropped_samples_dict[temperature] = i * drop
-                best_sample_weights_dict[temperature] = (
+            ) and not finished_dict[C]:
+                best_difference_dict[C] = auc_difference
+                dropped_samples_dict[C] = i * drop
+                best_sample_weights_dict[C] = (
                     sample_weights / np.sum(sample_weights)
                 ).copy()
 
                 if not switched and auroc < 0.5:
                     switched = True
-                    
+
             if (
                 len(dropped_N) <= drop
                 or len(dropped_N) <= n_pu_splits
                 or auc_difference <= delta
             ):
-                finished_dict[temperature] = True
+                finished_dict[C] = True
 
-            sample_weights_dict[temperature][drop_ids] = 0
+            sample_weights_dict[C][drop_ids] = 0
 
         if all(finished_dict.values()):
             break
 
+    
     return (
+        feature_weighted_aurocs_dict,
         best_sample_weights_dict,
         dropped_samples_dict,
         feature_weights_dict,
+        abs_feature_importance_dict,
     )

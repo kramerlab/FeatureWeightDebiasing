@@ -9,8 +9,12 @@ from utils.metrics import (
     compute_classification_metrics_svm,
 )
 from utils.visualization_fw_mrs import (
+    plot_budget_comparison_auroc,
+    plot_budget_comparison_auroc_mean,
+    plot_feature_weights,
     visualize_boxplot,
 )
+import numpy as np
 
 seed = 5
 
@@ -44,7 +48,8 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    temperatures = [None, 0.1, 0.05, 0.01, 0.005]
+    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
+    temperatures = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2]
 
     result_path = create_result_path(
         method_name,
@@ -56,6 +61,15 @@ def feature_weight_downstream_comparison_experiment(
     result_path = result_path / validation_method
     result_path.mkdir(parents=True, exist_ok=True)
 
+    auroc_path = result_path / "aurocs"
+    auroc_path.mkdir(exist_ok=True, parents=True)
+
+    boxplots_path = result_path / "boxplots"
+    boxplots_path.mkdir(exist_ok=True, parents=True)
+
+    dict_path = result_path / "dictionaries"
+    dict_path.mkdir(exist_ok=True, parents=True)
+
     dropped_samples_list_dict = {}
 
     scaler = StandardScaler()
@@ -66,6 +80,7 @@ def feature_weight_downstream_comparison_experiment(
     svm_auprc_dict = {}
     rf_auroc_dict = {}
     rf_auprc_dict = {}
+    feature_weighted_aurocs_list = []
 
     if method_name in ("fw-mrs-temperature", "mrs-tree", "mrs-forest"):
         drop_samples = True
@@ -79,20 +94,26 @@ def feature_weight_downstream_comparison_experiment(
         rf_auprc_dict[temperature] = []
         dropped_samples_list_dict[temperature] = []
 
-    for _ in trange(number_of_repetitions):
-        N, R, T = sample_with_test_set(
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+            N = sample_df[sample_df["label"] == 1]
+            R = sample_df[sample_df["label"] == 0]
+    else:
+        N, R, _ = sample_with_test_set(
             bias_type,
             sample_df,
             target,
             train_fraction=0.5,
             bias_fraction=bias_fraction,
-            test_fraction=0.1,
+            test_fraction=0.0,
             columns=columns,
         )
+    for i in trange(number_of_repetitions):
         (
+            random_forest_feature_weighted_aurocs,
             best_sample_weights_dict,
             dropped_samples_dict,
             best_feature_weights_dict,
+            feature_importance_dict,
         ) = sample_weighting_method(
             N=N,
             R=R,
@@ -105,7 +126,9 @@ def feature_weight_downstream_comparison_experiment(
             budgets=temperatures,
             validation_method=validation_method,
             method_name=method_name,
+            return_auroc=True,
         )
+        feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
 
         for temperature in temperatures:
             dropped_samples_list_dict[temperature].append(
@@ -114,7 +137,6 @@ def feature_weight_downstream_comparison_experiment(
             sample_weights = best_sample_weights_dict[temperature]
             feature_weights = best_feature_weights_dict[temperature]
 
-            best_feature_weights_dict,
             (
                 svm_auroc,
                 svm_auprc,
@@ -123,15 +145,16 @@ def feature_weight_downstream_comparison_experiment(
                 _,
             ) = compute_classification_metrics_svm(
                 N,
-                T,
+                R,
                 columns,
                 sample_weights,
-                feature_weights,
+                np.array(feature_weights),
                 target,
                 random_state=seed,
                 draw_with_feature_weights=True,
                 n_splits=10,
                 drop_samples=drop_samples,
+                compute_feature_importance=False,
             )
 
             svm_auroc_dict[temperature].append(svm_auroc)
@@ -140,7 +163,7 @@ def feature_weight_downstream_comparison_experiment(
             rf_auroc, rf_auprc, _, _, _, _ = (
                 compute_classification_metrics_random_forest(
                     N,
-                    T,
+                    R,
                     columns,
                     sample_weights,
                     feature_weights,
@@ -149,12 +172,28 @@ def feature_weight_downstream_comparison_experiment(
                     draw_with_feature_weights=True,
                     splitter="feature_weighted_best",
                     n_estimators=500,
-                    n_splits=5,
+                    n_splits=10,
                     drop_samples=drop_samples,
+                    compute_feature_importance=False,
                 )
             )
             rf_auroc_dict[temperature].append(rf_auroc)
             rf_auprc_dict[temperature].append(rf_auprc)
+
+        # Visualize individual run results
+        number_of_samples = len(N)
+        plot_budget_comparison_auroc(
+            random_forest_feature_weighted_aurocs,
+            number_of_samples,
+            drop,
+            auroc_path / f"iteration_{i}",
+        )
+        feature_weights_path = result_path / f"feature_weights" / str(i)
+        feature_weights_path.mkdir(exist_ok=True, parents=True)
+        plot_feature_weights(feature_weights, temperature, feature_weights_path)
+
+        feature_importance_path = result_path / f"feature_importance" / str(i)
+        feature_importance_path.mkdir(exist_ok=True, parents=True)
 
         # Visualize dropped samples and auroc comparison results
         for data_dict, y_label, file_name in zip(
@@ -174,8 +213,15 @@ def feature_weight_downstream_comparison_experiment(
                 "rf_auprc",
             ),
         ):
-            visualize_boxplot(data_dict, y_label, file_name=result_path / file_name)
+            visualize_boxplot(data_dict, y_label, file_name=boxplots_path / file_name)
 
+    # Visualize mean results
+    plot_budget_comparison_auroc_mean(
+        feature_weighted_aurocs_list,
+        number_of_samples,
+        drop,
+        result_path / "mean_auroc_comparison",
+    )
     for data, file_name in zip(
         (
             dropped_samples_list_dict,
@@ -192,5 +238,20 @@ def feature_weight_downstream_comparison_experiment(
             "rf_auprc_dict",
         ),
     ):
-        with open(result_path / f"{file_name}.json", "w", encoding="utf-8") as file:
+        with open(dict_path / f"{file_name}.json", "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
+    
+    save_mean_dropped_elements(result_path, dropped_samples_list_dict)
+
+
+def save_mean_dropped_elements(result_path, dropped_samples_list):
+    mean_dropped_samples_dict = {}
+    for key, value in dropped_samples_list.items():
+        dropped_elements = []
+        dropped_elements.append(value)
+        mean_dropped_samples_dict[f"{key} mean"] = np.mean(dropped_elements)
+        mean_dropped_samples_dict[f"{key} std"] = np.std(dropped_elements)
+
+    with open(result_path / "mean_dropped_samples", "w", encoding="utf-8") as file:
+        json.dump(mean_dropped_samples_dict, file, indent=4)
+

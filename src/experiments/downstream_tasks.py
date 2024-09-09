@@ -107,6 +107,7 @@ def downstream_experiment_with_test_set(
         explicit_weights = False
     elif method_name == "fw-mrs-svm":
         temperatures = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2]
+        # temperatures = [1e-1, 1e0,]
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
         explicit_weights = False
@@ -200,6 +201,7 @@ def downstream_experiment_with_test_set(
         (
             svc_auroc,
             svc_auprc,
+            _,
             _,
             _,
         ) = compute_classification_metrics_svm(

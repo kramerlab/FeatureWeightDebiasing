@@ -3,6 +3,7 @@ import shap
 import numpy as np
 from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import pdist
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import rbf_kernel
 
@@ -424,6 +425,7 @@ def compute_classification_metrics_svm(
         auprc,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
+        best_clf
     )
 
 
@@ -437,18 +439,22 @@ def compute_classification_metrics_pseudo_labels(
     n_splits=10,
     n_estimators=500,
 ):
-    pseudo_targets = best_clf.predict(R[columns])
-    clf, _ = train_random_forest_classifier(
-                R[columns].values,
-                pseudo_targets,
-                None,
-                None,
-                random_state=random_state,
-                n_splits=n_splits,
-                draw_with_feature_weights=False,
-                splitter="best",
-                n_estimators=n_estimators,
-            )
+    # tmp = best_clf.predict_proba(R[columns].values)
+    calibrated_clf = CalibratedClassifierCV(best_clf, cv="prefit")
+    calibrated_clf.fit(R[columns].values, R[target])
+    probabilities = calibrated_clf.predict_proba(R[columns].values)
+    pseudo_targets = calibrated_clf.predict(R[columns].values)
+    clf, auroc = train_random_forest_classifier(
+        R[columns].values,
+        pseudo_targets,
+        None,
+        None,
+        random_state=random_state,
+        n_splits=n_splits,
+        draw_with_feature_weights=False,
+        splitter="best",
+        n_estimators=n_estimators,
+    )
     predictions = clf.predict_proba(T[columns].values)[:, 1]
     auroc = roc_auc_score(T[target], predictions)
     auprc = average_precision_score(T[target], predictions)
@@ -1019,7 +1025,8 @@ def train_random_forest_classifier(
             0.05,
             0.1,
             0.25,
-        ]
+        ],
+        "class_weight": ["balanced", None],
     }
     clf = RandomForestClassifier(
         random_state=random_state,
@@ -1028,7 +1035,12 @@ def train_random_forest_classifier(
         max_features=max_features,
     )
     grid_cv = GridSearchCV(
-        clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
+        clf,
+        param_grid,
+        cv=skf,
+        n_jobs=-1,
+        # scoring="roc_auc",
+        refit=True,
     )
 
     grid_cv.fit(

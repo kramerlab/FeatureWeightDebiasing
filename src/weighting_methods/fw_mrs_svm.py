@@ -149,6 +149,7 @@ def fw_MRS_SVM(
     class_weight=None,
     n_pu_splits=10,
     max_patience=5,
+    temperature=0.0,
     *args,
     **attributes,
 ):
@@ -184,7 +185,6 @@ def fw_MRS_SVM(
     switched = False
 
     finished_dict = {}
-    temperature = 0.1
 
     for C in budgets:
         finished_dict[C] = False

@@ -48,8 +48,8 @@ def feature_weight_downstream_comparison_experiment(
     :param data_set_name: Data set name, defaults to ""
     """
 
-    # temperatures = [None, 0.1, 0.05, 0.01, 0.005]
-    temperatures = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    temperatures = [None, 0.1, 0.05, 0.01, 0.005, 0.001]
+    C = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
 
     result_path = create_result_path(
         method_name,
@@ -94,20 +94,20 @@ def feature_weight_downstream_comparison_experiment(
         rf_auprc_dict[temperature] = []
         dropped_samples_list_dict[temperature] = []
 
-    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+    for i in trange(number_of_repetitions):
+        if data_set_name in ("gbs_gesis", "gbs_allensbach"):
             N = sample_df[sample_df["label"] == 1]
             R = sample_df[sample_df["label"] == 0]
-    else:
-        N, R, _ = sample_with_test_set(
-            bias_type,
-            sample_df,
-            target,
-            train_fraction=0.5,
-            bias_fraction=bias_fraction,
-            test_fraction=0.0,
-            columns=columns,
-        )
-    for i in trange(number_of_repetitions):
+        else:
+            N, R, _ = sample_with_test_set(
+                bias_type,
+                sample_df,
+                target,
+                train_fraction=0.5,
+                bias_fraction=bias_fraction,
+                test_fraction=0.0,
+                columns=columns,
+            )
         (
             random_forest_feature_weighted_aurocs,
             best_sample_weights_dict,
@@ -125,6 +125,7 @@ def feature_weight_downstream_comparison_experiment(
             target=target,
             budgets=temperatures,
             validation_method=validation_method,
+            C=C,
             method_name=method_name,
             return_auroc=True,
         )
@@ -240,7 +241,7 @@ def feature_weight_downstream_comparison_experiment(
     ):
         with open(dict_path / f"{file_name}.json", "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-    
+
     save_mean_dropped_elements(result_path, dropped_samples_list_dict)
 
 
@@ -254,4 +255,3 @@ def save_mean_dropped_elements(result_path, dropped_samples_list):
 
     with open(result_path / "mean_dropped_samples", "w", encoding="utf-8") as file:
         json.dump(mean_dropped_samples_dict, file, indent=4)
-

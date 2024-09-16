@@ -5,7 +5,12 @@ import pandas as pd
 from tqdm import trange
 
 from sklearn.metrics.pairwise import rbf_kernel
-from sklearn.model_selection import KFold
+from sklearn.model_selection import (
+    RepeatedKFold,
+    RepeatedStratifiedKFold,
+    StratifiedKFold,
+    KFold,
+)
 from sklearn.metrics import roc_auc_score
 
 from utils.metrics import (
@@ -28,9 +33,9 @@ def mrs_step(
     N,
     R,
     columns,
+    target,
     n_drop: int = 1,
     n_splits=5,
-    class_weight=None,
     random_state=None,
     calculate_roc=False,
     sample_weights=None,
@@ -54,11 +59,17 @@ def mrs_step(
 
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    skf = RepeatedStratifiedKFold(
+        n_splits=n_splits, n_repeats=2, random_state=random_state
+    )
+    kf = RepeatedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
-        kf.split(dropped_N), kf.split(R)
+        skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
-        N_train, N_test = dropped_N.iloc[train_indices_N], dropped_N.iloc[test_indices_N]
+        N_train, N_test = (
+            dropped_N.iloc[train_indices_N],
+            dropped_N.iloc[test_indices_N],
+        )
         R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
         train_data = pd.concat([N_train, R_train])
         clf = train_pu_classifier_mrs(
@@ -70,7 +81,7 @@ def mrs_step(
         predictions = clf.predict_proba(test_data[columns])[:, 1]
         all_predictions[test_indices_N] = predictions[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, predictions))
-        
+
         if calculate_roc:
             interpolated_fpr, interpolated_tpr = interpolate_roc(
                 test_data.label, predictions
@@ -99,6 +110,7 @@ def mrs_without_cv(
     N,
     R,
     columns,
+    target,
     n_drop: int = 1,
     class_weight="balanced",
     random_state=None,
@@ -133,14 +145,13 @@ def mrs(
     N,
     R,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     mrs_function=mrs_step,
     return_metrics=False,
     compute_bias=True,
-    bias_variable=None,
-    n_pu_splits=10,
-    class_weight="balanced",
+    target=None,
+    n_pu_splits=5,
     drop=1,
     max_patience=5,
     random_generator=None,
@@ -171,9 +182,7 @@ def mrs(
     number_of_iterations = (len(N) - n_pu_splits) // drop
     mrs_iteration = 0
     roc_iteration = (len(N) // drop // 3.5) + 1
-    dropped_N = N.copy()
     sample_weights = np.ones(len(N))
-    dropped_N = dropped_N.reset_index(drop=True)
     best_difference = np.inf
     current_patience = 0
     switched = False
@@ -204,12 +213,12 @@ def mrs(
                 N=N,
                 R=R,
                 columns=columns,
+                target=target,
                 n_drop=drop,
-                class_weight=class_weight,
                 n_splits=n_pu_splits,
                 random_state=random_generator.randint(max_int),
                 calculate_roc=True,
-                sample_weights=sample_weights
+                sample_weights=sample_weights,
             )
             roc_list.append([mean_ifpr_list, mean_itpr_list, std_tpr, i * drop])
         else:
@@ -217,17 +226,15 @@ def mrs(
                 N=N,
                 R=R,
                 columns=columns,
+                target=target,
                 n_drop=drop,
-                class_weight=class_weight,
                 n_splits=n_pu_splits,
                 random_state=random_generator.randint(max_int),
-                sample_weights=sample_weights
+                sample_weights=sample_weights,
             )
 
-        if compute_bias and bias_variable is not None:
-            relative_bias = compute_relative_bias(
-                N[bias_variable], R[bias_variable], sample_weights
-            )
+        if compute_bias and target is not None:
+            relative_bias = compute_relative_bias(N[target], R[target], sample_weights)
             relative_bias_list.append(relative_bias)
 
         auc_difference = abs(auroc - 0.5)
@@ -241,16 +248,18 @@ def mrs(
         else:
             current_patience += 1
 
+        sample_weights[drop_ids] = 0.0
+        remaining = N[sample_weights != 0.0]
+        n_positive = np.count_nonzero(remaining[target])
+        n_negative = len(remaining) - n_positive
+
         if (
             ((best_difference <= delta or switched) and early_stopping)
-            or len(dropped_N) <= drop
-            or len(dropped_N) <= n_pu_splits
-            or ((current_patience == max_patience)
-            and early_stopping)
+            or len(remaining) <= drop
+            # or (n_positive <= n_pu_splits or n_negative <= n_pu_splits)
+            or ((current_patience == max_patience) and early_stopping)
         ):
             break
-
-        sample_weights[drop_ids] = 0.0
 
         if return_metrics:
             auc_list.append(auroc)

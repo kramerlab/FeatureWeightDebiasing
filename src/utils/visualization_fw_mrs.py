@@ -10,11 +10,12 @@ line_styles = [
     "dashed",
     (5, (10, 3)),
     (0, (3, 1, 1, 1, 1, 1)),
+    (5, (10, 3)),
 ]
 
 
 def plot_budget_comparison_auroc(
-    auroc_dictionary,
+    auroc_dictionaries,
     number_of_samples,
     drop,
     file_name,
@@ -22,17 +23,24 @@ def plot_budget_comparison_auroc(
 ):
     if wide:
         plt.figure(figsize=(10, 5))
-    n_auroc_values = len(auroc_dictionary[list(auroc_dictionary.keys())[0]])
+    n_auroc_values = np.max(
+        [len(auroc_dictionary) for auroc_dictionary in auroc_dictionaries.values()]
+    )
     stop = number_of_samples - (n_auroc_values * drop)
     x_labels = list(range(number_of_samples, stop, -drop))
-    for i, (budget, aurocs) in enumerate(auroc_dictionary.items()):
-        sns.lineplot(x=x_labels, y=aurocs, label=str(budget), linestyle=line_styles[i])
+    for i, (budget, aurocs) in enumerate(auroc_dictionaries.items()):
+        sns.lineplot(
+            x=x_labels[: len(aurocs)],
+            y=aurocs,
+            label=str(budget),
+            linestyle=line_styles[i],
+        )
     plt.plot(n_auroc_values * drop * [0.5], color="black", linestyle="--")
     plt.ylabel("Feature Weighted AUROC")
     plt.xlabel("Number of Remaining Samples")
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
+    step = -((number_of_samples - (stop + drop)) // 4)
+    step = 1 if step == 0 else step
+    x_ticks = list(range(number_of_samples, stop, step)) + [stop + drop]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
 
@@ -104,6 +112,27 @@ def visualize_boxplot(
     ax.set_ylabel(y_label)
     if y_lim is not None:
         ax.set_ylim(y_lim)
+
+    plt.savefig(f"{file_name}.pdf", bbox_inches="tight")
+    plt.close()
+
+
+def visualize_heatmap(
+    values_dict,
+    y_label,
+    file_name="",
+):
+    input_values = [
+        [np.mean(values) for values in dicts.values()] for dicts in values_dict.values()
+    ]
+    x_ticks = [values.keys() for values in values_dict.values()][0]
+    y_ticks = values_dict.keys()
+    ax = sns.heatmap(
+        data=input_values,
+        xticklabels=x_ticks,
+        yticklabels=y_ticks,
+    )
+    ax.set_ylabel(y_label)
 
     plt.savefig(f"{file_name}.pdf", bbox_inches="tight")
     plt.close()

@@ -103,10 +103,6 @@ def sample_with_test_set(
     :param columns: Columns that are used to compute the mean sample, defaults to None
     :return: A biased and a representative data set
     """
-    # Sample from the data set because the complete one is too big.
-    upper_sample_limit = 8000 
-    if len(df) > upper_sample_limit:
-        df = df.sample(upper_sample_limit, random_state=sampling_random_generator).copy()
     T = df.groupby(bias_variable, group_keys=False).apply(
         lambda x: x.sample(
             frac=test_fraction, random_state=sampling_random_generator, replace=False

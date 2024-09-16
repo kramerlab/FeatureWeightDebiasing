@@ -12,7 +12,8 @@ from folktables import (
 )
 
 file_path = pathlib.Path(__file__).parent
-
+seed = 5
+upper_sample_limit = 6000 
 
 def load_dataset(dataset_name):
     """Load the data set to a given name.
@@ -130,19 +131,22 @@ def load_folktables_income_data():
         features=ACSIncomeNew.features, definition_df=definition_df
     )
 
-    features, us_labels, _ = ACSIncomeNew.df_to_pandas(
+    df, us_labels, _ = ACSIncomeNew.df_to_pandas(
         usa_data, categories=categories, dummies=True
     )
 
-    columns = features.columns
-    features["Income"] = us_labels
-    features["Binary Income"] = [
+    columns = df.columns
+    df["Income"] = us_labels
+    df["Binary Income"] = [
         1 if us_label >= 50000 else 0 for us_label in us_labels.values
     ]
-    features = features.dropna()
-    features = features.replace({False: 0, True: 1}).infer_objects(copy=False)
+    df = df.dropna()
+    df = df.replace({False: 0, True: 1}).infer_objects(copy=False)
 
-    return features, columns, "Binary Income"
+    if len(df) > upper_sample_limit:
+        df = df.sample(upper_sample_limit, random_state=seed).copy()
+
+    return df, columns, "Binary Income"
 
 
 def load_hr_analytics():
@@ -224,18 +228,20 @@ def load_folktables_employment_data():
         features=ACSEmployment.features, definition_df=definition_df
     )
 
-    features, us_labels, _ = ACSEmployment.df_to_pandas(
+    df, us_labels, _ = ACSEmployment.df_to_pandas(
         data, categories=categories, dummies=True
     )
 
-    columns = features.columns
-    features["Employment"] = [
+    columns = df.columns
+    df["Employment"] = [
         1 if us_label == True else 0 for us_label in us_labels.values
     ]
-    features = features.dropna()
-    features = features.replace({False: 0, True: 1}).infer_objects(copy=False)
+    df = df.dropna()
+    df = df.replace({False: 0, True: 1}).infer_objects(copy=False)
 
-    return features, columns, "Employment"
+    if len(df) > upper_sample_limit:
+        df = df.sample(upper_sample_limit, random_state=seed).copy()
+    return df, columns, "Employment"
 
 
 breast_cancer_names = [

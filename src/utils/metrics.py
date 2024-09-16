@@ -1,4 +1,4 @@
-import warnings
+import pandas as pd
 import shap
 import numpy as np
 from scipy.stats import wasserstein_distance
@@ -17,13 +17,6 @@ from sklearn.metrics import (
     average_precision_score,
 )
 from sklearn.svm import SVC, LinearSVC
-
-param_grid_mrs = {
-    "min_weight_fraction_leaf": [
-        0.03,
-        0.5,
-    ]
-}
 
 
 def compute_weighted_means(N, weights):
@@ -70,7 +63,7 @@ def scale_df(df, columns):
     :return: Scaled data set and scaler
     """
     scaler = StandardScaler()
-    df[columns] = scaler.fit_transform(df[columns])
+    df[columns] = scaler.fit_transform(df[columns]).copy()
     return df, scaler
 
 
@@ -425,7 +418,7 @@ def compute_classification_metrics_svm(
         auprc,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
-        best_clf
+        best_clf,
     )
 
 
@@ -442,7 +435,6 @@ def compute_classification_metrics_pseudo_labels(
     # tmp = best_clf.predict_proba(R[columns].values)
     calibrated_clf = CalibratedClassifierCV(best_clf, cv="prefit")
     calibrated_clf.fit(R[columns].values, R[target])
-    probabilities = calibrated_clf.predict_proba(R[columns].values)
     pseudo_targets = calibrated_clf.predict(R[columns].values)
     clf, auroc = train_random_forest_classifier(
         R[columns].values,
@@ -751,12 +743,12 @@ def compute_test_metrics_mrs(
 def train_pu_classifier(
     X,
     y,
-    class_weight="balanced",
     n_estimators=200,
     feature_weight=None,
     random_state=None,
     splitter="feature_weighted_best",
     n_splits=3,
+    hyperparameter=None,
 ):
     """Train the positive unlabeled classifier
 
@@ -767,23 +759,14 @@ def train_pu_classifier(
     """
     draw_with_feature_weight = False if feature_weight is None else True
     clf = RandomForestClassifier(
-        class_weight=class_weight,
         n_estimators=n_estimators,
         n_jobs=-1,
         random_state=random_state,
-        min_weight_fraction_leaf=0.03,
+        min_weight_fraction_leaf=hyperparameter,
         splitter=splitter,
+        class_weight="balanced",
     )
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    grid = GridSearchCV(
-        clf,
-        param_grid_mrs,
-        cv=skf,
-        scoring="roc_auc",
-        refit=True,
-        n_jobs=n_splits,
-    )
     clf.fit(
         X,
         y,
@@ -791,7 +774,6 @@ def train_pu_classifier(
         feature_weights=feature_weight,
     )
 
-    # return grid.best_estimator_
     return clf
 
 
@@ -836,7 +818,6 @@ def train_pu_classifier_mrs(
     y,
     n_estimators=200,
     random_state=None,
-    n_splits=3,
 ):
     """Train the positive unlabeled classifier
 
@@ -849,20 +830,10 @@ def train_pu_classifier_mrs(
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
+        class_weight="balanced",
     )
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-
-    grid = GridSearchCV(
-        clf,
-        param_grid_mrs,
-        cv=skf,
-        scoring="roc_auc",
-        refit=True,
-        n_jobs=n_splits,
-    )
-
-    return grid.fit(
+    return clf.fit(
         X,
         y,
     )
@@ -1134,59 +1105,6 @@ def calculate_mean_roc(interpolated_fpr, interpolated_tpr):
     return mean_fpr, mean_tpr, std_tpr
 
 
-import pandas as pd
-
-
-def compute_test_metrics_fw_mrs(
-    N,
-    R,
-    columns,
-    random_state=None,
-    feature_weights=None,
-    method=train_feature_weighted_random_forest,
-    class_weight="balanced",
-    splitter="feature_weighted_best",
-    max_features="sqrt",
-    n_splits_test=10,
-    n_estimators=500,
-    draw_with_feature_weights=False,
-):
-    """Compute test metrics for mrs
-
-    :param data: Data set as pandas.DataFrame
-    :param columns: Names of the columns use for training
-    :param calculate_roc: If true, compute roc, defaults to False
-    :param weights: Sample weights, defaults to None
-    :param cv: Number of cross-validation iterations, defaults to 3
-    :return: Test metrics for mrs
-    """
-
-    auroc_scores = []
-    data = pd.concat([N, R])
-    kf = StratifiedKFold(
-        n_splits=n_splits_test, shuffle=True, random_state=random_state
-    )
-    for train_indices, test_indices in kf.split(data[columns], data.label):
-        train, test = data.iloc[train_indices], data.iloc[test_indices]
-
-        clf = method(
-            train[columns],
-            train.label,
-            feature_weights=feature_weights,
-            draw_with_feature_weights=draw_with_feature_weights,
-            random_state=random_state,
-            class_weight=class_weight,
-            splitter=splitter,
-            max_features=max_features,
-            cv=3,
-            n_estimators=n_estimators,
-        )
-        y_predict = clf.predict_proba(test[columns])[:, 1]
-        auroc = roc_auc_score(test.label, y_predict)
-        auroc_scores.append(auroc)
-    return np.mean(auroc_scores)
-
-
 def compute_classification_metrics_feature_weights(
     N,
     R,
@@ -1197,7 +1115,7 @@ def compute_classification_metrics_feature_weights(
     n_splits=10,
     class_weight=None,
     splitter="feature_weighted_best",
-    n_estimators=1000,
+    n_estimators=500,
     max_depth=None,
     feature_weights_list=None,
     drop_ids_list=None,

@@ -22,7 +22,6 @@ from utils.metrics import (
     train_pu_classifier_mrs,
     weighted_maximum_mean_discrepancy,
     train_tree_classifier_mrs,
-    train_random_forest_classifier_mrs,
 )
 
 # Used to draw random states

@@ -26,7 +26,7 @@ def mrs_step(
     splitter="feature_weighted_best",
     sample_weights=None,
     compute_feature_importance=False,
-    hyperparameter=None,
+    hyperparameter=0.0,
     *args,
     **attributes,
 ):
@@ -218,6 +218,7 @@ def feature_weighted_repeated_MRS(
         feature_weights_dict[temperature] = compute_feature_weights_with_temperature(
             temperature, np.array(abs_feature_importance)
         ).tolist()
+        best_sample_weights_dict[temperature] = np.ones(len(N)).tolist()
 
     for i in trange(number_of_iterations):
         for temperature in budgets:

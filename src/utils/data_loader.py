@@ -2,6 +2,7 @@ import pathlib
 
 import pandas as pd
 import numpy as np
+from fairlearn.datasets import fetch_adult
 
 from folktables import (
     ACSDataSource,
@@ -13,7 +14,8 @@ from folktables import (
 
 file_path = pathlib.Path(__file__).parent
 seed = 5
-upper_sample_limit = 6000 
+upper_sample_limit = 6000
+
 
 def load_dataset(dataset_name):
     """Load the data set to a given name.
@@ -35,6 +37,8 @@ def load_dataset(dataset_name):
         return load_hr_analytics()
     elif dataset_name == "loan_prediction":
         return load_loan_prediction()
+    elif dataset_name == "fairness_adult":
+        return load_fairness_adult()
     else:
         print("No valid data set name given!")
         exit()
@@ -136,7 +140,6 @@ def load_folktables_income_data():
     )
 
     columns = df.columns
-    df["Income"] = us_labels
     df["Binary Income"] = [
         1 if us_label >= 50000 else 0 for us_label in us_labels.values
     ]
@@ -233,9 +236,7 @@ def load_folktables_employment_data():
     )
 
     columns = df.columns
-    df["Employment"] = [
-        1 if us_label == True else 0 for us_label in us_labels.values
-    ]
+    df["Employment"] = [1 if us_label == True else 0 for us_label in us_labels.values]
     df = df.dropna()
     df = df.replace({False: 0, True: 1}).infer_objects(copy=False)
 
@@ -277,3 +278,18 @@ def load_breast_cancer_data():
     df[columns] = df[columns]
 
     return df, columns, "class"
+
+
+def load_fairness_adult():
+    data = fetch_adult(as_frame=True)
+    X = pd.get_dummies(data.data)
+    X = X.replace({False: 0, True: 1}).infer_objects(copy=False)
+    X = X.drop(columns="fnlwgt")
+    columns = X.columns
+    y_true = (data.target == ">50K") * 1
+    sex = data.data["sex"]
+    sex = sex.replace({"Male": 0, "Female": 1}).infer_objects(copy=False)
+
+    df = pd.concat([X, sex, pd.DataFrame({"income": y_true})], axis=1)
+
+    return df, columns, ("sex", "income")

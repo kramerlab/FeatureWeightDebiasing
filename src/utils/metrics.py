@@ -542,60 +542,6 @@ def compute_classification_metrics_random_forest_gbs(
     )
 
 
-def train_feature_weighted_random_forest(
-    X,
-    y,
-    feature_weights=None,
-    draw_with_feature_weights=False,
-    random_state=None,
-    class_weight=None,
-    splitter="feature_weighted_best",
-    max_features="sqrt",
-    cv=5,
-    n_estimators=50,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 3
-    :return: Trained classifier
-    """
-    clf = RandomForestClassifier(
-        n_estimators=n_estimators,
-        random_state=random_state,
-        splitter=splitter,
-        class_weight=class_weight,
-        max_features=max_features,
-    )
-    parameter_grid = {
-        "min_weight_fraction_leaf": [
-            0.0001,
-            0.001,
-            0.01,
-            0.1,
-        ],
-    }
-
-    grid = GridSearchCV(
-        param_grid=parameter_grid,
-        estimator=clf,
-        cv=cv,
-        refit=True,
-        scoring="roc_auc",
-        n_jobs=-1,
-    )
-
-    return grid.fit(
-        X,
-        y,
-        feature_weights=feature_weights,
-        draw_with_feature_weights=draw_with_feature_weights,
-    )
-
-
 def train_tree_classifier_mrs(
     X_train, y_train, speedup=True, n_splits=10, random_state=None
 ):
@@ -643,53 +589,6 @@ def train_tree_classifier_mrs(
         X_train,
         y_train,
     )
-
-
-def train_random_forest_classifier_mrs(
-    X,
-    y,
-    n_splits=10,
-    n_estimators=500,
-    random_state=None,
-    **kwargs,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 3
-    :return: Trained classifier
-    """
-    clf = RandomForestClassifier(
-        n_estimators=n_estimators,
-        random_state=random_state,
-        class_weight="balanced",
-    )
-    parameter_grid = {
-        "min_weight_fraction_leaf": [
-            0.0001,
-            0.001,
-            0.01,
-            0.1,
-        ],
-    }
-
-    grid = GridSearchCV(
-        param_grid=parameter_grid,
-        estimator=clf,
-        cv=n_splits,
-        refit=True,
-        scoring="roc_auc",
-        n_jobs=-1,
-    )
-
-    return grid.fit(
-        X,
-        y,
-    )
-
 
 def compute_test_metrics_mrs(
     N,
@@ -748,7 +647,7 @@ def train_pu_classifier(
     random_state=None,
     splitter="feature_weighted_best",
     n_splits=3,
-    hyperparameter=None,
+    hyperparameter=0.0,
 ):
     """Train the positive unlabeled classifier
 
@@ -991,6 +890,7 @@ def train_random_forest_classifier(
         feature_weights = np.array(feature_weights)
     param_grid = {
         "min_weight_fraction_leaf": [
+            0.0,
             0.01,
             0.025,
             0.05,
@@ -1181,3 +1081,138 @@ def calculate_feature_importance(test_N, clf, background=None):
     abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
 
     return abs_feature_importance
+
+
+from fairlearn.reductions import DemographicParity, ExponentiatedGradient
+
+
+def compute_classification_metrics_random_forest_fairness(
+    N,
+    columns,
+    sensitive_attribute,
+    sample_weights_list,
+    feature_weights,
+    label,
+    random_state=None,
+    n_splits=5,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    draw_with_feature_weights=False,
+    max_features="sqrt",
+    mitigate=False,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+    clf_list = []
+    if isinstance(sample_weights_list, dict):
+        for sample_weights, feature_weight in zip(
+            sample_weights_list.values(), feature_weights.values()
+        ):
+            N_train = N.copy()
+            train_sample_weights = sample_weights.copy()
+
+            clf = train_random_forest_classifier_fairness(
+                N_train[columns].values,
+                N_train[label].values,
+                N_train[sensitive_attribute],
+                train_sample_weights,
+                feature_weight,
+                random_state=random_state,
+                n_splits=n_splits,
+                draw_with_feature_weights=draw_with_feature_weights,
+                splitter=splitter,
+                n_estimators=n_estimators,
+                max_features=max_features,
+            )
+            clf_list.append(clf)
+    else:
+        N_train = N.copy()
+        clf = train_random_forest_classifier_fairness(
+            N_train[columns].values,
+            N_train[label].values,
+            N_train[sensitive_attribute],
+            sample_weights_list,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=n_estimators,
+            max_features=max_features,
+            mitigate=mitigate,
+        )
+        clf_list = clf
+
+    return clf_list
+
+
+def train_random_forest_classifier_fairness(
+    X,
+    y,
+    sensitive_attribute,
+    sample_weights,
+    feature_weights=None,
+    n_splits=5,
+    draw_with_feature_weights=False,
+    random_state=None,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    max_features="sqrt",
+    mitigate=False,
+    **kwargs,
+):
+    """Train a classifier to measure the auroc
+
+    :param X_train: Training features
+    :param y_train: Training targets
+    :param weights: Sample weights, defaults to None
+    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param n_splits: Number of cross-validation iterations, defaults to 5
+    :return: Trained classifier
+    """
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    if draw_with_feature_weights:
+        feature_weights = np.array(feature_weights)
+    param_grid = {
+        "min_weight_fraction_leaf": [
+            0.0,
+            0.01,
+            0.1,
+        ],
+        "class_weight": ["balanced", None],
+    }
+    clf = RandomForestClassifier(
+        random_state=random_state,
+        splitter=splitter,
+        n_estimators=n_estimators,
+        max_features=max_features,
+    )
+    grid_cv = GridSearchCV(
+        clf,
+        param_grid,
+        cv=skf,
+        n_jobs=-1,
+        scoring="roc_auc",
+        refit=True,
+    )
+    if mitigate:
+        constraint = DemographicParity()
+        mitigator = ExponentiatedGradient(grid_cv, constraint)
+        grid_cv = mitigator.fit(X, y, sensitive_features=sensitive_attribute)
+    else:
+        grid_cv.fit(
+            X,
+            y,
+            sample_weight=sample_weights,
+            feature_weights=feature_weights,
+            draw_with_feature_weights=draw_with_feature_weights,
+        )
+
+    return grid_cv

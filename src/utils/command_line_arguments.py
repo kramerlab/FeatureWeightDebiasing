@@ -4,7 +4,7 @@ from experiments import (
     temperature_comparison,
     perform_statistical_analysis,
     downstream_tasks_experiment,
-
+    fairness_tasks_experiment
 )
 
 
@@ -50,6 +50,8 @@ bias_choice = [
 dataset_list = [
     "gbs_allensbach",
     "gbs_gesis",
+    "fairness_adult",
+    "fairness_folktables_income",
     "folktables_income",
     "folktables_employment",
     "breast_cancer",
@@ -159,3 +161,5 @@ def get_experiment_function(experiment_name=""):
         return temperature_comparison
     elif experiment_name == "statistical_analysis":
         return perform_statistical_analysis
+    elif experiment_name == "fairness_task":
+        return fairness_tasks_experiment

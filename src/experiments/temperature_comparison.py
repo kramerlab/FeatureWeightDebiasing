@@ -20,6 +20,7 @@ from utils.visualization_fw_mrs import (
 import numpy as np
 
 seed = 5
+sampling_random_generator = np.random.RandomState(seed)
 
 
 def temperature_comparison(
@@ -105,7 +106,9 @@ def temperature_comparison(
         R = sample_df[sample_df["label"] == 0]
 
     skf = RepeatedStratifiedKFold(
-        n_splits=n_cv_splits, n_repeats=n_cv_repeats, random_state=seed
+        n_splits=n_cv_splits,
+        n_repeats=n_cv_repeats,
+        random_state=seed,
     )
     for i, (train_indices, test_indices) in enumerate(
         skf.split(sample_df, sample_df[target])
@@ -118,6 +121,7 @@ def temperature_comparison(
                 bias_fraction=bias_fraction,
                 columns=columns,
                 bias_variable=target,
+                random_generator=sampling_random_generator,
             )
             R = sample_df.iloc[test_indices].copy()
             N["label"] = 1

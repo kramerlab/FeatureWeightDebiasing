@@ -24,6 +24,7 @@ from utils.metrics import (
 )
 
 seed = 5
+sampling_random_generator = np.random.RandomState(seed)
 
 
 def downstream_tasks_experiment(
@@ -122,7 +123,11 @@ def downstream_tasks_experiment(
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
-            n_cv_splits, n_cv_repeats, sample_df, sample_df[target], random_generator
+            n_cv_splits,
+            n_cv_repeats,
+            sample_df,
+            sample_df[target],
+            sampling_random_generator,
         )
     ):
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
@@ -132,6 +137,7 @@ def downstream_tasks_experiment(
                 bias_fraction=bias_fraction,
                 columns=columns,
                 bias_variable=target,
+                random_generator=sampling_random_generator,
             )
             N["label"] = 1
             R["label"] = 0
@@ -340,13 +346,18 @@ def repeated_train_val_test_split(
 ):
     for _ in range(n_cv_repeats):
         train_val_samples, test_samples, train_val_y, _ = train_test_split(
-            df, target, random_state=random_generator.randint(max_int), stratify=target
+            df,
+            target,
+            random_state=random_generator.randint(max_int),
+            stratify=target,
+            test_size=(1/3),
         )
         train_samples, val_samples, _, _ = train_test_split(
             train_val_samples,
             train_val_y,
             stratify=train_val_y,
             random_state=random_generator.randint(max_int),
+            test_size=0.5,
         )
         splits_list = [train_samples, val_samples, test_samples]
         train_index = -1

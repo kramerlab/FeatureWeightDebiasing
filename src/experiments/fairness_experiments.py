@@ -265,7 +265,7 @@ def fairness_tasks_experiment(
             sensitive_features=sensitive_attribute_list,
             x_axis_metric=average_precision_score,
             y_axis_metric=selection_rate_difference,
-            axis_labels=("AUROC", "Selection Rate Difference"),
+            axis_labels=("AUPRC", "Selection Rate Difference"),
             point_labels=True,
         )
         plt.savefig(result_path / "auprc_metric_comparison.pdf")

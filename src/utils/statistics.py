@@ -33,7 +33,6 @@ def write_result_dict(
     columns,
     weighted_mmds_list,
     biases_list,
-    explicit_weights,
 ):
     """Creates the result dictionary
 
@@ -54,15 +53,14 @@ def write_result_dict(
         },
     }
 
-    if explicit_weights:
-        mean_biases = np.nanmean(biases_list, axis=0)
-        sd_biases = np.nanstd(biases_list, axis=0)
+    mean_biases = np.nanmean(biases_list, axis=0)
+    sd_biases = np.nanstd(biases_list, axis=0)
 
-        for index, column in enumerate(columns):
-            result_dict[f"{column}_relative_bias"] = {
-                "bias mean": mean_biases[index],
-                "bias sd": sd_biases[index],
-            }
+    for index, column in enumerate(columns):
+        result_dict[f"{column}_relative_bias"] = {
+            "bias mean": mean_biases[index],
+            "bias sd": sd_biases[index],
+        }
 
     return result_dict
 
@@ -72,6 +70,8 @@ def write_result_dict_test_set(
     rf_auprc_list,
     svm_auroc_list,
     svm_auprc_list,
+    pseudo_targets_auroc_list,
+    pseudo_targets_auprc_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -103,6 +103,14 @@ def write_result_dict_test_set(
         "svm auprc": {
             "mean": np.mean(svm_auprc_list),
             "sd": np.std(svm_auprc_list),
+        },
+        "pseudo targets forest auroc": {
+            "mean": np.mean(pseudo_targets_auroc_list),
+            "sd": np.std(pseudo_targets_auroc_list),
+        },
+        "pseudo targets forest auprc": {
+            "mean": np.mean(pseudo_targets_auprc_list),
+            "sd": np.std(pseudo_targets_auprc_list),
         },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),

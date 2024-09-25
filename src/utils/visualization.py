@@ -266,8 +266,10 @@ def plot_mmds_average(
     plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
+    step = -((number_of_samples - (stop + drop)) // 4)
+    step = 1 if step == 0 else step
     x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
+        range(number_of_samples, stop, step)
     ) + [stop + drop]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()

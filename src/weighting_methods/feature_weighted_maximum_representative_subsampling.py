@@ -3,13 +3,11 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import  RepeatedKFold, RepeatedStratifiedKFold
 from utils.metrics import (
     calculate_feature_importance,
     compute_feature_weights_with_temperature,
-    compute_test_metrics_fw_mrs,
     train_pu_classifier,
-    train_feature_weighted_random_forest,
 )
 
 # Used to draw radom states
@@ -20,14 +18,15 @@ def mrs_step(
     N,
     R,
     columns,
+    target,
     n_drop: int = 1,
     n_splits=5,
-    class_weight="balanced",
     random_state=None,
     feature_weight=None,
     splitter="feature_weighted_best",
     sample_weights=None,
     compute_feature_importance=False,
+    hyperparameter=0.0,
     *args,
     **attributes,
 ):
@@ -46,9 +45,10 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0]
     all_predictions = np.zeros(len(dropped_N))
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    skf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
+    kf = RepeatedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
-        kf.split(dropped_N), kf.split(R)
+        skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
         N_train, N_test = (
             dropped_N.iloc[train_indices_N],
@@ -59,10 +59,10 @@ def mrs_step(
         clf = train_pu_classifier(
             train_data[columns],
             train_data.label,
-            class_weight=class_weight,
             random_state=random_state,
             feature_weight=feature_weight,
             splitter=splitter,
+            hyperparameter=hyperparameter
         )
         test_data = pd.concat([N_test, R_test])
         predictions = clf.predict_proba(test_data[columns])[:, 1]
@@ -146,14 +146,15 @@ def compute_feature_weights_with_budget(budget, feature_importance):
 def feature_weighted_repeated_MRS(
     N,
     R,
+    target,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=10,
+    n_pu_splits=5,
     max_patience=5,
     *args,
     **attributes,
@@ -194,6 +195,7 @@ def feature_weighted_repeated_MRS(
     _, abs_feature_importance, _ = mrs_step(
         N=dropped_N,
         R=R,
+        target=target,
         columns=columns,
         n_drop=drop,
         random_state=random_generator.randint(max_int),
@@ -216,13 +218,17 @@ def feature_weighted_repeated_MRS(
         feature_weights_dict[temperature] = compute_feature_weights_with_temperature(
             temperature, np.array(abs_feature_importance)
         ).tolist()
+        best_sample_weights_dict[temperature] = np.ones(len(N)).tolist()
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
+            if finished_dict[temperature]:
+                break
             splitter = "best" if temperature is None else "feature_weighted_best"
             drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
+                target=target,
                 columns=columns,
                 n_drop=drop,
                 random_state=random_generator.randint(max_int),

@@ -1,7 +1,11 @@
 import json
 import numpy as np
 
-from tqdm import trange
+from sklearn.model_selection import (
+    RepeatedStratifiedKFold,
+    StratifiedKFold,
+    train_test_split,
+)
 from sklearn.discriminant_analysis import StandardScaler
 
 from utils.statistics import (
@@ -9,7 +13,7 @@ from utils.statistics import (
     write_result_dict,
     write_result_dict_test_set,
 )
-from utils.sampling import sample_with_test_set
+from utils.sampling import sample_N
 from utils.visualization import plot_feature_weights, plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
@@ -20,21 +24,22 @@ from utils.metrics import (
 )
 
 seed = 5
+sampling_random_generator = np.random.RandomState(seed)
 
 
-def downstream_experiment_with_test_set(
+def downstream_tasks_experiment(
     df,
     columns,
     sample_weighting_method,
     target: str,
-    number_of_repetitions: int = 50,
+    n_cv_repeats: int,
+    n_cv_splits: int,
     bias_type: str = None,
     data_set_name: str = "",
     random_generator=None,
     load_previous_results=True,
-    bias_fraction=0.75,
+    bias_fraction=0.1,
     drop=1,
-    validation_method="random_forest",
     method_name=None,
     **args,
 ):
@@ -103,33 +108,43 @@ def downstream_experiment_with_test_set(
     if method_name == "fw-mrs-temperature":
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
-        temperatures = [0.1, 0.05, 0.01, 0.005]
-        explicit_weights = False
+        temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+        hyperparameter_list = [0.05, 0.025, 0.0]
     elif method_name == "fw-mrs-svm":
-        temperatures = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2]
-        # temperatures = [1e-1, 1e0,]
+        temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+        hyperparameter_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
-        explicit_weights = False
     else:
         splitter = "best"
         draw_with_feature_weights = False
         temperatures = None
-        explicit_weights = True
+        hyperparameter_list = []
 
-    for i in trange(number_of_repetitions):
-        N, R, T = sample_with_test_set(
-            bias_type,
+    for i, (N, R, T) in enumerate(
+        repeated_train_val_test_split(
+            n_cv_splits,
+            n_cv_repeats,
             sample_df,
-            target,
-            train_fraction=0.5,
-            bias_fraction=bias_fraction,
-            test_fraction=0.1,
-            columns=columns,
+            sample_df[target],
+            sampling_random_generator,
         )
+    ):
+        if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
+            N = sample_N(
+                train=N,
+                bias_type=bias_type,
+                bias_fraction=bias_fraction,
+                columns=columns,
+                bias_variable=target,
+                random_generator=sampling_random_generator,
+            )
+            N["label"] = 1
+            R["label"] = 0
+
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
-        if len(sample_weight_list) > i and explicit_weights and load_previous_results:
+        if len(sample_weight_list) > i and load_previous_results:
             sample_weights = sample_weight_list[i]
             feature_weights = feature_weight_list[i]
 
@@ -145,7 +160,7 @@ def downstream_experiment_with_test_set(
                 random_generator=random_generator,
                 target=target,
                 budgets=temperatures,
-                validation_method=validation_method,
+                hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
             )
 
@@ -231,16 +246,16 @@ def downstream_experiment_with_test_set(
 
         pseudo_targets_auroc_list.append(pseudo_targets_auroc)
         pseudo_targets_auprc_list.append(pseudo_targets_auprc)
+        weighted_mmds_list.append(weighted_mmd)
+        biases_list.append(relative_bias)
+        wasserstein_distance_list.append(wasserstein_distances)
+        rf_auroc_list.append(rf_auroc)
+        rf_auprc_list.append(rf_auprc)
+        svc_auroc_list.append(svc_auroc)
+        svc_auprc_list.append(svc_auprc)
 
         if not feature_weights is None:
             plot_feature_weights(feature_weights, feature_weights_save_path, i)
-            weighted_mmds_list.append(weighted_mmd)
-            biases_list.append(relative_bias)
-            wasserstein_distance_list.append(wasserstein_distances)
-            rf_auroc_list.append(rf_auroc)
-            rf_auprc_list.append(rf_auprc)
-            svc_auroc_list.append(svc_auroc)
-            svc_auprc_list.append(svc_auprc)
 
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)
         # plot_feature_weights(feature_weights, feature_weights_save_path, i)
@@ -286,7 +301,6 @@ def downstream_experiment_with_test_set(
         N.drop(["label"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
-        explicit_weights=explicit_weights,
     )
 
     with open(result_path / "similarity_results.json", "w") as result_file:
@@ -298,6 +312,8 @@ def downstream_experiment_with_test_set(
         rf_auprc_list,
         svc_auroc_list,
         svc_auprc_list,
+        pseudo_targets_auroc_list,
+        pseudo_targets_auprc_list,
         dropped_samples_list,
         len(N),
     )
@@ -319,3 +335,39 @@ def load_weights(path):
     else:
         weights = []
     return weights
+
+
+# Used to draw radom states
+max_int = 2**32 - 1
+
+
+def repeated_train_val_test_split(
+    n_cv_splits, n_cv_repeats, df, target, random_generator
+):
+    for _ in range(n_cv_repeats):
+        train_val_samples, test_samples, train_val_y, _ = train_test_split(
+            df,
+            target,
+            random_state=random_generator.randint(max_int),
+            stratify=target,
+            test_size=(1/3),
+        )
+        train_samples, val_samples, _, _ = train_test_split(
+            train_val_samples,
+            train_val_y,
+            stratify=train_val_y,
+            random_state=random_generator.randint(max_int),
+            test_size=0.5,
+        )
+        splits_list = [train_samples, val_samples, test_samples]
+        train_index = -1
+        val_index = 0
+        test_index = 1
+        for _ in range(n_cv_splits):
+            train_index = (train_index + 1) % n_cv_splits
+            val_index = (val_index + 1) % n_cv_splits
+            test_index = (test_index + 1) % n_cv_splits
+
+            yield splits_list[train_index], splits_list[val_index], splits_list[
+                test_index
+            ]

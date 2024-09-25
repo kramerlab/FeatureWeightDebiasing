@@ -4,7 +4,7 @@ import shap
 from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, RepeatedKFold, RepeatedStratifiedKFold, StratifiedKFold
 from utils.metrics import (
     compute_feature_weights_with_temperature,
     train_svm_pu_classifier,
@@ -17,6 +17,7 @@ max_int = 2**32 - 1
 def mrs_step(
     N,
     R,
+    target,
     columns,
     n_drop: int = 1,
     n_splits=5,
@@ -42,9 +43,10 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0]
     all_predictions = np.zeros(len(dropped_N))
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    skf = RepeatedStratifiedKFold(n_splits=n_splits, random_state=random_state)
+    kf = RepeatedKFold(n_splits=n_splits, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
-        kf.split(dropped_N), kf.split(R)
+        skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
         N_train, N_test = (
             dropped_N.iloc[train_indices_N],
@@ -83,6 +85,7 @@ def calculate_feature_importance(test_N, clf, background=None):
 def mrs_without_cv(
     N,
     R,
+    target,
     columns,
     n_drop: int = 1,
     class_weight="balanced",
@@ -140,15 +143,18 @@ def compute_feature_weights_with_budget(budget, feature_importance):
 def fw_MRS_SVM(
     N,
     R,
+    target,
     columns,
-    delta=0.005,
+    delta=0.01,
     early_stopping=False,
     drop=1,
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=10,
+    n_pu_splits=5,
     max_patience=5,
+    temperature=0.0,
+    hyperparameter_list=[0.0],
     *args,
     **attributes,
 ):
@@ -184,9 +190,8 @@ def fw_MRS_SVM(
     switched = False
 
     finished_dict = {}
-    temperature = 0.1
 
-    for C in budgets:
+    for C in hyperparameter_list:
         finished_dict[C] = False
         best_difference_dict[C] = np.inf
         auc_difference_dict[C] = 1
@@ -197,6 +202,7 @@ def fw_MRS_SVM(
         _, abs_feature_importance, _ = mrs_step(
             N=dropped_N,
             R=R,
+            target=target,
             columns=columns,
             n_drop=drop,
             random_state=random_generator.randint(max_int),
@@ -213,9 +219,12 @@ def fw_MRS_SVM(
 
     for i in trange(number_of_iterations):
         for C in budgets:
+            if finished_dict[C]:
+                break
             drop_ids, abs_feature_importance, auroc = mrs_step(
                 N=dropped_N,
                 R=R,
+                target=target,
                 columns=columns,
                 n_drop=drop,
                 random_state=random_generator.randint(max_int),
@@ -245,16 +254,21 @@ def fw_MRS_SVM(
                     switched = True
             else:
                 current_patience[C] += 1
+
+            sample_weights_dict[C][drop_ids] = 0
+            remaining = N[sample_weights_dict[C] != 0.0]
+            n_positive = np.count_nonzero(remaining[target])
+            n_negative = len(remaining) - n_positive
+
             if (
-                len(dropped_N) <= drop
-                or len(dropped_N) <= n_pu_splits
+                len(remaining) <= drop
+                or (n_positive <= n_pu_splits or n_negative <= n_pu_splits)
                 or (auc_difference <= delta and early_stopping)
                 or (current_patience[C] == max_patience and early_stopping)
                 or auroc < 0.5
             ):
                 finished_dict[C] = True
 
-            sample_weights_dict[C][drop_ids] = 0
 
         if all(finished_dict.values()) and early_stopping:
             break

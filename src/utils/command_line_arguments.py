@@ -1,10 +1,10 @@
 import argparse
 
 from experiments import (
-    downstream_experiment,
-    feature_weight_downstream_comparison_experiment,
+    temperature_comparison,
     perform_statistical_analysis,
-    downstream_experiment_with_test_set
+    downstream_tasks_experiment,
+    fairness_tasks_experiment
 )
 
 
@@ -14,7 +14,6 @@ from weighting_methods import (
     propensity_score_adjustment,
     feature_weighted_repeated_MRS,
     uniform_sample_weighting,
-    train_domain_adversarial_network,
     mrs,
     fw_MRS_SVM,
     feature_weighted_repeated_MRS_downstream,
@@ -51,6 +50,8 @@ bias_choice = [
 dataset_list = [
     "gbs_allensbach",
     "gbs_gesis",
+    "fairness_adult",
+    "fairness_folktables_income",
     "folktables_income",
     "folktables_employment",
     "breast_cancer",
@@ -78,7 +79,8 @@ def parse_command_line_arguments():
         "--sample_weighting_method", choices=sample_weighting_method_list, required=True
     )
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
-    parser.add_argument("--number_of_repetitions", default=50, type=int)
+    parser.add_argument("--n_cv_splits", default=2, type=int)
+    parser.add_argument("--n_cv_repeats", default=5, type=int)
     parser.add_argument("--budget", default=0.01, type=none_or_float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
@@ -103,7 +105,8 @@ def parse_mrs_analysis_command_line_arguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_set_name", choices=dataset_list, required=True)
-    parser.add_argument("--number_of_repetitions", default=10, type=int)
+    parser.add_argument("--n_cv_splits", default=2, type=int)
+    parser.add_argument("--n_cv_repeats", default=5, type=int)
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--drop", default=1, type=int)
     parser.add_argument("--bias_fraction", default=0.1, type=float)
@@ -138,14 +141,12 @@ def get_sample_weighting_function(method_name):
         return mrs
     elif method_name == "kmm":
         return kernel_mean_matching
-    elif method_name == "dann":
-        return train_domain_adversarial_network
     elif method_name == "fw-mrs-svm":
         return fw_MRS_SVM
     elif method_name == "fw-mrs-temperature-downstream":
         return feature_weighted_repeated_MRS_downstream
     elif method_name == "fw-mrs-svm-downstream":
-        return  feature_weighted_repeated_MRS_svm_downstream
+        return feature_weighted_repeated_MRS_svm_downstream
 
 
 def get_experiment_function(experiment_name=""):
@@ -154,11 +155,11 @@ def get_experiment_function(experiment_name=""):
     :param dataset_name: Data set name
     :return: Experiment function
     """
-    if experiment_name == "test_set":
-        return downstream_experiment_with_test_set
-    elif experiment_name == "feature_weight_dropped_downstream_comparison":
-        return feature_weight_downstream_comparison_experiment
+    if experiment_name == "downstream_task":
+        return downstream_tasks_experiment
+    elif experiment_name == "temperature_comparison":
+        return temperature_comparison
     elif experiment_name == "statistical_analysis":
         return perform_statistical_analysis
-    else:
-        return downstream_experiment
+    elif experiment_name == "fairness_task":
+        return fairness_tasks_experiment

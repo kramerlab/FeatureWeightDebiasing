@@ -9,16 +9,14 @@ from utils.command_line_arguments import (
 )
 
 seed = 5
-no_weights_function = [
-    "train_domain_adversarial_network",
-]
 
 
 def weighting_experiment(
     data_set_name: str,
     sample_weighting_method_name: str,
     bias_type: str,
-    number_of_repetitions: int,
+    n_cv_splits: int,
+    n_cv_repeats,
     load_previous_results: bool,
     experiment_name: str,
     budget: float,
@@ -44,22 +42,16 @@ def weighting_experiment(
     )
     experiment_function = get_experiment_function(experiment_name)
 
-    explicit_weights = (
-        False
-        if compute_sample_weights_function.__name__ in no_weights_function
-        else True
-    )
-
     experiment_function(
         df=data,
         columns=columns,
         sample_weighting_method=compute_sample_weights_function,
         bias_type=bias_type,
-        number_of_repetitions=number_of_repetitions,
+        n_cv_splits=n_cv_splits,
+        n_cv_repeats=n_cv_repeats,
         data_set_name=data_set_name,
         target=target,
         random_generator=random_generator,
-        explicit_weights=explicit_weights,
         load_previous_results=load_previous_results,
         method_name=sample_weighting_method_name,
         budget=budget,
@@ -76,7 +68,8 @@ if __name__ == "__main__":
         args.dataset,
         args.sample_weighting_method,
         args.bias_type,
-        args.number_of_repetitions,
+        args.n_cv_splits,
+        args.n_cv_repeats,
         args.load_previous_results,
         args.experiment_name,
         args.budget,

@@ -279,29 +279,31 @@ def compute_classification_metrics_random_forest(
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
-        for (temperature, sample_weights), feature_weight in zip(
-            sample_weights_list.items(), feature_weights.values()
-        ):
-            N_train = N.copy()
-            train_sample_weights = sample_weights.copy()
-
-            clf, score = train_random_forest_classifier(
-                N_train[columns].values,
-                N_train[label].values,
-                train_sample_weights,
-                feature_weight,
-                random_state=random_state,
-                n_splits=n_splits,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
-                n_estimators=n_estimators,
-                max_features=max_features,
-            )
-            if score > best_score:
-                best_score = score
-                best_clf = clf
-                best_weights = sample_weights
-                best_temperature = temperature
+        for temperature in sample_weights_list.keys():
+            for (hyperparameter, sample_weights), feature_weight in zip(
+                sample_weights_list[temperature].items(),
+                feature_weights[temperature].values(),
+            ):
+                N_train = N.copy()
+                train_sample_weights = sample_weights.copy()
+                clf, score = train_random_forest_classifier(
+                    N_train[columns].values,
+                    N_train[label].values,
+                    train_sample_weights,
+                    feature_weight,
+                    random_state=random_state,
+                    n_splits=n_splits,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    splitter=splitter,
+                    n_estimators=n_estimators,
+                    max_features=max_features,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_clf = clf
+                    best_weights = sample_weights
+                    best_temperature = temperature
+                    best_hyperparameter = hyperparameter
     else:
         best_temperature = 0
         N_train = N.copy()
@@ -319,9 +321,11 @@ def compute_classification_metrics_random_forest(
             n_estimators=n_estimators,
             max_features=max_features,
         )
+        best_hyperparameter = None
         best_weights = sample_weights_list
     y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
+
 
     if compute_feature_importance:
         abs_feature_importance = calculate_feature_importance(
@@ -341,6 +345,7 @@ def compute_classification_metrics_random_forest(
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
         best_temperature,
+        best_hyperparameter,
         best_clf,
     )
 
@@ -354,7 +359,6 @@ def compute_classification_metrics_svm(
     label,
     random_state=None,
     n_splits=5,
-    compute_feature_importance=True,
     draw_with_feature_weights=False,
 ):
     """Computes classification metrics for downstream tasks
@@ -369,25 +373,27 @@ def compute_classification_metrics_svm(
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
-        for sample_weights, feature_weight in zip(
-            sample_weights_list.values(), feature_weights.values()
-        ):
-            N_train = N.copy()
-            N_train[columns] = N_train[columns]
-            train_sample_weights = sample_weights.copy()
+        for temperature in sample_weights_list.keys():
+            for (_, sample_weights), feature_weight in zip(
+                sample_weights_list[temperature].items(),
+                feature_weights[temperature].values(),
+            ):
+                N_train = N.copy()
+                N_train[columns] = N_train[columns]
+                train_sample_weights = sample_weights.copy()
 
-            clf, score = train_svc(
-                N_train[columns].values,
-                N_train[label].values,
-                train_sample_weights,
-                feature_weight,
-                random_state=random_state,
-                n_splits=n_splits,
-                draw_with_feature_weights=draw_with_feature_weights,
-            )
-            if score > best_score:
-                best_score = score
-                best_clf = clf
+                clf, score = train_svc(
+                    N_train[columns].values,
+                    N_train[label].values,
+                    train_sample_weights,
+                    feature_weight,
+                    random_state=random_state,
+                    n_splits=n_splits,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_clf = clf
     else:
         N_train = N.copy()
         N_train[columns] = N_train[columns]
@@ -403,12 +409,6 @@ def compute_classification_metrics_svm(
             draw_with_feature_weights=draw_with_feature_weights,
         )
     y_predictions = best_clf.decision_function(T[columns].values)
-    fpr, tpr, _ = roc_curve(T[label], y_predictions)
-
-    if compute_feature_importance:
-        abs_feature_importance = np.abs(best_clf.coef_[0])
-    else:
-        abs_feature_importance = None
 
     auroc_score = roc_auc_score(T[label], y_predictions)
     auprc = average_precision_score(T[label], y_predictions)
@@ -416,9 +416,6 @@ def compute_classification_metrics_svm(
     return (
         auroc_score,
         auprc,
-        abs_feature_importance,
-        (fpr.tolist(), tpr.tolist()),
-        best_clf,
     )
 
 
@@ -432,7 +429,6 @@ def compute_classification_metrics_pseudo_labels(
     n_splits=10,
     n_estimators=500,
 ):
-    # tmp = best_clf.predict_proba(R[columns].values)
     calibrated_clf = CalibratedClassifierCV(best_clf, cv="prefit")
     calibrated_clf.fit(R[columns].values, R[target])
     pseudo_targets = calibrated_clf.predict(R[columns].values)
@@ -589,6 +585,7 @@ def train_tree_classifier_mrs(
         X_train,
         y_train,
     )
+
 
 def compute_test_metrics_mrs(
     N,
@@ -1067,7 +1064,7 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     :param feature_importance: _description_
     :return: _description_
     """
-    if temperature is None or temperature == 0.0:
+    if temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
     feature_weights = np.exp(-np.array(feature_importance) / temperature)
     return feature_weights / np.sum(feature_weights)

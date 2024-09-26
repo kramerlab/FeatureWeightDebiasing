@@ -58,10 +58,8 @@ def mrs_step(
 
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
-    skf = RepeatedStratifiedKFold(
-        n_splits=n_splits, n_repeats=2, random_state=random_state
-    )
-    kf = RepeatedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
         skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
@@ -78,7 +76,7 @@ def mrs_step(
         )
         test_data = pd.concat([N_test, R_test])
         predictions = clf.predict_proba(test_data[columns])[:, 1]
-        all_predictions[test_indices_N] = predictions[: len(N_test)]
+        all_predictions[test_indices_N] += predictions[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, predictions))
 
         if calculate_roc:
@@ -152,8 +150,9 @@ def mrs(
     target=None,
     n_pu_splits=5,
     drop=1,
-    max_patience=5,
+    max_patience=10,
     random_generator=None,
+    hyperparameter_list=[0.0],
     *args,
     **attributes
 ):
@@ -178,6 +177,7 @@ def mrs(
     relative_bias_list = []
     mmd_list = []
     roc_list = []
+
     number_of_iterations = (len(N) - n_pu_splits) // drop
     mrs_iteration = 0
     roc_iteration = (len(N) // drop // 3.5) + 1
@@ -237,25 +237,21 @@ def mrs(
             relative_bias_list.append(relative_bias)
 
         auc_difference = abs(auroc - 0.5)
-        if (auc_difference <= best_difference or auroc <= 0.5) and not switched:
+        if auc_difference <= best_difference or auroc <= 0.5:
             best_weights = sample_weights.copy().astype(np.float64)
             mrs_iteration = i * drop
             best_difference = auc_difference
             current_patience = 0
-            if auroc <= 0.5 and not switched:
-                switched = True
+            switched = True if auroc <= 0.5 and not switched else False
         else:
             current_patience += 1
 
         sample_weights[drop_ids] = 0.0
         remaining = N[sample_weights != 0.0]
-        n_positive = np.count_nonzero(remaining[target])
-        n_negative = len(remaining) - n_positive
 
         if (
             ((best_difference <= delta or switched) and early_stopping)
             or len(remaining) <= drop
-            # or (n_positive <= n_pu_splits or n_negative <= n_pu_splits)
             or ((current_patience == max_patience) and early_stopping)
         ):
             break
@@ -279,7 +275,9 @@ def mrs(
     if return_metrics:
         return auc_list, mmd_list, relative_bias_list, mrs_iteration, roc_list
     else:
-        return (best_weights / best_weights.sum()).tolist(), None
+        return (best_weights / best_weights.sum()).tolist(), (
+            np.ones(len(columns)) / len(columns)
+        ).tolist()
 
 
 def random_drops(N, n_drop: int = 1, *args, **attributes):

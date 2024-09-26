@@ -3,6 +3,7 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 from tqdm import trange
 from sklearn.discriminant_analysis import StandardScaler
 
+from experiments.downstream_tasks import repeated_train_val_test_split
 from utils.statistics import create_result_path
 from utils.sampling import sample_N
 from utils.metrics import (
@@ -110,11 +111,16 @@ def temperature_comparison(
         n_repeats=n_cv_repeats,
         random_state=seed,
     )
-    for i, (train_indices, test_indices) in enumerate(
-        skf.split(sample_df, sample_df[target])
+    for i, (N, R, T) in enumerate(
+        repeated_train_val_test_split(
+            n_cv_splits,
+            n_cv_repeats,
+            sample_df,
+            sample_df[target],
+            sampling_random_generator,
+        )
     ):
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
-            N = sample_df.iloc[train_indices].copy()
             N = sample_N(
                 train=N,
                 bias_type=bias_type,
@@ -123,7 +129,6 @@ def temperature_comparison(
                 bias_variable=target,
                 random_generator=sampling_random_generator,
             )
-            R = sample_df.iloc[test_indices].copy()
             N["label"] = 1
             R["label"] = 0
         (

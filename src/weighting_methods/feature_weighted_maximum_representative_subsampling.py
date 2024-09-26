@@ -3,7 +3,13 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
-from sklearn.model_selection import  RepeatedKFold, RepeatedStratifiedKFold
+from sklearn.model_selection import (
+    KFold,
+    RepeatedKFold,
+    RepeatedStratifiedKFold,
+    StratifiedKFold,
+)
+from sklearn.ensemble import RandomForestClassifier
 from utils.metrics import (
     calculate_feature_importance,
     compute_feature_weights_with_temperature,
@@ -45,8 +51,8 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0]
     all_predictions = np.zeros(len(dropped_N))
-    skf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
-    kf = RepeatedKFold(n_splits=n_splits, n_repeats=2, random_state=random_state)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
         skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
@@ -62,7 +68,7 @@ def mrs_step(
             random_state=random_state,
             feature_weight=feature_weight,
             splitter=splitter,
-            hyperparameter=hyperparameter
+            hyperparameter=hyperparameter,
         )
         test_data = pd.concat([N_test, R_test])
         predictions = clf.predict_proba(test_data[columns])[:, 1]
@@ -155,7 +161,8 @@ def feature_weighted_repeated_MRS(
     random_generator=None,
     class_weight=None,
     n_pu_splits=5,
-    max_patience=5,
+    hyperparameter_list=[],
+    mean=False,
     *args,
     **attributes,
 ):
@@ -178,101 +185,200 @@ def feature_weighted_repeated_MRS(
     """
     number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
     dropped_N = N.copy().reset_index(drop=True)
-    sample_weights_dict = {}
-    feature_weighted_aurocs_dict = {}
-    feature_weights_dict = {}
-    dropped_samples_dict = {}
-    finished_dict = {}
+
     best_difference_dict = {}
     best_sample_weights_dict = {}
     dropped_samples_dict = {}
     auc_difference_dict = {}
-    current_patience = {}
-    switched = False
-
+    abs_feature_importance_dict = {}
+    sample_weights_dict = {}
+    feature_weights_dict = {}
+    feature_weighted_aurocs_dict = {}
     finished_dict = {}
+    switched_dict = {}
 
-    _, abs_feature_importance, _ = mrs_step(
-        N=dropped_N,
-        R=R,
-        target=target,
-        columns=columns,
-        n_drop=drop,
-        random_state=random_generator.randint(max_int),
-        class_weight=class_weight,
-        n_splits=n_pu_splits,
-        feature_weight=np.ones(len(columns)),
-        splitter="best",
-        sample_weights=np.ones(len(N)),
-        compute_feature_importance=True
+    initialize_dictionaries(
+        N,
+        R,
+        columns,
+        target,
+        drop,
+        budgets,
+        random_generator,
+        n_pu_splits,
+        hyperparameter_list,
+        dropped_N,
+        best_difference_dict,
+        best_sample_weights_dict,
+        dropped_samples_dict,
+        auc_difference_dict,
+        abs_feature_importance_dict,
+        sample_weights_dict,
+        feature_weights_dict,
+        feature_weighted_aurocs_dict,
+        finished_dict,
+        switched_dict,
+        mean,
     )
-
-    for temperature in budgets:
-        finished_dict[temperature] = False
-        best_difference_dict[temperature] = np.inf
-        auc_difference_dict[temperature] = 1
-        dropped_samples_dict[temperature] = 0
-        current_patience[temperature] = 0
-        feature_weighted_aurocs_dict[temperature] = []
-        sample_weights_dict[temperature] = np.ones(len(N))
-        feature_weights_dict[temperature] = compute_feature_weights_with_temperature(
-            temperature, np.array(abs_feature_importance)
-        ).tolist()
-        best_sample_weights_dict[temperature] = np.ones(len(N)).tolist()
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
-            if finished_dict[temperature]:
-                break
-            splitter = "best" if temperature is None else "feature_weighted_best"
-            drop_ids, abs_feature_importance, auroc = mrs_step(
-                N=dropped_N,
-                R=R,
-                target=target,
-                columns=columns,
-                n_drop=drop,
-                random_state=random_generator.randint(max_int),
-                class_weight=class_weight,
-                n_splits=n_pu_splits,
-                feature_weight=np.array(feature_weights_dict[temperature]),
-                splitter=splitter,
-                sample_weights=sample_weights_dict[temperature],
-            )
-
-            feature_weighted_aurocs_dict[temperature].append(auroc)
-
-            auc_difference = abs(auroc - 0.5)
-
-            if (
-                (auc_difference + delta) <= best_difference_dict[temperature]
-                or (not switched and auroc < 0.5)
-            ) and not finished_dict[temperature]:
-                best_difference_dict[temperature] = auc_difference
-                dropped_samples_dict[temperature] = i * drop
-                sample_weights = sample_weights_dict[temperature]
-                best_sample_weights_dict[temperature] = (
-                    (sample_weights / np.sum(sample_weights)).tolist().copy()
+            for hyperparameter in hyperparameter_list:
+                if finished_dict[temperature][hyperparameter]:
+                    break
+                splitter = "best" if temperature is None else "feature_weighted_best"
+                drop_ids, _, auroc = mrs_step(
+                    N=dropped_N,
+                    R=R,
+                    target=target,
+                    columns=columns,
+                    n_drop=drop,
+                    random_state=random_generator.randint(max_int),
+                    class_weight=class_weight,
+                    n_splits=n_pu_splits,
+                    feature_weight=np.array(
+                        feature_weights_dict[temperature][hyperparameter]
+                    ),
+                    splitter=splitter,
+                    sample_weights=sample_weights_dict[temperature][hyperparameter],
                 )
-                current_patience[temperature] = 0
-                if not switched and auroc < 0.5:
-                    switched = True
-            else:
-                current_patience[temperature] += 1
-            if (
-                len(dropped_N) <= drop
-                or len(dropped_N) <= n_pu_splits
-                or (auc_difference <= delta and early_stopping)
-                or (current_patience[temperature] == max_patience and early_stopping)
-                or auroc < 0.5
-            ):
-                finished_dict[temperature] = True
 
-            sample_weights_dict[temperature][drop_ids] = 0
+                feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)
+                auc_difference = abs(auroc - 0.5)
 
-        if all(finished_dict.values()) and early_stopping:
+                if (
+                    (auc_difference + delta)
+                    <= best_difference_dict[temperature][hyperparameter]
+                    or (not switched_dict[temperature][hyperparameter] and auroc <= 0.5)
+                ) and not finished_dict[temperature][hyperparameter]:
+                    best_difference_dict[temperature][hyperparameter] = auc_difference
+                    dropped_samples_dict[temperature][hyperparameter] = i * drop
+                    sample_weights = sample_weights_dict[temperature][hyperparameter]
+                    best_sample_weights_dict[temperature][hyperparameter] = (
+                        (sample_weights / np.sum(sample_weights)).tolist().copy()
+                    )
+                    if not switched_dict[temperature][hyperparameter] and auroc <= 0.5:
+                        switched_dict[temperature][hyperparameter] = True
+
+                remaining = dropped_N[
+                    sample_weights_dict[temperature][hyperparameter] != 0.0
+                ]
+                if (
+                    len(remaining) <= drop
+                    or len(remaining) <= n_pu_splits
+                    or (auc_difference <= delta and early_stopping)
+                    or switched_dict[temperature][hyperparameter]
+                ):
+                    finished_dict[temperature][hyperparameter] = True
+
+                sample_weights_dict[temperature][hyperparameter][drop_ids] = 0
+
+        if all(all(finished.values()) for finished in finished_dict.values()):
             break
 
     return (
         best_sample_weights_dict,
         feature_weights_dict,
     )
+
+
+def initialize_dictionaries(
+    N,
+    R,
+    columns,
+    target,
+    drop,
+    budgets,
+    random_generator,
+    n_pu_splits,
+    hyperparameter_list,
+    dropped_N,
+    best_difference_dict,
+    best_sample_weights_dict,
+    dropped_samples_dict,
+    auc_difference_dict,
+    abs_feature_importance_dict,
+    sample_weights_dict,
+    feature_weights_dict,
+    feature_weighted_aurocs_dict,
+    finished_dict,
+    switched_dict={},
+    mean=False,
+):
+    for temperature in budgets:
+        best_difference_dict[temperature] = {}
+        auc_difference_dict[temperature] = {}
+        dropped_samples_dict[temperature] = {}
+        feature_weighted_aurocs_dict[temperature] = {}
+        sample_weights_dict[temperature] = {}
+        abs_feature_importance_dict[temperature] = {}
+        feature_weights_dict[temperature] = {}
+        best_sample_weights_dict[temperature] = {}
+        finished_dict[temperature] = {}
+        switched_dict[temperature] = {}
+        for hyperparameter in hyperparameter_list:
+            finished_dict[temperature][hyperparameter] = False
+            switched_dict[temperature][hyperparameter] = False
+            best_difference_dict[temperature][hyperparameter] = np.inf
+            auc_difference_dict[temperature][hyperparameter] = 1
+            dropped_samples_dict[temperature][hyperparameter] = 0
+            feature_weighted_aurocs_dict[temperature][hyperparameter] = []
+            sample_weights_dict[temperature][hyperparameter] = np.ones(len(N))
+            abs_feature_importance_dict[temperature][hyperparameter] = np.ones(
+                len(columns)
+            ).tolist()
+
+    random_state = random_generator.randint(max_int)
+    for hyperparameter in hyperparameter_list:
+        _, abs_feature_importance, _ = mrs_step(
+            N=dropped_N,
+            R=R,
+            target=target,
+            columns=columns,
+            n_drop=drop,
+            random_state=random_state,
+            n_splits=n_pu_splits,
+            feature_weight=np.ones(len(columns)),
+            splitter="best",
+            sample_weights=np.ones(len(N)),
+            compute_feature_importance=True,
+            hyperparameter=hyperparameter,
+        )
+
+        if mean:
+            target_importance = compute_target_importances(
+                pd.concat([N, R]), columns, target, random_state, n_pu_splits
+            )
+            abs_feature_importance = np.mean(
+                [abs_feature_importance, target_importance], axis=0
+            )
+
+        for temperature in budgets:
+            feature_weights_dict[temperature][hyperparameter] = (
+                compute_feature_weights_with_temperature(
+                    temperature, np.array(abs_feature_importance)
+                ).tolist()
+            )
+
+
+def compute_target_importances(X, columns, target, random_state, n_splits):
+    clf = RandomForestClassifier(
+        n_jobs=-1,
+        random_state=random_state,
+        class_weight="balanced",
+    )
+    abs_feature_importance_list = []
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    for train_indices, test_indices in skf.split(X, X[target]):
+        train = X.iloc[train_indices]
+        test = X.iloc[test_indices]
+        clf.fit(train[columns], train[target])
+        abs_feature_importance = calculate_feature_importance(
+            test_N=test[columns].values,
+            clf=clf,
+            background=train[columns],
+        )
+        abs_feature_importance_list.append(abs_feature_importance)
+
+    abs_mean_feature_importance = np.nanmean(abs_feature_importance_list, axis=0)
+    return -abs_mean_feature_importance

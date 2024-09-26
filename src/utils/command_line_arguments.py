@@ -4,7 +4,7 @@ from experiments import (
     temperature_comparison,
     perform_statistical_analysis,
     downstream_tasks_experiment,
-    fairness_tasks_experiment
+    fairness_tasks_experiment,
 )
 
 
@@ -30,10 +30,10 @@ sample_weighting_method_list = [
     "mrs-tree",
     "mrs-forest",
     "fw-mrs-temperature",
-    "kmm",
-    "dann",
-    "fw-mrs-svm",
     "fw-mrs-temperature-downstream",
+    "fw-mrs-temperature-mean",
+    "kmm",
+    "fw-mrs-svm",
     "fw-mrs-svm-downstream",
 ]
 
@@ -145,6 +145,8 @@ def get_sample_weighting_function(method_name):
         return fw_MRS_SVM
     elif method_name == "fw-mrs-temperature-downstream":
         return feature_weighted_repeated_MRS_downstream
+    elif method_name == "fw-mrs-temperature-mean":
+        return feature_weighted_repeated_MRS
     elif method_name == "fw-mrs-svm-downstream":
         return feature_weighted_repeated_MRS_svm_downstream
 

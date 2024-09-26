@@ -14,7 +14,7 @@ from utils.statistics import (
     write_result_dict_test_set,
 )
 from utils.sampling import sample_N
-from utils.visualization import plot_feature_weights, plot_rocs_downstream
+from utils.visualization import plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,
@@ -76,6 +76,7 @@ def downstream_tasks_experiment(
     feature_importance_list = []
     roc_curves_list = []
     best_temperature_list = []
+    best_hyperparameter_list = []
 
     dropped_samples_list = []
 
@@ -105,13 +106,13 @@ def downstream_tasks_experiment(
     df[columns] = scaler.transform(df[columns])
     sample_df = df.copy()
 
-    if method_name == "fw-mrs-temperature":
+    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
-        temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+        temperatures = [0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [0.05, 0.025, 0.0]
     elif method_name == "fw-mrs-svm":
-        temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+        temperatures = [0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
@@ -120,6 +121,8 @@ def downstream_tasks_experiment(
         draw_with_feature_weights = False
         temperatures = None
         hyperparameter_list = []
+
+    mean = True if method_name == "fw-mrs-temperature-mean" else False
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
@@ -130,17 +133,16 @@ def downstream_tasks_experiment(
             sampling_random_generator,
         )
     ):
-        if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
-            N = sample_N(
-                train=N,
-                bias_type=bias_type,
-                bias_fraction=bias_fraction,
-                columns=columns,
-                bias_variable=target,
-                random_generator=sampling_random_generator,
-            )
-            N["label"] = 1
-            R["label"] = 0
+        N = sample_N(
+            train=N,
+            bias_type=bias_type,
+            bias_fraction=bias_fraction,
+            columns=columns,
+            bias_variable=target,
+            random_generator=sampling_random_generator,
+        )
+        N["label"] = 1
+        R["label"] = 0
 
         gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
@@ -162,6 +164,7 @@ def downstream_tasks_experiment(
                 budgets=temperatures,
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
+                mean=mean,
             )
 
             feature_weight_list.append(feature_weights)
@@ -170,10 +173,11 @@ def downstream_tasks_experiment(
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
 
-        if feature_weights is None:
-            feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
-
-        if method_name not in ("fw-mrs-svm", "fw-mrs-temperature"):
+        if method_name not in (
+            "fw-mrs-svm",
+            "fw-mrs-temperature",
+            "fw-mrs-temperature-mean",
+        ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
                 R,
@@ -184,9 +188,9 @@ def downstream_tasks_experiment(
                 gamma,
             )
         else:
-            weighted_mmd = 0
-            relative_bias = 0
-            wasserstein_distances = 0
+            weighted_mmd = np.zeros(len(columns))
+            relative_bias = np.zeros(len(columns))
+            wasserstein_distances = np.zeros(len(columns))
 
         (
             rf_auroc,
@@ -195,6 +199,7 @@ def downstream_tasks_experiment(
             abs_feature_importance,
             roc_curve_values,
             best_temperature,
+            best_hyperparameter,
             best_clf,
         ) = compute_classification_metrics_random_forest(
             N,
@@ -212,13 +217,11 @@ def downstream_tasks_experiment(
         dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
         best_temperature_list.append(best_temperature)
+        best_hyperparameter_list.append(best_hyperparameter)
 
         (
             svc_auroc,
             svc_auprc,
-            _,
-            _,
-            _,
         ) = compute_classification_metrics_svm(
             N,
             T,
@@ -229,7 +232,6 @@ def downstream_tasks_experiment(
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
             n_splits=10,
-            compute_feature_importance=False,
         )
 
         (
@@ -254,9 +256,6 @@ def downstream_tasks_experiment(
         svc_auroc_list.append(svc_auroc)
         svc_auprc_list.append(svc_auprc)
 
-        if not feature_weights is None:
-            plot_feature_weights(feature_weights, feature_weights_save_path, i)
-
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)
         # plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
@@ -277,6 +276,7 @@ def downstream_tasks_experiment(
                 feature_importance_list,
                 roc_curves_list,
                 best_temperature_list,
+                best_hyperparameter_list,
             ),
             (
                 "rf_auroc",
@@ -290,6 +290,7 @@ def downstream_tasks_experiment(
                 "feature_importance",
                 "roc_curves",
                 "best_temperature",
+                "best_hyperparameter",
             ),
         ):
             with open(
@@ -350,7 +351,7 @@ def repeated_train_val_test_split(
             target,
             random_state=random_generator.randint(max_int),
             stratify=target,
-            test_size=(1/3),
+            test_size=(1 / 3),
         )
         train_samples, val_samples, _, _ = train_test_split(
             train_val_samples,

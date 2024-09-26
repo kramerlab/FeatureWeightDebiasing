@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import trange
 from .feature_weighted_maximum_representative_subsampling import (
     compute_feature_weights_with_temperature,
+    initialize_dictionaries,
     mrs_step,
 )
 
@@ -78,12 +79,11 @@ def feature_weighted_repeated_MRS_downstream(
     rand_int = random_generator.randint(max_int)
 
     for i in trange(number_of_iterations):
-        rand_int = random_generator.randint(max_int)
         for temperature in budgets:
             for hyperparameter in hyperparameter_list:
                 if finished_dict[temperature][hyperparameter]:
                     break
-                splitter = "best" if temperature is None else "feature_weighted_best"
+                splitter = "best" if temperature is 0.0 else "feature_weighted_best"
                 drop_ids, _, auroc = mrs_step(
                     N=dropped_N,
                     R=R,
@@ -117,13 +117,8 @@ def feature_weighted_repeated_MRS_downstream(
                 remaining = dropped_N[
                     sample_weights_dict[temperature][hyperparameter] != 0.0
                 ]
-                n_positive = np.count_nonzero(remaining[target])
-                n_negative = len(remaining) - n_positive
-                if (
-                    len(remaining) <= drop
-                    or (n_positive <= n_pu_splits or n_negative <= n_pu_splits)
-                    or auc_difference <= delta
-                ):
+
+                if len(remaining) <= drop:
                     finished_dict[temperature][hyperparameter] = True
 
         if all(all(finished.values()) for finished in finished_dict.values()):
@@ -136,68 +131,3 @@ def feature_weighted_repeated_MRS_downstream(
         feature_weights_dict,
         abs_feature_importance_dict,
     )
-
-
-def initialize_dictionaries(
-    N,
-    R,
-    columns,
-    target,
-    drop,
-    budgets,
-    random_generator,
-    n_pu_splits,
-    hyperparameter_list,
-    dropped_N,
-    best_difference_dict,
-    best_sample_weights_dict,
-    dropped_samples_dict,
-    auc_difference_dict,
-    abs_feature_importance_dict,
-    sample_weights_dict,
-    feature_weights_dict,
-    feature_weighted_aurocs_dict,
-    finished_dict,
-):
-    for temperature in budgets:
-        best_difference_dict[temperature] = {}
-        auc_difference_dict[temperature] = {}
-        dropped_samples_dict[temperature] = {}
-        feature_weighted_aurocs_dict[temperature] = {}
-        sample_weights_dict[temperature] = {}
-        abs_feature_importance_dict[temperature] = {}
-        feature_weights_dict[temperature] = {}
-        best_sample_weights_dict[temperature] = {}
-        finished_dict[temperature] = {}
-        for hyperparameter in hyperparameter_list:
-            finished_dict[temperature][hyperparameter] = False
-            best_difference_dict[temperature][hyperparameter] = np.inf
-            auc_difference_dict[temperature][hyperparameter] = 1
-            dropped_samples_dict[temperature][hyperparameter] = 0
-            feature_weighted_aurocs_dict[temperature][hyperparameter] = []
-            sample_weights_dict[temperature][hyperparameter] = np.ones(len(N))
-            abs_feature_importance_dict[temperature][hyperparameter] = np.ones(
-                len(columns)
-            ).tolist()
-
-    for hyperparameter in hyperparameter_list:
-        _, abs_feature_importance, _ = mrs_step(
-            N=dropped_N,
-            R=R,
-            target=target,
-            columns=columns,
-            n_drop=drop,
-            random_state=random_generator.randint(max_int),
-            n_splits=n_pu_splits,
-            feature_weight=np.ones(len(columns)),
-            splitter="best",
-            sample_weights=np.ones(len(N)),
-            compute_feature_importance=True,
-            hyperparameter=hyperparameter,
-        )
-        for temperature in budgets:
-            feature_weights_dict[temperature][hyperparameter] = (
-                compute_feature_weights_with_temperature(
-                    temperature, np.array(abs_feature_importance)
-                ).tolist()
-            )

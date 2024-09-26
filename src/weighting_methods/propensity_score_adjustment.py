@@ -17,7 +17,7 @@ def propensity_score_adjustment(N, R, columns, *args, **attributes):
     clf = train_logistic_regression(x, y)
     predictions = clf.predict_proba(N[columns].values)[:, 1]
     weights = (1 - predictions) / predictions
-    return (weights / weights.sum()).tolist(), None
+    return (weights / weights.sum()).tolist(), (np.ones(len(columns)) / len(columns)).tolist()
 
 
 def train_logistic_regression(X_train, y_train):

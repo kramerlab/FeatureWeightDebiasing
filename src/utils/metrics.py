@@ -160,7 +160,7 @@ def compute_metrics(
     scaler,
     scale_columns,
     columns,
-    sample_weights,
+    sample_weights_list,
     gamma,
 ):
     """Computes the metrics for an experiment
@@ -174,36 +174,79 @@ def compute_metrics(
     :param gamma: Gamma for the rbf kernel
     :return: Result metrics
     """
-    wasserstein_distances = []
-    scaled_N_dropped = scaled_N[columns].values
-    scaled_R_dropped = scaled_R[columns].values
+    if isinstance(sample_weights_list, dict):
+        best_weighted_mmd = np.inf
+        best_sample_biases = np.inf
+        best_wasserstein_distances = np.inf
+        sample_weights_list = sample_weights_list[0.0]
+        for sample_weights in sample_weights_list.values():
+            wasserstein_distances = []
+            scaled_N_dropped = scaled_N[columns].values
+            scaled_R_dropped = scaled_R[columns].values
 
-    weighted_mmd = weighted_maximum_mean_discrepancy(
-        scaled_N_dropped,
-        scaled_R_dropped,
-        sample_weights,
-        gamma,
-    )
+            weighted_mmd = weighted_maximum_mean_discrepancy(
+                scaled_N_dropped,
+                scaled_R_dropped,
+                sample_weights,
+                gamma,
+            )
 
-    for i in range(scaled_N.values.shape[1]):
-        u_values = scaled_N.values[:, i]
-        v_values = scaled_R.values[:, i]
-        wasserstein_distance_value = wasserstein_distance(
-            u_values, v_values, sample_weights
+            for i in range(scaled_N.values.shape[1]):
+                u_values = scaled_N.values[:, i]
+                v_values = scaled_R.values[:, i]
+                wasserstein_distance_value = wasserstein_distance(
+                    u_values, v_values, sample_weights
+                )
+                wasserstein_distances.append(wasserstein_distance_value)
+
+            unscaled_N = scaled_N.copy()
+            unscaled_R = scaled_R.copy()
+            unscaled_N[scale_columns] = scaler.inverse_transform(
+                scaled_N[scale_columns]
+            )
+            unscaled_R[scale_columns] = scaler.inverse_transform(
+                scaled_R[scale_columns]
+            )
+            sample_biases = compute_relative_bias(
+                unscaled_N, unscaled_R, sample_weights
+            )
+            if weighted_mmd < best_weighted_mmd:
+                best_weighted_mmd = weighted_mmd
+                best_sample_biases = sample_biases
+                best_wasserstein_distances = wasserstein_distances
+
+    else:
+        best_wasserstein_distances = []
+        scaled_N_dropped = scaled_N[columns].values
+        scaled_R_dropped = scaled_R[columns].values
+
+        best_weighted_mmd = weighted_maximum_mean_discrepancy(
+            scaled_N_dropped,
+            scaled_R_dropped,
+            sample_weights_list,
+            gamma,
         )
-        wasserstein_distances.append(wasserstein_distance_value)
 
-    unscaled_N = scaled_N.copy()
-    unscaled_R = scaled_R.copy()
-    unscaled_N[scale_columns] = scaler.inverse_transform(scaled_N[scale_columns])
-    unscaled_R[scale_columns] = scaler.inverse_transform(scaled_R[scale_columns])
+        for i in range(scaled_N.values.shape[1]):
+            u_values = scaled_N.values[:, i]
+            v_values = scaled_R.values[:, i]
+            wasserstein_distance_value = wasserstein_distance(
+                u_values, v_values, sample_weights_list
+            )
+            best_wasserstein_distances.append(wasserstein_distance_value)
 
-    sample_biases = compute_relative_bias(unscaled_N, unscaled_R, sample_weights)
+        unscaled_N = scaled_N.copy()
+        unscaled_R = scaled_R.copy()
+        unscaled_N[scale_columns] = scaler.inverse_transform(scaled_N[scale_columns])
+        unscaled_R[scale_columns] = scaler.inverse_transform(scaled_R[scale_columns])
+        best_sample_biases = compute_relative_bias(
+            unscaled_N, unscaled_R, sample_weights_list
+        )
 
     return (
-        weighted_mmd,
-        sample_biases,
-        wasserstein_distances,
+        best_weighted_mmd,
+        best_sample_biases,
+        best_wasserstein_distances,
     )
 
 
@@ -280,12 +323,14 @@ def compute_classification_metrics_random_forest(
         best_clf = None
         best_score = -1
         for temperature in sample_weights_list.keys():
-            for (hyperparameter, sample_weights), feature_weight in zip(
-                sample_weights_list[temperature].items(),
-                feature_weights[temperature].values(),
-            ):
-                N_train = N.copy()
-                train_sample_weights = sample_weights.copy()
+            for hyperparameter, sample_weights in sample_weights_list[
+                temperature
+            ].items():
+                feature_weight = feature_weights[temperature][hyperparameter]
+                not_zero_indices = np.array(sample_weights) > 0
+                N_train = N.loc[not_zero_indices, :]
+                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+                
                 clf, score = train_random_forest_classifier(
                     N_train[columns].values,
                     N_train[label].values,
@@ -325,7 +370,6 @@ def compute_classification_metrics_random_forest(
         best_weights = sample_weights_list
     y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
     fpr, tpr, _ = roc_curve(T[label], y_predictions)
-
 
     if compute_feature_importance:
         abs_feature_importance = calculate_feature_importance(
@@ -374,10 +418,10 @@ def compute_classification_metrics_svm(
         best_clf = None
         best_score = -1
         for temperature in sample_weights_list.keys():
-            for (_, sample_weights), feature_weight in zip(
-                sample_weights_list[temperature].items(),
-                feature_weights[temperature].values(),
-            ):
+            for hyperparameter, sample_weights in sample_weights_list[
+                temperature
+            ].items():
+                feature_weight = feature_weights[temperature][hyperparameter]
                 N_train = N.copy()
                 N_train[columns] = N_train[columns]
                 train_sample_weights = sample_weights.copy()
@@ -579,6 +623,7 @@ def train_tree_classifier_mrs(
         cv=cv,
         n_jobs=-1,
         refit=True,
+        scoring="roc_auc",
     )
 
     return grid.fit(
@@ -643,7 +688,6 @@ def train_pu_classifier(
     feature_weight=None,
     random_state=None,
     splitter="feature_weighted_best",
-    n_splits=3,
     hyperparameter=0.0,
 ):
     """Train the positive unlabeled classifier
@@ -677,7 +721,6 @@ def train_svm_pu_classifier(
     X,
     y,
     random_state=None,
-    n_splits=3,
     C=1,
 ):
     """Train the positive unlabeled classifier
@@ -689,23 +732,11 @@ def train_svm_pu_classifier(
     """
     clf = LinearSVC(dual="auto", random_state=random_state, C=C)
 
-    # param_grid_svm = {"C": [1, 1000]}
-
-    # skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    # grid = GridSearchCV(
-    #    clf,
-    #    param_grid_svm,
-    #    cv=skf,
-    #   scoring="roc_auc",
-    #   refit=True,
-    #    n_jobs=n_splits,
-    # )
     clf.fit(
         X,
         y,
     )
 
-    # return clf.best_estimator_
     return clf
 
 
@@ -714,6 +745,7 @@ def train_pu_classifier_mrs(
     y,
     n_estimators=200,
     random_state=None,
+    hyperparameter=0.0,
 ):
     """Train the positive unlabeled classifier
 
@@ -727,6 +759,7 @@ def train_pu_classifier_mrs(
         n_estimators=n_estimators,
         random_state=random_state,
         class_weight="balanced",
+        min_weight_fraction_leaf=hyperparameter,
     )
 
     return clf.fit(
@@ -892,7 +925,6 @@ def train_random_forest_classifier(
             0.025,
             0.05,
             0.1,
-            0.25,
         ],
         "class_weight": ["balanced", None],
     }
@@ -907,7 +939,7 @@ def train_random_forest_classifier(
         param_grid,
         cv=skf,
         n_jobs=-1,
-        # scoring="roc_auc",
+        scoring="roc_auc",
         refit=True,
     )
 
@@ -954,11 +986,11 @@ def train_svc(
         random_state=random_state,
     )
     grid_cv = GridSearchCV(
-        # clf, param_grid, cv=skf, n_jobs=-1, scoring="roc_auc", refit=True
         clf,
         param_grid,
         cv=skf,
         n_jobs=-1,
+        scoring="roc_auc",
         refit=True,
     )
 

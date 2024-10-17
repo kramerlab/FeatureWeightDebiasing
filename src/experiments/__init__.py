@@ -1,4 +1,5 @@
 from .downstream_tasks import downstream_tasks_experiment
-from .temperature_comparison import temperature_comparison
+from .temperature_comparison_method_auroc import temperature_comparison
 from .statistical_analysis import perform_statistical_analysis
 from .fairness_experiments import fairness_tasks_experiment
+from . downstream_task_validation import downstream_task_validation_comparison

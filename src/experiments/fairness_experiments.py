@@ -1,13 +1,19 @@
 import json
 import numpy as np
 
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, average_precision_score
+from sklearn.metrics import (
+    roc_auc_score,
+    accuracy_score,
+    precision_score,
+    average_precision_score,
+)
 from sklearn.model_selection import (
     RepeatedStratifiedKFold,
 )
 import pandas as pd
 from sklearn.discriminant_analysis import StandardScaler
 
+from utils.data_loader import load_weights, save_weights
 from utils.metrics import compute_classification_metrics_random_forest_fairness
 from utils.statistics import create_result_path
 from fairlearn.metrics import (
@@ -162,7 +168,9 @@ def fairness_tasks_experiment(
 
         for clf, temperature in zip(weighted_clf_list, temperatures):
             weighted_prediction = clf.predict(T[columns].values)
-            prediction_proba_dict[temperature].extend(clf.predict_proba(T[columns].values)[:,1])
+            prediction_proba_dict[temperature].extend(
+                clf.predict_proba(T[columns].values)[:, 1]
+            )
             prediction_dict[temperature].extend(clf.predict(T[columns].values))
             metric_frame = MetricFrame(
                 metrics=metrics,
@@ -194,7 +202,9 @@ def fairness_tasks_experiment(
             n_splits=n_splits,
         )
         uniform_prediction = uniform_clf.predict(T[columns].values)
-        prediction_proba_dict["Uniform"].extend(uniform_clf.predict_proba(T[columns].values)[:, 1])
+        prediction_proba_dict["Uniform"].extend(
+            uniform_clf.predict_proba(T[columns].values)[:, 1]
+        )
         prediction_dict["Uniform"].extend(uniform_clf.predict(T[columns].values))
         metric_frame = MetricFrame(
             metrics=metrics,
@@ -227,8 +237,12 @@ def fairness_tasks_experiment(
             mitigate=True,
         )
         mitigated_prediction = mitigated_clf.predict(T[columns].values)
-        prediction_proba_dict["Exponentiated Gradient"].extend(mitigated_clf.predict(T[columns].values))
-        prediction_dict["Exponentiated Gradient"].extend(mitigated_clf.predict(T[columns].values))
+        prediction_proba_dict["Exponentiated Gradient"].extend(
+            mitigated_clf.predict(T[columns].values)
+        )
+        prediction_dict["Exponentiated Gradient"].extend(
+            mitigated_clf.predict(T[columns].values)
+        )
         metric_frame = MetricFrame(
             metrics=metrics,
             y_true=T[target],
@@ -294,21 +308,6 @@ def create_sets(df, sensitive_attribute, train_indices, test_indices):
     R["label"] = 0
     T = df.iloc[test_indices]
     return N, R, T
-
-
-def save_weights(path, weights_list):
-    with open(path / "weights.json", "w") as file:
-        json.dump(weights_list, file, indent=4)
-
-
-def load_weights(path):
-    weight_file = path / "weights.json"
-    if weight_file.is_file():
-        with open(weight_file, "r") as file:
-            weights = json.load(file)
-    else:
-        weights = []
-    return weights
 
 
 def selection_rate_difference(y_true, y_pred, sensitive_features):

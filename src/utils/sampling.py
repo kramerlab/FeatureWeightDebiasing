@@ -83,7 +83,7 @@ def less_outlier_sampling(train, bias_fraction, columns, random_generator):
     temperature = -(1 / 20)
     sample_weights = np.exp(temperature * differences)
     N = train.sample(
-        frac=bias_fraction + 0.4,
+        frac=bias_fraction,
         weights=sample_weights,
         random_state=random_generator,
     )

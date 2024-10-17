@@ -5,8 +5,6 @@ from tqdm import trange
 
 from sklearn.model_selection import (
     KFold,
-    RepeatedKFold,
-    RepeatedStratifiedKFold,
     StratifiedKFold,
 )
 from sklearn.ensemble import RandomForestClassifier
@@ -160,9 +158,10 @@ def feature_weighted_repeated_MRS(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=5,
+    n_pu_splits=2,
     hyperparameter_list=[],
     mean=False,
+    return_metrics=False,
     *args,
     **attributes,
 ):
@@ -196,6 +195,8 @@ def feature_weighted_repeated_MRS(
     feature_weighted_aurocs_dict = {}
     finished_dict = {}
     switched_dict = {}
+    auroc_dict = {}
+    mmd_dict = {}
 
     initialize_dictionaries(
         N,
@@ -218,13 +219,15 @@ def feature_weighted_repeated_MRS(
         feature_weighted_aurocs_dict,
         finished_dict,
         switched_dict,
+        auroc_dict,
+        mmd_dict,
         mean,
     )
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
             for hyperparameter in hyperparameter_list:
-                if finished_dict[temperature][hyperparameter]:
+                if finished_dict[temperature][hyperparameter] and not return_metrics:
                     break
                 splitter = "best" if temperature is None else "feature_weighted_best"
                 drop_ids, _, auroc = mrs_step(
@@ -241,10 +244,14 @@ def feature_weighted_repeated_MRS(
                     ),
                     splitter=splitter,
                     sample_weights=sample_weights_dict[temperature][hyperparameter],
+                    hyperparameter=hyperparameter,
                 )
 
                 feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)
                 auc_difference = abs(auroc - 0.5)
+
+                if return_metrics:
+                    auroc_dict[temperature][hyperparameter].append(auroc)
 
                 if (
                     (auc_difference + delta)
@@ -273,13 +280,19 @@ def feature_weighted_repeated_MRS(
 
                 sample_weights_dict[temperature][hyperparameter][drop_ids] = 0
 
-        if all(all(finished.values()) for finished in finished_dict.values()):
+        if (
+            all(all(finished.values()) for finished in finished_dict.values())
+            and not return_metrics
+        ):
             break
 
-    return (
-        best_sample_weights_dict,
-        feature_weights_dict,
-    )
+    if return_metrics:
+        return auroc_dict, best_sample_weights_dict, feature_weights_dict
+    else:
+        return (
+            best_sample_weights_dict,
+            feature_weights_dict,
+        )
 
 
 def initialize_dictionaries(
@@ -303,7 +316,10 @@ def initialize_dictionaries(
     feature_weighted_aurocs_dict,
     finished_dict,
     switched_dict={},
+    auc_dict={},
+    mmd_dict={},
     mean=False,
+    mrs_step=mrs_step,
 ):
     for temperature in budgets:
         best_difference_dict[temperature] = {}
@@ -316,12 +332,16 @@ def initialize_dictionaries(
         best_sample_weights_dict[temperature] = {}
         finished_dict[temperature] = {}
         switched_dict[temperature] = {}
+        auc_dict[temperature] = {}
+        mmd_dict[temperature] = {}
         for hyperparameter in hyperparameter_list:
             finished_dict[temperature][hyperparameter] = False
             switched_dict[temperature][hyperparameter] = False
             best_difference_dict[temperature][hyperparameter] = np.inf
             auc_difference_dict[temperature][hyperparameter] = 1
             dropped_samples_dict[temperature][hyperparameter] = 0
+            auc_dict[temperature][hyperparameter] = []
+            mmd_dict[temperature][hyperparameter] = []
             feature_weighted_aurocs_dict[temperature][hyperparameter] = []
             sample_weights_dict[temperature][hyperparameter] = np.ones(len(N))
             abs_feature_importance_dict[temperature][hyperparameter] = np.ones(

@@ -8,6 +8,7 @@ from sklearn.model_selection import (
 )
 from sklearn.discriminant_analysis import StandardScaler
 
+from utils.data_loader import load_weights, save_weights
 from utils.statistics import (
     create_result_path,
     write_result_dict,
@@ -18,8 +19,6 @@ from utils.visualization import plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,
-    compute_classification_metrics_svm,
-    compute_classification_metrics_pseudo_labels,
     compute_metrics,
 )
 
@@ -116,6 +115,11 @@ def downstream_tasks_experiment(
         hyperparameter_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
+    elif method_name == "mrs-forest":
+        hyperparameter_list = [0.05, 0.025, 0.0]
+        splitter = "best"
+        draw_with_feature_weights = False
+        temperatures = None
     else:
         splitter = "best"
         draw_with_feature_weights = False
@@ -165,6 +169,7 @@ def downstream_tasks_experiment(
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
                 mean=mean,
+                compute_bias=False,
             )
 
             feature_weight_list.append(feature_weights)
@@ -172,6 +177,10 @@ def downstream_tasks_experiment(
 
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
+
+        if method_name == "mrs-forest":
+            sample_weights = {0.0: sample_weights}
+            feature_weights = {0.0: feature_weights}
 
         if method_name not in (
             "fw-mrs-svm",
@@ -188,9 +197,9 @@ def downstream_tasks_experiment(
                 gamma,
             )
         else:
-            weighted_mmd = np.zeros(len(columns))
-            relative_bias = np.zeros(len(columns))
-            wasserstein_distances = np.zeros(len(columns))
+            weighted_mmd = np.ones(len(N.columns))
+            relative_bias = np.ones(len(N.columns))
+            wasserstein_distances = np.ones(len(N.columns))
 
         (
             rf_auroc,
@@ -212,39 +221,44 @@ def downstream_tasks_experiment(
             draw_with_feature_weights=draw_with_feature_weights,
             splitter=splitter,
             n_estimators=500,
-            n_splits=10,
+            n_splits=5,
         )
         dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
 
-        (
-            svc_auroc,
-            svc_auprc,
-        ) = compute_classification_metrics_svm(
-            N,
-            T,
-            columns,
-            sample_weights,
-            feature_weights,
-            target,
-            random_state=seed,
-            draw_with_feature_weights=draw_with_feature_weights,
-            n_splits=10,
-        )
+        # (
+        #     svc_auroc,
+        #     svc_auprc,
+        # ) = compute_classification_metrics_svm(
+        #     N,
+        #     T,
+        #     columns,
+        #     sample_weights,
+        #     feature_weights,
+        #     target,
+        #     random_state=seed,
+        #     draw_with_feature_weights=draw_with_feature_weights,
+        #     n_splits=10,
+        # )
 
-        (
-            pseudo_targets_auroc,
-            pseudo_targets_auprc,
-        ) = compute_classification_metrics_pseudo_labels(
-            R,
-            T,
-            columns,
-            best_clf,
-            target,
-            random_state=seed,
-        )
+        svc_auroc = 0
+        svc_auprc = 0
+
+        # (
+        #     pseudo_targets_auroc,
+        #     pseudo_targets_auprc,
+        # ) = compute_classification_metrics_pseudo_labels(
+        #     R,
+        #     T,
+        #     columns,
+        #     best_clf,
+        #     target,
+        #     random_state=seed,
+        # )
+        pseudo_targets_auroc = 0
+        pseudo_targets_auprc = 0
 
         pseudo_targets_auroc_list.append(pseudo_targets_auroc)
         pseudo_targets_auprc_list.append(pseudo_targets_auprc)
@@ -323,21 +337,6 @@ def downstream_tasks_experiment(
         result_file.write(json.dumps(result_dict))
 
 
-def save_weights(path, weights_list):
-    with open(path / "weights.json", "w") as file:
-        json.dump(weights_list, file, indent=4)
-
-
-def load_weights(path):
-    weight_file = path / "weights.json"
-    if weight_file.is_file():
-        with open(weight_file, "r") as file:
-            weights = json.load(file)
-    else:
-        weights = []
-    return weights
-
-
 # Used to draw radom states
 max_int = 2**32 - 1
 
@@ -360,7 +359,26 @@ def repeated_train_val_test_split(
             random_state=random_generator.randint(max_int),
             test_size=0.5,
         )
-        splits_list = [train_samples, val_samples, test_samples]
+
+        min_samples = np.min(
+            [
+                len(sample_list)
+                for sample_list in (
+                    train_samples.values,
+                    val_samples.values,
+                    test_samples.values,
+                )
+            ]
+        )
+
+        train_samples = train_samples.iloc[:min_samples].copy()
+        val_samples = val_samples.iloc[:min_samples].copy()
+        test_samples = test_samples.iloc[:min_samples].copy()
+        splits_list = [
+            train_samples,
+            val_samples,
+            test_samples,
+        ]
         train_index = -1
         val_index = 0
         test_index = 1

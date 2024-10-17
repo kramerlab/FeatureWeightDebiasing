@@ -1,3 +1,4 @@
+import json
 import pathlib
 
 import pandas as pd
@@ -293,3 +294,18 @@ def load_fairness_adult():
     df = pd.concat([X, sex, pd.DataFrame({"income": y_true})], axis=1)
 
     return df, columns, ("sex", "income")
+
+
+def save_weights(path, weights_list, file_name="weights"):
+    with open(path / f"{file_name}.json", "w") as file:
+        json.dump(weights_list, file, indent=4)
+
+
+def load_weights(path, file_name="weights"):
+    weight_file = path / f"{file_name}.json"
+    if weight_file.is_file():
+        with open(weight_file, "r") as file:
+            weights = json.load(file)
+    else:
+        weights = []
+    return weights

@@ -2,12 +2,11 @@ import random
 import numpy as np
 from pathlib import Path
 from sklearn.model_selection import RepeatedStratifiedKFold
-from tqdm import trange
 
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
-from utils.sampling import sample_N, sample_with_test_set
+from utils.sampling import sample_N
 from utils.metrics import calculate_mean_rocs, scale_df
 from utils.visualization import (
     plot_auc_average,
@@ -55,9 +54,7 @@ def analyse_mrs(
     skf = RepeatedStratifiedKFold(
         n_splits=n_cv_splits, n_repeats=n_cv_repeats, random_state=seed
     )
-    for i, (train_indices, test_indices) in enumerate(
-        skf.split(sample_df, sample_df[target])
-    ):
+    for train_indices, test_indices in skf.split(sample_df, sample_df[target]):
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             N = sample_df.iloc[train_indices].copy()
             N = sample_N(

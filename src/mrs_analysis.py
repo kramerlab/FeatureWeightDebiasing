@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 from sklearn.model_selection import RepeatedStratifiedKFold
 
+from experiments.downstream_tasks import repeated_train_val_test_split
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
@@ -16,6 +17,7 @@ from utils.visualization import (
 )
 
 seed = 5
+sampling_random_generator = np.random.RandomState(seed)
 
 
 def analyse_mrs(
@@ -51,12 +53,14 @@ def analyse_mrs(
     else:
         use_bias_mean = True
 
-    skf = RepeatedStratifiedKFold(
-        n_splits=n_cv_splits, n_repeats=n_cv_repeats, random_state=seed
-    )
-    for train_indices, test_indices in skf.split(sample_df, sample_df[target]):
+    for N, R, _ in repeated_train_val_test_split(
+        n_cv_splits,
+        n_cv_repeats,
+        sample_df,
+        sample_df[target],
+        sampling_random_generator,
+    ):
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
-            N = sample_df.iloc[train_indices].copy()
             N = sample_N(
                 train=N,
                 bias_type=bias_type,
@@ -65,7 +69,6 @@ def analyse_mrs(
                 bias_variable=target,
             )
             number_of_samples = len(N)
-            R = sample_df.iloc[test_indices].copy()
             N["label"] = 1
             R["label"] = 0
         (

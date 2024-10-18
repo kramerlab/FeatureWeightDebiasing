@@ -1,5 +1,5 @@
 N_CV_REPEATS=10
-DROP=2
+DROP=3
 
 for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature fw-mrs-temperature-mean
 do

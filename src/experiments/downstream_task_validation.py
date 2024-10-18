@@ -5,11 +5,7 @@ from utils.data_loader import save_weights
 from utils.statistics import create_result_path
 from utils.sampling import sample_N
 from utils.metrics import compute_classification_metrics_random_forest, scale_df
-from utils.visualization_fw_mrs import (
-    plot_budget_comparison_auroc,
-    plot_budget_comparison_auroc_mean,
-    visualize_boxplot,
-)
+from utils.visualization_fw_mrs import visualize_boxplot
 import numpy as np
 
 seed = 5
@@ -70,11 +66,9 @@ def downstream_task_validation_comparison(
 
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
-    iteration_save_path = result_path / "iterations"
 
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
-    iteration_save_path.mkdir(exist_ok=True)
 
     sample_weights_list = load_weights(sample_weights_save_path)
     feature_weights_list = load_weights(feature_weights_save_path)
@@ -166,15 +160,11 @@ def downstream_task_validation_comparison(
             dropped_samples_dict[temperature].append(dropped_samples)
             auroc_dict[temperature].append(rf_auroc)
             auprc_dict[temperature].append(rf_auprc)
-        visualize_boxplot(auroc_dict, "AUROC", iteration_save_path / f"auroc_comparison_{i}")
-        visualize_boxplot(auprc_dict, "AUROC", iteration_save_path / f"auroc_comparison_{i}")
+        visualize_boxplot(auroc_dict, "AUROC", result_path / "auroc_comparison")
+        visualize_boxplot(auprc_dict, "AUPRC", result_path / "auprc_comparison")
         visualize_boxplot(
-            dropped_samples_dict, "AUROC", iteration_save_path / f"dropped_samples_comparison_{i}"
+            dropped_samples_dict, "Dropped Samples", result_path / "dropped_samples_comparison"
         )
-
-    visualize_boxplot(auroc_dict, "AUROC", "auroc_comparison_all")
-    visualize_boxplot(auprc_dict, "AUROC", "auroc_comparison_all")
-    visualize_boxplot(dropped_samples_dict, "AUROC", "dropped_samples_comparison_all")
 
 
 # save_mean_dropped_elements(result_path, dropped_samples_list_dict)

@@ -1,11 +1,7 @@
 import json
 import numpy as np
 
-from sklearn.model_selection import (
-    RepeatedStratifiedKFold,
-    StratifiedKFold,
-    train_test_split,
-)
+from sklearn.model_selection import train_test_split
 from sklearn.discriminant_analysis import StandardScaler
 
 from utils.data_loader import load_weights, save_weights
@@ -21,6 +17,7 @@ from utils.metrics import (
     compute_classification_metrics_random_forest,
     compute_metrics,
 )
+from utils.visualization_fw_mrs import visualize_boxplot
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
@@ -58,15 +55,6 @@ def downstream_tasks_experiment(
     rf_auroc_list = []
     rf_auprc_list = []
 
-    svc_auroc_list = []
-    svc_auprc_list = []
-
-    svc_auroc_list = []
-    svc_auprc_list = []
-
-    pseudo_targets_auroc_list = []
-    pseudo_targets_auprc_list = []
-
     weighted_mmds_list = []
     biases_list = []
     wasserstein_distance_list = []
@@ -89,6 +77,7 @@ def downstream_tasks_experiment(
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
     classificiation_result_path = result_path / "classification_results"
+    validation_path = result_path / "validation"
     roc_path = result_path / "rocs"
 
     result_path.mkdir(exist_ok=True)
@@ -96,6 +85,7 @@ def downstream_tasks_experiment(
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
     roc_path.mkdir(exist_ok=True)
+    validation_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weight_list = load_weights(feature_weights_save_path)
@@ -109,12 +99,10 @@ def downstream_tasks_experiment(
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]
+        dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
+        auroc_val_dict = {temperature: [] for temperature in temperatures}
+        auprc_val_dict = {temperature: [] for temperature in temperatures}
         hyperparameter_list = [0.05, 0.025, 0.0]
-    elif method_name == "fw-mrs-svm":
-        temperatures = [0.1, 0.05, 0.01, 0.005]
-        hyperparameter_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
-        splitter = "feature_weighted_best"
-        draw_with_feature_weights = True
     elif method_name == "mrs-forest":
         hyperparameter_list = [0.05, 0.025, 0.0]
         splitter = "best"
@@ -192,7 +180,6 @@ def downstream_tasks_experiment(
                 R,
                 scaler,
                 columns,
-                columns,
                 sample_weights,
                 gamma,
             )
@@ -228,47 +215,46 @@ def downstream_tasks_experiment(
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
 
-        # (
-        #     svc_auroc,
-        #     svc_auprc,
-        # ) = compute_classification_metrics_svm(
-        #     N,
-        #     T,
-        #     columns,
-        #     sample_weights,
-        #     feature_weights,
-        #     target,
-        #     random_state=seed,
-        #     draw_with_feature_weights=draw_with_feature_weights,
-        #     n_splits=10,
-        # )
+        if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+            for temperature, temperature_sample_weights in sample_weights.items():
+                temperature_feature_weights = {"tmp": feature_weights[temperature]}
+                temperature_sample_weights = {"tmp": temperature_sample_weights}
 
-        svc_auroc = 0
-        svc_auprc = 0
+                (
+                    rf_auroc_val,
+                    rf_auprc_val,
+                    best_sample_weights_val,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                ) = compute_classification_metrics_random_forest(
+                    N,
+                    R,
+                    columns,
+                    temperature_sample_weights,
+                    temperature_feature_weights,
+                    target,
+                    random_state=seed,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    splitter=splitter,
+                    n_estimators=500,
+                    n_splits=5,
+                )
 
-        # (
-        #     pseudo_targets_auroc,
-        #     pseudo_targets_auprc,
-        # ) = compute_classification_metrics_pseudo_labels(
-        #     R,
-        #     T,
-        #     columns,
-        #     best_clf,
-        #     target,
-        #     random_state=seed,
-        # )
-        pseudo_targets_auroc = 0
-        pseudo_targets_auprc = 0
+                dropped_samples_val = np.count_nonzero(
+                    np.array(best_sample_weights_val) == 0.0
+                )
+                dropped_samples_val_dict[temperature].append(dropped_samples_val)
+                auroc_val_dict[temperature].append(rf_auroc_val)
+                auprc_val_dict[temperature].append(rf_auprc_val)
 
-        pseudo_targets_auroc_list.append(pseudo_targets_auroc)
-        pseudo_targets_auprc_list.append(pseudo_targets_auprc)
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
-        svc_auroc_list.append(svc_auroc)
-        svc_auprc_list.append(svc_auprc)
 
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)
         # plot_feature_weights(feature_weights, feature_weights_save_path, i)
@@ -281,10 +267,6 @@ def downstream_tasks_experiment(
             (
                 rf_auroc_list,
                 rf_auprc_list,
-                svc_auroc_list,
-                svc_auprc_list,
-                pseudo_targets_auroc_list,
-                pseudo_targets_auprc_list,
                 dropped_samples_list,
                 abs_feature_importance_list,
                 feature_importance_list,
@@ -295,10 +277,6 @@ def downstream_tasks_experiment(
             (
                 "rf_auroc",
                 "rf_auprc",
-                "svm_auroc",
-                "svm_auprc",
-                "pseudo_target_auroc",
-                "pseudo_target_auprc",
                 "dropped_samples",
                 "abs_feature_importance",
                 "feature_importance",
@@ -325,16 +303,36 @@ def downstream_tasks_experiment(
     result_dict = write_result_dict_test_set(
         rf_auroc_list,
         rf_auprc_list,
-        svc_auroc_list,
-        svc_auprc_list,
-        pseudo_targets_auroc_list,
-        pseudo_targets_auprc_list,
         dropped_samples_list,
         len(N),
     )
 
     with open(result_path / "classification_results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
+
+    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+        visualize_boxplot(auroc_val_dict, "AUROC", validation_path / "auroc_comparison")
+        visualize_boxplot(auprc_val_dict, "AUPRC", validation_path / "auprc_comparison")
+        visualize_boxplot(
+            dropped_samples_val_dict,
+            "Dropped Samples",
+            validation_path / "dropped_samples_comparison",
+        )
+
+        for result_list, file_name in zip(
+            (
+                auroc_val_dict,
+                auprc_val_dict,
+                dropped_samples_val_dict,
+            ),
+            (
+                "auroc_val_dict",
+                "auprc_val_dict",
+                "dropped_samples_val_dict",
+            ),
+        ):
+            with open(validation_path / f"{file_name}.json", "w") as result_file:
+                result_file.write(json.dumps(result_list))
 
 
 # Used to draw radom states

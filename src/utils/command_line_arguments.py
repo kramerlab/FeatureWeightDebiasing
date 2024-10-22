@@ -2,10 +2,10 @@ import argparse
 
 from experiments import (
     temperature_comparison,
-    perform_statistical_analysis,
+    perform_statistical_analysis_mrs,
     downstream_tasks_experiment,
     fairness_tasks_experiment,
-    downstream_task_validation_comparison,
+    perform_statistical_analysis_fw_mrs,
 )
 
 
@@ -16,7 +16,6 @@ from weighting_methods import (
     feature_weighted_repeated_MRS,
     uniform_sample_weighting,
     mrs,
-    fw_MRS_SVM,
 )
 
 
@@ -26,12 +25,10 @@ sample_weighting_method_list = [
     "uniform",
     "soft-mrs-linear",
     "soft-mrs-exponential",
-    "mrs-tree",
     "mrs-forest",
     "fw-mrs-temperature",
     "fw-mrs-temperature-mean",
     "kmm",
-    "fw-mrs-svm",
 ]
 
 
@@ -155,8 +152,8 @@ def get_experiment_function(experiment_name=""):
     elif experiment_name == "temperature_comparison":
         return temperature_comparison
     elif experiment_name == "statistical_analysis":
-        return perform_statistical_analysis
+        return perform_statistical_analysis_mrs
+    elif experiment_name == "statistical_analysis_fw":
+        return perform_statistical_analysis_fw_mrs
     elif experiment_name == "fairness_task":
         return fairness_tasks_experiment
-    elif experiment_name == "downstream_task_validation":
-        return downstream_task_validation_comparison

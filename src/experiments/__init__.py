@@ -1,5 +1,5 @@
 from .downstream_tasks import downstream_tasks_experiment
 from .temperature_comparison_method_auroc import temperature_comparison
-from .statistical_analysis import perform_statistical_analysis
+from .statistical_analysis_mrs import perform_statistical_analysis_mrs
 from .fairness_experiments import fairness_tasks_experiment
-from . downstream_task_validation import downstream_task_validation_comparison
+from .statistical_analysis_fw_mrs import perform_statistical_analysis_fw_mrs

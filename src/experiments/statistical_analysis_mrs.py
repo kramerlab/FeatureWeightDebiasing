@@ -10,7 +10,7 @@ from utils.statistics import logistic_regression
 from utils.visualization import plot_statistical_analysis
 from utils.metrics import (
     calculate_rbf_gamma,
-    compute_classification_metrics_random_forest_gbs,
+    compute_classification_metrics_random_forest,
     compute_metrics,
 )
 
@@ -20,7 +20,7 @@ seed = 5
 max_int = 2**32 - 1
 
 
-def perform_statistical_analysis(
+def perform_statistical_analysis_mrs(
     df,
     columns,
     sample_weighting_method,
@@ -41,7 +41,7 @@ def perform_statistical_analysis(
     file_directory = Path(__file__).parent
     result_path = Path(
         file_directory,
-        f"../../results/statistical_analysis/{data_set_name}/{method_name}",
+        f"../../results/statistical_analysis_mrs/{data_set_name}/{method_name}",
     )
     iterations_path = result_path / "iteration"
     iterations_path.mkdir(exist_ok=True, parents=True)
@@ -98,7 +98,7 @@ def perform_statistical_analysis(
             abs_feature_importance,
             feature_importance,
             roc_curve_values,
-        ) = compute_classification_metrics_random_forest_gbs(
+        ) = compute_classification_metrics_random_forest(
             scaled_N,
             scaled_N,
             scaled_N,
@@ -133,7 +133,6 @@ def perform_statistical_analysis(
             scaled_N[columns].copy(),
             scaled_R[columns].copy(),
             scaler,
-            columns,
             columns,
             sample_weights,
             gamma,

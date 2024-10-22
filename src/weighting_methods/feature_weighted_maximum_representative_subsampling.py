@@ -7,7 +7,6 @@ from sklearn.model_selection import (
     KFold,
     StratifiedKFold,
 )
-from sklearn.ensemble import RandomForestClassifier
 from utils.metrics import (
     calculate_feature_importance,
     compute_feature_weights_with_temperature,
@@ -95,7 +94,7 @@ def mrs_without_cv(
     R,
     columns,
     n_drop: int = 1,
-    class_weight="balanced",
+    class_weight=None,
     random_state=None,
     feature_weights=None,
     *args,
@@ -158,7 +157,7 @@ def feature_weighted_repeated_MRS(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=2,
+    n_pu_splits=3,
     hyperparameter_list=[],
     mean=False,
     return_metrics=False,
@@ -367,8 +366,10 @@ def initialize_dictionaries(
 
         if mean:
             target_importance = compute_target_importances(
-                pd.concat([N, R]), columns, target, random_state, n_pu_splits
+                N, columns, target, random_state, n_pu_splits, hyperparameter
             )
+            target_importance = target_importance / np.sum(target_importance)
+            abs_feature_importance = abs_feature_importance / np.sum(abs_feature_importance)
             abs_feature_importance = np.mean(
                 [abs_feature_importance, target_importance], axis=0
             )
@@ -381,24 +382,29 @@ def initialize_dictionaries(
             )
 
 
-def compute_target_importances(X, columns, target, random_state, n_splits):
-    clf = RandomForestClassifier(
-        n_jobs=-1,
-        random_state=random_state,
-        class_weight="balanced",
-    )
+def compute_target_importances(
+    X, columns, target, random_state, n_splits, hyperparameter
+):
     abs_feature_importance_list = []
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for train_indices, test_indices in skf.split(X, X[target]):
-        train = X.iloc[train_indices]
-        test = X.iloc[test_indices]
-        clf.fit(train[columns], train[target])
+    for train_indices_N, test_indices_N in skf.split(X, X[target]):
+        X_train, X_test = (
+            X.iloc[train_indices_N],
+            X.iloc[test_indices_N],
+        )
+        clf = train_pu_classifier(
+            X_train[columns],
+            X_train[target],
+            random_state=random_state,
+            splitter="best",
+            hyperparameter=hyperparameter,
+        )
+
         abs_feature_importance = calculate_feature_importance(
-            test_N=test[columns].values,
+            test_N=X_test[columns].values,
             clf=clf,
-            background=train[columns],
+            background=X_train[columns],
         )
         abs_feature_importance_list.append(abs_feature_importance)
 
-    abs_mean_feature_importance = np.nanmean(abs_feature_importance_list, axis=0)
-    return -abs_mean_feature_importance
+    return np.nanmean(abs_feature_importance_list, axis=0)

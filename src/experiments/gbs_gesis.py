@@ -32,8 +32,7 @@ def gbs_gesis_experiment(
     df = df.sample(frac=1)
     mmd_list = []
     mean_list = []
-    scale_columns = columns
-    scaled_df, scaler = scale_df(df, scale_columns)
+    scaled_df, scaler = scale_df(df, columns)
 
     gamma = calculate_rbf_gamma(scaled_df[columns])
 
@@ -59,16 +58,14 @@ def gbs_gesis_experiment(
     ) = compute_metrics(
         scaled_N[columns],
         scaled_R[columns],
-        sample_weights,
         scaler,
-        scale_columns,
+        sample_weights,
         columns,
         gamma,
     )
 
     remaining_samples = np.count_nonzero(sample_weights != 0)
     plot_sample_weights(sample_weights, visualisation_path, 0, "GBS")
-
 
     result_dict = {
         "MMDs": weighted_mmd,

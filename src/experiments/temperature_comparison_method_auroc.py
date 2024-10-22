@@ -46,7 +46,7 @@ def temperature_comparison(
     """
 
     temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
-    hyperparameter_list = [0.0]
+    hyperparameter_list = [0.025]
     mean = True if method_name == "fw-mrs-temperature-mean" else False
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
 

@@ -17,11 +17,9 @@ from utils.metrics import (
     calculate_mean_roc,
     calculate_rbf_gamma,
     compute_relative_bias,
-    compute_test_metrics_mrs,
     interpolate_roc,
     train_pu_classifier_mrs,
     weighted_maximum_mean_discrepancy,
-    train_tree_classifier_mrs,
 )
 
 # Used to draw random states
@@ -150,7 +148,7 @@ def mrs(
     return_metrics=False,
     compute_bias=True,
     target=None,
-    n_pu_splits=2,
+    n_pu_splits=3,
     drop=1,
     random_generator=None,
     hyperparameter_list=[0.0],

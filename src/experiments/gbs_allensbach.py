@@ -40,8 +40,7 @@ def gbs_allensbach_experiment(
     biases_list = []
     wasserstein_parameter_list = []
     remaining_samples_list = []
-    scale_columns = columns
-    scaled_df, scaler = scale_df(df, scale_columns)
+    scaled_df, scaler = scale_df(df, columns)
 
     gamma = calculate_rbf_gamma(scaled_df[columns])
 
@@ -66,7 +65,7 @@ def gbs_allensbach_experiment(
             sample_biases,
             wasserstein_distances,
         ) = compute_metrics(
-            scaled_N, scaled_R, weights, scaler, scale_columns, columns, gamma
+            scaled_N, scaled_R, scaler, weights, columns, gamma
         )
 
         plot_sample_weights(weights, result_path / "weights", i)

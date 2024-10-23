@@ -306,6 +306,7 @@ def load_weights(path, file_name="weights"):
     if weight_file.is_file():
         with open(weight_file, "r") as file:
             weights = json.load(file)
+        weights = {int(k):v for k,v in weights.items()}
     else:
         weights = []
     return weights

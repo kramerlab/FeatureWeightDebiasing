@@ -108,6 +108,16 @@ def downstream_tasks_experiment(
         splitter = "best"
         draw_with_feature_weights = False
         temperatures = None
+    elif method_name == "psa":
+        splitter = "best"
+        draw_with_feature_weights = False
+        temperatures = None
+        hyperparameter_list = [1e-1, 1e0, 1e1]
+    elif method_name == "kmm":
+        splitter = "best"
+        draw_with_feature_weights = False
+        temperatures = None
+        hyperparameter_list = []
     else:
         splitter = "best"
         draw_with_feature_weights = False
@@ -166,7 +176,7 @@ def downstream_tasks_experiment(
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
 
-        if method_name == "mrs-forest":
+        if method_name in ("mrs-forest", "psa", "kmm"):
             sample_weights = {0.0: sample_weights}
             feature_weights = {0.0: feature_weights}
 

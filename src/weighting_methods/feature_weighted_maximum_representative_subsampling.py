@@ -245,7 +245,6 @@ def feature_weighted_repeated_MRS(
                     sample_weights=sample_weights_dict[temperature][hyperparameter],
                     hyperparameter=hyperparameter,
                 )
-
                 feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)
                 auc_difference = abs(auroc - 0.5)
 

@@ -170,15 +170,15 @@ def downstream_tasks_experiment(
                 compute_bias=False,
             )
 
+            if method_name in ("mrs-forest", "psa"):
+                sample_weights = {0.0: sample_weights}
+                feature_weights = {0.0: feature_weights}
+
             feature_weight_list.append(feature_weights)
             sample_weight_list.append(sample_weights)
 
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
-
-        if method_name in ("mrs-forest", "psa", "kmm"):
-            sample_weights = {0.0: sample_weights}
-            feature_weights = {0.0: feature_weights}
 
         if method_name not in (
             "fw-mrs-svm",
@@ -251,14 +251,15 @@ def downstream_tasks_experiment(
                     splitter=splitter,
                     n_estimators=500,
                     n_splits=5,
+                    compute_feature_importance=False,
                 )
 
                 dropped_samples_val = np.count_nonzero(
                     np.array(best_sample_weights_val) == 0.0
                 )
-                dropped_samples_val_dict[temperature].append(dropped_samples_val)
-                auroc_val_dict[temperature].append(rf_auroc_val)
-                auprc_val_dict[temperature].append(rf_auprc_val)
+                dropped_samples_val_dict[float(temperature)].append(dropped_samples_val)
+                auroc_val_dict[float(temperature)].append(rf_auroc_val)
+                auprc_val_dict[float(temperature)].append(rf_auprc_val)
 
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)

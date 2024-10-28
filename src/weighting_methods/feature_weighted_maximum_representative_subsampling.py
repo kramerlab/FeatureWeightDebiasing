@@ -370,7 +370,7 @@ def initialize_dictionaries(
             target_importance = target_importance / np.sum(target_importance)
             abs_feature_importance = abs_feature_importance / np.sum(abs_feature_importance)
             abs_feature_importance = np.mean(
-                [abs_feature_importance, target_importance], axis=0
+                [abs_feature_importance, -target_importance], axis=0
             )
 
         for temperature in budgets:

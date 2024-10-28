@@ -500,8 +500,11 @@ def train_random_forest_classifier(
     :param n_splits: Number of cross-validation iterations, defaults to 5
     :return: Trained classifier
     """
-    if np.sum(y) < n_splits:
-        n_splits = np.sum(y)
+    target_sum = np.sum(y)
+    if target_sum < n_splits:
+        n_splits = target_sum
+    elif (len(y) - target_sum) < n_splits:
+        n_splits = (len(y) - target_sum)
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)

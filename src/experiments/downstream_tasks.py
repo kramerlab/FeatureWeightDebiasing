@@ -345,6 +345,14 @@ def downstream_tasks_experiment(
             with open(validation_path / f"{file_name}.json", "w") as result_file:
                 result_file.write(json.dumps(result_list))
 
+        dropped_samples_val_results_dict = {}
+        for temperature in dropped_samples_val_dict.keys():
+            dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(dropped_samples_val_dict[temperature])
+            dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(dropped_samples_val_dict[temperature])
+
+        with open(result_path / "dropped_elements.json", "w") as result_file:
+            result_file.write(json.dumps(dropped_samples_val_results_dict))
+
 
 # Used to draw radom states
 max_int = 2**32 - 1

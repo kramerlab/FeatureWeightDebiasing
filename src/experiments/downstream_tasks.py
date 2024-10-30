@@ -1,7 +1,6 @@
 import json
 import numpy as np
 
-from sklearn.model_selection import train_test_split
 from sklearn.discriminant_analysis import StandardScaler
 
 from utils.data_loader import load_weights, save_weights
@@ -10,7 +9,7 @@ from utils.statistics import (
     write_result_dict,
     write_result_dict_test_set,
 )
-from utils.sampling import sample_N
+from utils.sampling import repeated_train_val_test_split, sample_N
 from utils.visualization import plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
@@ -381,59 +380,3 @@ def downstream_tasks_experiment(
 
         with open(result_path / "dropped_elements.json", "w") as result_file:
             result_file.write(json.dumps(dropped_samples_val_results_dict))
-
-
-# Used to draw radom states
-max_int = 2**32 - 1
-
-
-def repeated_train_val_test_split(
-    n_cv_splits, n_cv_repeats, df, target, random_generator
-):
-    for _ in range(n_cv_repeats):
-        train_val_samples, test_samples, train_val_y, _ = train_test_split(
-            df,
-            target,
-            random_state=random_generator.randint(max_int),
-            stratify=target,
-            test_size=(1 / n_cv_splits),
-        )
-        train_samples, val_samples, _, _ = train_test_split(
-            train_val_samples,
-            train_val_y,
-            stratify=train_val_y,
-            random_state=random_generator.randint(max_int),
-            test_size=0.5,
-        )
-
-        min_samples = np.min(
-            [
-                len(sample_list)
-                for sample_list in (
-                    train_samples.values,
-                    val_samples.values,
-                    test_samples.values,
-                )
-            ]
-        )
-
-        train_samples = train_samples.iloc[:min_samples].copy()
-        val_samples = val_samples.iloc[:min_samples].copy()
-        test_samples = test_samples.iloc[:min_samples].copy()
-        splits_list = [
-            train_samples,
-            val_samples,
-            test_samples,
-        ]
-        
-        train_index = -1
-        val_index = 0
-        test_index = 1
-        for _ in range(n_cv_splits):
-            train_index = (train_index + 1) % n_cv_splits
-            val_index = (val_index + 1) % n_cv_splits
-            test_index = (test_index + 1) % n_cv_splits
-
-            yield splits_list[train_index], splits_list[val_index], splits_list[
-                test_index
-            ]

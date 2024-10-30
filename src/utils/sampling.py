@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 seed = 5
 
@@ -180,3 +181,30 @@ def sample_class_biased_N(
     )
 
     return N
+
+
+def repeated_train_val_test_split(
+    n_cv_splits, n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+    for _ in range(n_cv_repeats):
+        skf = StratifiedKFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(df, target_values):
+            train_val_samples = df.iloc[train_val_index].copy()
+            train_val_target_values = target_values.iloc[train_val_index]
+            test_samples = df.iloc[test_index].copy()
+
+            train_samples, val_samples, _, _ = train_test_split(
+                train_val_samples,
+                train_val_target_values,
+                stratify=train_val_target_values,
+                random_state=random_generator.randint(max_int),
+                test_size=0.5,
+            )
+
+            yield train_samples, val_samples, test_samples

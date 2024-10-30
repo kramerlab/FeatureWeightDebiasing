@@ -4,7 +4,6 @@ from pathlib import Path
 from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
 from utils.visualization import (
     plot_statistical_analysis,
-    plot_results_with_variance,
     plot_sample_weights,
 )
 

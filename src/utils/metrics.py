@@ -198,15 +198,13 @@ def compute_metrics(
                     )
                     wasserstein_distances.append(wasserstein_distance_value)
 
-                sample_biases = compute_relative_bias(scaled_N, scaled_R, sample_weights)
+                sample_biases = compute_relative_bias(
+                    scaled_N, scaled_R, sample_weights
+                )
                 unscaled_N = scaled_N.copy()
                 unscaled_R = scaled_R.copy()
-                unscaled_N[columns] = scaler.inverse_transform(
-                    scaled_N[columns]
-                )
-                unscaled_R[columns] = scaler.inverse_transform(
-                    scaled_R[columns]
-                )
+                unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
+                unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
                 sample_biases = compute_relative_bias(
                     unscaled_N, unscaled_R, sample_weights
                 )
@@ -323,7 +321,7 @@ def compute_classification_metrics_random_forest(
         )
         best_hyperparameter = None
         best_weights = sample_weights_list
-    
+
     if best_clf is not None:
         y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
         fpr, tpr, _ = roc_curve(T[label], y_predictions)
@@ -504,7 +502,7 @@ def train_random_forest_classifier(
     if target_sum < n_splits:
         n_splits = target_sum
     elif (len(y) - target_sum) < n_splits:
-        n_splits = (len(y) - target_sum)
+        n_splits = len(y) - target_sum
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
@@ -780,3 +778,26 @@ def train_random_forest_classifier_fairness(
         )
 
     return grid_cv
+
+
+def train_svm_pu_classifier(
+    X,
+    y,
+    random_state=None,
+    C=1,
+):
+    """Train the positive unlabeled classifier
+
+    :param X_train: Training features
+    :param y_train: Training target
+    :param class_weight: Sample weights, defaults to "balanced"
+    :return: Trained positive unlabeled classifier
+    """
+    clf = LinearSVC(dual="auto", random_state=random_state, C=C)
+
+    clf.fit(
+        X,
+        y,
+    )
+
+    return clf

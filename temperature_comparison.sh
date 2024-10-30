@@ -1,7 +1,7 @@
 N_CV_REPEATS=10
 DROP=3
 
-for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature fw-mrs-temperature-mean
+for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature fw-mrs-temperature-mean fw-mrs-temperature-svm
 do
         for DATASET in folktables_income folktables_employment  
         do

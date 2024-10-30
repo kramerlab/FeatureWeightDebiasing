@@ -6,8 +6,6 @@ from tqdm import trange
 
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.model_selection import (
-    RepeatedKFold,
-    RepeatedStratifiedKFold,
     StratifiedKFold,
     KFold,
 )

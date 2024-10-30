@@ -103,16 +103,27 @@ def downstream_tasks_experiment(
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         hyperparameter_list = [0.05, 0.025, 0.0]
+    if method_name == "fw-mrs-temperature-svm":
+        splitter = "feature_weighted_best"
+        draw_with_feature_weights = True
+        temperatures = [0.1, 0.05, 0.01, 0.005]
+        dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
+        auroc_val_dict = {temperature: [] for temperature in temperatures}
+        auprc_val_dict = {temperature: [] for temperature in temperatures}
+        hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
     elif method_name == "mrs-forest":
         hyperparameter_list = [0.05, 0.025, 0.0]
         splitter = "best"
         draw_with_feature_weights = False
         temperatures = None
+        dropped_samples_val_dict = {0.0: []}
+        auroc_val_dict = {0.0: []}
+        auprc_val_dict = {0.0: []}
     elif method_name == "psa":
         splitter = "best"
         draw_with_feature_weights = False
         temperatures = None
-        hyperparameter_list = [1e-1, 1e0, 1e1]
+        hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
     elif method_name == "kmm":
         splitter = "best"
         draw_with_feature_weights = False
@@ -181,7 +192,6 @@ def downstream_tasks_experiment(
             save_weights(feature_weights_save_path, feature_weight_list)
 
         if method_name not in (
-            "fw-mrs-svm",
             "fw-mrs-temperature",
             "fw-mrs-temperature-mean",
         ):
@@ -225,7 +235,12 @@ def downstream_tasks_experiment(
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
 
-        if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+        if method_name in (
+            "fw-mrs-temperature",
+            "fw-mrs-temperature-mean",
+            "mrs-forest",
+            "fw-mrs-temperature-svm",
+        ):
             for temperature, temperature_sample_weights in sample_weights.items():
                 temperature_feature_weights = {"tmp": feature_weights[temperature]}
                 temperature_sample_weights = {"tmp": temperature_sample_weights}
@@ -321,7 +336,11 @@ def downstream_tasks_experiment(
     with open(result_path / "classification_results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
 
-    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+    if method_name in (
+        "fw-mrs-temperature",
+        "fw-mrs-temperature-mean",
+        "fw-mrs-temperature-svm",
+    ):
         visualize_boxplot(auroc_val_dict, "AUROC", validation_path / "auroc_comparison")
         visualize_boxplot(auprc_val_dict, "AUPRC", validation_path / "auprc_comparison")
         visualize_boxplot(
@@ -345,10 +364,20 @@ def downstream_tasks_experiment(
             with open(validation_path / f"{file_name}.json", "w") as result_file:
                 result_file.write(json.dumps(result_list))
 
+    if method_name in (
+        "fw-mrs-temperature",
+        "fw-mrs-temperature-mean",
+        "mrs-forest",
+        "fw-mrs-temperature-svm",
+    ):
         dropped_samples_val_results_dict = {}
         for temperature in dropped_samples_val_dict.keys():
-            dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(dropped_samples_val_dict[temperature])
-            dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(dropped_samples_val_dict[temperature])
+            dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(
+                dropped_samples_val_dict[temperature]
+            )
+            dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(
+                dropped_samples_val_dict[temperature]
+            )
 
         with open(result_path / "dropped_elements.json", "w") as result_file:
             result_file.write(json.dumps(dropped_samples_val_results_dict))
@@ -367,7 +396,7 @@ def repeated_train_val_test_split(
             target,
             random_state=random_generator.randint(max_int),
             stratify=target,
-            test_size=(1 / 3),
+            test_size=(1 / n_cv_splits),
         )
         train_samples, val_samples, _, _ = train_test_split(
             train_val_samples,
@@ -396,6 +425,7 @@ def repeated_train_val_test_split(
             val_samples,
             test_samples,
         ]
+        
         train_index = -1
         val_index = 0
         test_index = 1

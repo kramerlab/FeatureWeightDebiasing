@@ -4,7 +4,7 @@ from experiments.downstream_tasks import load_weights, repeated_train_val_test_s
 from utils.data_loader import save_weights
 from utils.statistics import create_result_path
 from utils.sampling import sample_N
-from utils.metrics import scale_df
+from utils.metrics import compute_classification_metrics_random_forest, scale_df
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
     plot_budget_comparison_auroc_mean,
@@ -44,9 +44,12 @@ def temperature_comparison(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-
-    temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
-    hyperparameter_list = [0.025]
+    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+        temperatures = [0.1, 0.05, 0.01, 0.005]
+        hyperparameter_list = [0.05, 0.025, 0.0]
+    if method_name == "fw-mrs-temperature-svm":
+        temperatures = [0.1, 0.05, 0.01, 0.005]
+        hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
     mean = True if method_name == "fw-mrs-temperature-mean" else False
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
 
@@ -123,12 +126,39 @@ def temperature_comparison(
                     mean=mean,
                 )
             )
-            random_forest_feature_weighted_aurocs = {
-                temperature: random_forest_feature_weighted_aurocs[temperature][
-                    hyperparameter_list[0]
-                ]
-                for temperature in temperatures
-            }
+            for temperature, temperature_sample_weights in sample_weights.items():
+                temperature_feature_weights = {"tmp": feature_weights[temperature]}
+                temperature_sample_weights = {"tmp": temperature_sample_weights}
+
+                (
+                    _,
+                    _,
+                    best_sample_weights_val,
+                    _,
+                    _,
+                    _,
+                    best_hyperparameter,
+                    _,
+                ) = compute_classification_metrics_random_forest(
+                    N,
+                    R,
+                    columns,
+                    temperature_sample_weights,
+                    temperature_feature_weights,
+                    target,
+                    random_state=seed,
+                    draw_with_feature_weights=True,
+                    splitter="feature_weighted_best",
+                    n_estimators=500,
+                    n_splits=5,
+                    compute_feature_importance=False,
+                )
+
+                random_forest_feature_weighted_aurocs[temperature] = (
+                    random_forest_feature_weighted_aurocs[temperature][
+                        best_hyperparameter
+                    ]
+                )
 
             feature_weights_list.append(feature_weights)
             sample_weights_list.append(sample_weights)
@@ -159,7 +189,7 @@ def temperature_comparison(
 
     with open(result_path / "dropped_elements.json", "w") as result_file:
         result_file.write(json.dumps(dropped_samples_dict))
-        
+
     plot_budget_comparison_auroc_mean(
         feature_weighted_aurocs_list,
         number_of_samples_list,

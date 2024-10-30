@@ -83,7 +83,8 @@ def plot_budget_comparison_auroc_mean(
     for i, budget in enumerate(auroc_list_of_dictionaries[0].keys()):
         auroc_list = []
         for dictionary in auroc_list_of_dictionaries:
-            auroc_list.append(dictionary[budget][:min_length])
+            dictionary = {float(k): v for k, v in dictionary.items()}
+            auroc_list.append(dictionary[float(budget)][:min_length])
         mean_aurocs = np.mean(auroc_list, axis=0)
         std_aurocs = np.std(auroc_list, axis=0)
         ratio_upper = mean_aurocs + std_aurocs

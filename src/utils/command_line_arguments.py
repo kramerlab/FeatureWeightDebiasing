@@ -16,6 +16,7 @@ from weighting_methods import (
     feature_weighted_repeated_MRS,
     uniform_sample_weighting,
     mrs,
+    fw_MRS_SVM,
 )
 
 
@@ -28,6 +29,7 @@ sample_weighting_method_list = [
     "mrs-forest",
     "fw-mrs-temperature",
     "fw-mrs-temperature-mean",
+    "fw-mrs-temperature-svm",
     "kmm",
 ]
 
@@ -135,7 +137,7 @@ def get_sample_weighting_function(method_name):
         return mrs
     elif method_name == "kmm":
         return kernel_mean_matching
-    elif method_name == "fw-mrs-svm":
+    elif method_name == "fw-mrs-temperature-svm":
         return fw_MRS_SVM
     elif method_name == "fw-mrs-temperature-mean":
         return feature_weighted_repeated_MRS

@@ -3,12 +3,10 @@ import shap
 import numpy as np
 from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import pdist
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import rbf_kernel
 
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     roc_curve,
@@ -16,7 +14,8 @@ from sklearn.metrics import (
     roc_curve,
     average_precision_score,
 )
-from sklearn.svm import SVC, LinearSVC
+from sklearn.svm import LinearSVC
+from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
 
 def compute_weighted_means(N, weights):
@@ -178,7 +177,7 @@ def compute_metrics(
         best_sample_biases = np.inf
         best_wasserstein_distances = np.inf
         for temperature in sample_weights_list.keys():
-            for hyperparameter, sample_weights in sample_weights_list[
+            for _, sample_weights in sample_weights_list[
                 temperature
             ].items():
                 wasserstein_distances = []
@@ -349,56 +348,6 @@ def compute_classification_metrics_random_forest(
     )
 
 
-def train_tree_classifier_mrs(
-    X_train, y_train, speedup=True, n_splits=10, random_state=None
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param cv: Number of cross-validation iterations, defaults to 3
-    :return: Trained classifier
-    """
-    clf = DecisionTreeClassifier(random_state=np.random.RandomState(random_state))
-    path = clf.cost_complexity_pruning_path(
-        X_train,
-        y_train,
-    )
-    ccp_alphas = path.ccp_alphas
-    ccp_alphas[ccp_alphas < 0] = 0
-    ccp_alphas_unique = np.unique(ccp_alphas)
-
-    if speedup:
-        if len(ccp_alphas_unique) > 10:
-            shortened_ccp_alphas_unique = ccp_alphas_unique[0::10]
-            ccp_alphas_unique = np.append(
-                ccp_alphas_unique[-10:], shortened_ccp_alphas_unique
-            )
-            ccp_alphas_unique = np.unique(ccp_alphas_unique)
-
-    param_grid = {"ccp_alpha": ccp_alphas_unique}
-    cv = StratifiedKFold(
-        n_splits=n_splits,
-        shuffle=True,
-        random_state=np.random.RandomState(random_state),
-    )
-    grid = GridSearchCV(
-        clf,
-        param_grid=param_grid,
-        cv=cv,
-        n_jobs=-1,
-        refit=True,
-        scoring="roc_auc",
-    )
-
-    return grid.fit(
-        X_train,
-        y_train,
-    )
-
-
 def train_pu_classifier(
     X,
     y,
@@ -503,7 +452,9 @@ def train_random_forest_classifier(
         n_splits = target_sum
     elif (len(y) - target_sum) < n_splits:
         n_splits = len(y) - target_sum
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    if n_splits == 1:
+        n_splits = 2
+    skf = StratifiedKFold(n_splits=int(n_splits), shuffle=True, random_state=random_state)
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
     param_grid = {
@@ -539,55 +490,6 @@ def train_random_forest_classifier(
     )
 
     return grid_cv, grid_cv.best_score_
-
-
-def train_svc(
-    X,
-    y,
-    sample_weights,
-    feature_weights=None,
-    n_splits=5,
-    draw_with_feature_weights=False,
-    random_state=None,
-    **kwargs,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 5
-    :return: Trained classifier
-    """
-
-    if draw_with_feature_weights:
-        X = X * feature_weights
-
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    param_grid = {
-        "kernel": ["linear", "rbf"],
-        "C": [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e2],
-    }
-    clf = SVC(
-        random_state=random_state,
-    )
-    grid_cv = GridSearchCV(
-        clf,
-        param_grid,
-        cv=skf,
-        n_jobs=-1,
-        scoring="roc_auc",
-        refit=True,
-    )
-
-    grid_cv.fit(
-        X,
-        y,
-        sample_weight=sample_weights,
-    )
-
-    return grid_cv.best_estimator_, grid_cv.best_score_
 
 
 def calculate_mean_rocs(rocs):
@@ -642,9 +544,6 @@ def calculate_feature_importance(test_N, clf, background=None):
     abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
 
     return abs_feature_importance
-
-
-from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
 
 def compute_classification_metrics_random_forest_fairness(

@@ -72,7 +72,7 @@ def gbs_allensbach_experiment(
         remaining_samples = np.count_nonzero(weights != 0)
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(sample_biases)
+        biases_list.append(sample_biases.drop(["label"]))
         wasserstein_parameter_list.append(wasserstein_distances)
         remaining_samples_list.append(remaining_samples)
 

@@ -5,7 +5,6 @@ from experiments import (
     perform_statistical_analysis_mrs,
     downstream_tasks_experiment,
     fairness_tasks_experiment,
-    perform_statistical_analysis_fw_mrs,
     decomposition_experiment,
 )
 
@@ -23,15 +22,15 @@ from weighting_methods import (
 
 # Possible weighting methods
 sample_weighting_method_list = [
-    "psa",
     "uniform",
+    "mrs-forest",
     "soft-mrs-linear",
     "soft-mrs-exponential",
-    "mrs-forest",
     "fw-mrs-temperature",
     "fw-mrs-temperature-mean",
     "fw-mrs-temperature-svm",
     "kmm",
+    "psa",
 ]
 
 
@@ -52,14 +51,6 @@ dataset_list = [
     "folktables_income",
     "folktables_employment",
     "breast_cancer",
-    "hr_analytics",
-    "loan_prediction",
-]
-
-down_stream_data_sets = [
-    "breast_cancer",
-    "folktables_employment",
-    "folktables_income",
     "hr_analytics",
     "loan_prediction",
 ]
@@ -132,16 +123,14 @@ def get_sample_weighting_function(method_name):
         return propensity_score_adjustment
     elif method_name in ("soft-mrs-linear", "soft-mrs-exponential"):
         return soft_mrs_weighting
-    elif method_name in ("fw-mrs-temperature", "fw-mrs-budget"):
+    elif method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
         return feature_weighted_repeated_MRS
-    elif method_name in ("mrs-tree", "mrs-forest"):
+    elif method_name == "mrs-forest":
         return mrs
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "fw-mrs-temperature-svm":
         return fw_MRS_SVM
-    elif method_name == "fw-mrs-temperature-mean":
-        return feature_weighted_repeated_MRS
 
 
 def get_experiment_function(experiment_name=""):
@@ -156,7 +145,7 @@ def get_experiment_function(experiment_name=""):
         return temperature_comparison
     elif experiment_name == "statistical_analysis":
         return perform_statistical_analysis_mrs
-    elif experiment_name == "statistical_analysis_fw":
-        return perform_statistical_analysis_fw_mrs
     elif experiment_name == "fairness_task":
         return fairness_tasks_experiment
+    elif experiment_name == "decomposition":
+        return decomposition_experiment

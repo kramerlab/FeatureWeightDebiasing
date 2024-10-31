@@ -10,7 +10,7 @@ from sklearn.model_selection import (
     RepeatedStratifiedKFold,
 )
 import pandas as pd
-from sklearn.discriminant_analysis import StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 from utils.data_loader import load_weights, save_weights
 from utils.metrics import compute_classification_metrics_random_forest_fairness

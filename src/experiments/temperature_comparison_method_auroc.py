@@ -4,12 +4,13 @@ from experiments.downstream_tasks import load_weights
 from utils.data_loader import save_weights
 from utils.statistics import create_result_path
 from utils.sampling import sample_N, repeated_train_val_test_split
-from utils.metrics import compute_classification_metrics_random_forest, scale_df
+from utils.metrics import compute_classification_metrics_random_forest
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
     plot_budget_comparison_auroc_mean,
 )
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
@@ -75,22 +76,24 @@ def temperature_comparison(
     sample_weights_list = load_weights(sample_weights_save_path)
     feature_weights_list = load_weights(feature_weights_save_path)
 
-    sample_df, _ = scale_df(df, columns)
     number_of_samples_list = []
+    scaler = StandardScaler()
 
     if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-        N = sample_df[sample_df["label"] == 1]
-        R = sample_df[sample_df["label"] == 0]
+        N = df[df["label"] == 1]
+        R = df[df["label"] == 0]
 
     for i, (N, R, _) in enumerate(
         repeated_train_val_test_split(
             n_cv_splits,
             n_cv_repeats,
-            sample_df,
-            sample_df[target],
+            df,
+            df[target],
             sampling_random_generator,
         )
     ):
+        N[columns] = scaler.fit_transform(N[columns])
+        R[columns] = scaler.transform(R[columns])
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             N = sample_N(
                 train=N,
@@ -133,7 +136,7 @@ def temperature_comparison(
                 (
                     _,
                     _,
-                    best_sample_weights_val,
+                    _,
                     _,
                     _,
                     _,

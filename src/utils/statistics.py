@@ -33,6 +33,7 @@ def write_result_dict(
     columns,
     weighted_mmds_list,
     biases_list,
+    wasserstein_distance_list,
 ):
     """Creates the result dictionary
 
@@ -48,18 +49,25 @@ def write_result_dict(
     """
     result_dict = {
         "MMDs": {
-            "mean": np.mean(weighted_mmds_list),
-            "sd": np.std(weighted_mmds_list),
+            "mean": np.nanmean(weighted_mmds_list),
+            "sd": np.nanstd(weighted_mmds_list),
         },
     }
 
     mean_biases = np.nanmean(biases_list, axis=0)
     sd_biases = np.nanstd(biases_list, axis=0)
 
+    mean_wasserstein_distances = np.mean(wasserstein_distance_list, axis=0)
+    mean_wasserstein_distances = np.std(wasserstein_distance_list, axis=0)
+
     for index, column in enumerate(columns):
         result_dict[f"{column}_relative_bias"] = {
             "bias mean": mean_biases[index],
             "bias sd": sd_biases[index],
+        }
+        result_dict[f"{column}_wasserstein_distance"] = {
+            "bias mean": mean_wasserstein_distances[index],
+            "bias sd": mean_wasserstein_distances[index],
         }
 
     return result_dict

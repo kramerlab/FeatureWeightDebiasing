@@ -2,5 +2,4 @@ from .downstream_tasks import downstream_tasks_experiment
 from .temperature_comparison_method_auroc import temperature_comparison
 from .statistical_analysis_mrs import perform_statistical_analysis_mrs
 from .fairness_experiments import fairness_tasks_experiment
-from .statistical_analysis_fw_mrs import perform_statistical_analysis_fw_mrs
 from .bias_variance_decomposition_experiments import decomposition_experiment

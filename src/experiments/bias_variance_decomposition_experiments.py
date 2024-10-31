@@ -1,9 +1,10 @@
 import json
 import numpy as np
 
-from sklearn.discriminant_analysis import StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 from utils.data_loader import load_weights, save_weights
+from utils.parameter import set_parameter
 from utils.statistics import (
     create_result_path,
     write_result_dict,
@@ -90,49 +91,16 @@ def decomposition_experiment(
     feature_weight_list = load_weights(feature_weights_save_path)
 
     scaler = StandardScaler()
-    scaler = scaler.fit(df[columns])
-    df[columns] = scaler.transform(df[columns])
-    sample_df = df.copy()
 
-    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
-        splitter = "feature_weighted_best"
-        draw_with_feature_weights = True
-        temperatures = [0.1, 0.05, 0.01, 0.005]
-        dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
-        auroc_val_dict = {temperature: [] for temperature in temperatures}
-        auprc_val_dict = {temperature: [] for temperature in temperatures}
-        hyperparameter_list = [0.05, 0.025, 0.0]
-    if method_name == "fw-mrs-temperature-svm":
-        splitter = "feature_weighted_best"
-        draw_with_feature_weights = True
-        temperatures = [0.1, 0.05, 0.01, 0.005]
-        dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
-        auroc_val_dict = {temperature: [] for temperature in temperatures}
-        auprc_val_dict = {temperature: [] for temperature in temperatures}
-        hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
-    elif method_name == "mrs-forest":
-        hyperparameter_list = [0.05, 0.025, 0.0]
-        splitter = "best"
-        draw_with_feature_weights = False
-        temperatures = None
-        dropped_samples_val_dict = {0.0: []}
-        auroc_val_dict = {0.0: []}
-        auprc_val_dict = {0.0: []}
-    elif method_name == "psa":
-        splitter = "best"
-        draw_with_feature_weights = False
-        temperatures = None
-        hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
-    elif method_name == "kmm":
-        splitter = "best"
-        draw_with_feature_weights = False
-        temperatures = None
-        hyperparameter_list = []
-    else:
-        splitter = "best"
-        draw_with_feature_weights = False
-        temperatures = None
-        hyperparameter_list = []
+    (
+        splitter,
+        draw_with_feature_weights,
+        temperatures,
+        dropped_samples_val_dict,
+        auroc_val_dict,
+        auprc_val_dict,
+        hyperparameter_list,
+    ) = set_parameter(method_name)
 
     mean = True if method_name == "fw-mrs-temperature-mean" else False
 
@@ -140,11 +108,14 @@ def decomposition_experiment(
         repeated_train_val_test_split(
             n_cv_splits,
             n_cv_repeats,
-            sample_df,
-            sample_df[target],
+            df,
+            df[target],
             sampling_random_generator,
         )
     ):
+        N[columns] = scaler.fit_transform(N[columns])
+        R[columns] = scaler.transform(R[columns])
+        T[columns] = scaler.transform(T[columns])
         N = sample_N(
             train=N,
             bias_type=bias_type,
@@ -276,7 +247,7 @@ def decomposition_experiment(
                 auprc_val_dict[float(temperature)].append(rf_auprc_val)
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(relative_bias)
+        biases_list.append(relative_bias.drop(["label"]))
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
@@ -319,6 +290,7 @@ def decomposition_experiment(
         N.drop(["label"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
+        wasserstein_distance_list,
     )
 
     with open(result_path / "similarity_results.json", "w") as result_file:

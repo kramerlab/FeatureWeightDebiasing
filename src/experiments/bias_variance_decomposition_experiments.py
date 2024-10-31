@@ -22,7 +22,7 @@ seed = 5
 sampling_random_generator = np.random.RandomState(seed)
 
 
-def downstream_tasks_experiment(
+def decomposition_experiment(
     df,
     columns,
     sample_weighting_method,
@@ -237,8 +237,8 @@ def downstream_tasks_experiment(
         if method_name in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-mean",
-            "fw-mrs-temperature-svm",
             "mrs-forest",
+            "fw-mrs-temperature-svm",
         ):
             for temperature, temperature_sample_weights in sample_weights.items():
                 temperature_feature_weights = {"tmp": feature_weights[temperature]}

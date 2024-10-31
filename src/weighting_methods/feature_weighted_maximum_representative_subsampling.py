@@ -157,7 +157,7 @@ def feature_weighted_repeated_MRS(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=3,
+    n_pu_splits=5,
     hyperparameter_list=[],
     mean=False,
     return_metrics=False,

@@ -38,7 +38,7 @@ def gbs_gesis_experiment(
     scaled_N = scaled_df[scaled_df["label"] == 1]
     scaled_R = scaled_df[scaled_df["label"] == 0]
 
-    sample_weights, feature_weights = weighting_method(
+    sample_weights, _ = weighting_method(
         scaled_N,
         scaled_R,
         columns,

@@ -141,7 +141,7 @@ def fw_MRS_SVM(
     budgets=[1.0],
     random_generator=None,
     class_weight=None,
-    n_pu_splits=3,
+    n_pu_splits=5,
     temperature=0.0,
     hyperparameter_list=[0.0],
     return_metrics=False,

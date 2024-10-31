@@ -6,6 +6,7 @@ from experiments import (
     downstream_tasks_experiment,
     fairness_tasks_experiment,
     perform_statistical_analysis_fw_mrs,
+    decomposition_experiment,
 )
 
 

@@ -146,7 +146,7 @@ def mrs(
     return_metrics=False,
     compute_bias=True,
     target=None,
-    n_pu_splits=3,
+    n_pu_splits=5,
     drop=1,
     random_generator=None,
     hyperparameter_list=[0.0],

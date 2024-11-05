@@ -258,33 +258,33 @@ def downstream_tasks_experiment(
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
 
-        plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")
-        for result_list, file_name in zip(
-            (
-                rf_auroc_list,
-                rf_auprc_list,
-                dropped_samples_list,
-                abs_feature_importance_list,
-                feature_importance_list,
-                roc_curves_list,
-                best_temperature_list,
-                best_hyperparameter_list,
-            ),
-            (
-                "rf_auroc",
-                "rf_auprc",
-                "dropped_samples",
-                "abs_feature_importance",
-                "feature_importance",
-                "roc_curves",
-                "best_temperature",
-                "best_hyperparameter",
-            ),
-        ):
-            with open(
-                classificiation_result_path / f"{file_name}.json", "w"
-            ) as result_file:
-                result_file.write(json.dumps(result_list))
+        # plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")
+    for result_list, file_name in zip(
+        (
+            rf_auroc_list,
+            rf_auprc_list,
+            dropped_samples_list,
+            abs_feature_importance_list,
+            feature_importance_list,
+            roc_curves_list,
+            best_temperature_list,
+            best_hyperparameter_list,
+        ),
+        (
+            "rf_auroc",
+            "rf_auprc",
+            "dropped_samples",
+            "abs_feature_importance",
+            "feature_importance",
+            "roc_curves",
+            "best_temperature",
+            "best_hyperparameter",
+        ),
+    ):
+        with open(
+            classificiation_result_path / f"{file_name}.json", "w"
+        ) as result_file:
+            result_file.write(json.dumps(result_list))
 
     result_dict = write_result_dict(
         N.drop(["label"], axis="columns").columns,

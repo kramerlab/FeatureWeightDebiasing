@@ -1,13 +1,30 @@
 #!/bin/bash
 
 #SBATCH -A m2_datamining
-#SBATCH -p devel 
+#SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
-#SBATCH -n 2 # gives SLURM_NTASKS
+#SBATCH -n 12 # gives SLURM_NTASKS
 #SBATCH -t 1 # <time in minutes>
-#SBATCH --mem-per-cpu=300 # memory in MiB
 #SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
+
+# Store working directory to be safe
+SAVEDPWD=$(pwd)
+# We define a bash function to do the cleaning when the signal is caught
+cleanup(){
+    # Note: The following only works on single with output on the node,
+    #       where the jobscript is running.
+    #       For multinode output, you can use the 'sgather' command or
+    #       get in touch with us, if the case is more complex.
+    cp -r /localscratch/${SLURM_JOB_ID}/results ${SAVEDPWD}/results &
+    wait
+    exit 0
+}
+trap 'cleanup' SIGUSR2
+
+# Copy input file
+cp -r ${SAVEDPWD}/data /localscratch/${SLURM_JOB_ID}/data
+cd /localscratch/${SLURM_JOB_ID}
 
 N_CV_REPEATS=10
 N_CV_SPLITS=5
@@ -22,7 +39,7 @@ do
         do
             for DATASET in breast_cancer loan_prediction
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
                  --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results &
             done
@@ -40,7 +57,7 @@ do
         do
             for DATASET in folktables_income hr_analytics folktables_employment
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
               --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results &
             done
@@ -58,7 +75,7 @@ do
         do
             for DATASET in breast_cancer loan_prediction
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
                  --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results &
             done
@@ -76,10 +93,13 @@ do
         do
             for DATASET in folktables_income hr_analytics folktables_employment
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
               --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results &
             done
         done
     done
 done
+wait
+# Call the cleanup function when everything went fine
+cleanup

@@ -208,3 +208,28 @@ def repeated_train_val_test_split(
             )
 
             yield train_samples, val_samples, test_samples
+
+
+def repeated_train_val_test_split_fixed_test_set(
+    n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+
+    train_val_samples, test_samples, train_val_targets, _ = train_test_split(
+        df,
+        target_values,
+        stratify=target_values,
+        random_state=random_generator.randint(max_int),
+        test_size=0.5,
+    )
+    for _ in range(n_cv_repeats):
+        train_samples, val_samples, _, _ = train_test_split(
+        train_val_samples,
+        train_val_targets,
+        stratify=train_val_targets,
+        random_state=random_generator.randint(max_int),
+        test_size=0.5,
+    )
+
+        yield train_samples, val_samples, test_samples

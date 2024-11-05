@@ -3,10 +3,11 @@
 #SBATCH -A m2_datamining
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
-#SBATCH -n 12 # gives SLURM_NTASKS
-#SBATCH -t 1 # <time in minutes>
-#SBATCH --cpus-per-task=5
+#SBATCH -n 10 # gives SLURM_NTASKS
+#SBATCH -t 7200 # <time in minutes>
+#SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
+#SBATCH --mem=200000M 
 
 # Store working directory to be safe
 SAVEDPWD=$(pwd)
@@ -99,6 +100,7 @@ do
         done
     done
 done
+
 wait
 # Call the cleanup function when everything went fine
 cleanup

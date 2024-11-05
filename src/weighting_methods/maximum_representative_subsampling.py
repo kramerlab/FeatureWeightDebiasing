@@ -305,7 +305,6 @@ def mrs(
         if all(finished for finished in finished_dict.values()):
             break
 
-    # best_weights_dict = best_weights_dict.astype(np.float64)
 
     feature_weights = {}
     for hyperparameter in hyperparameter_list:

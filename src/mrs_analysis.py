@@ -4,11 +4,12 @@ from pathlib import Path
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 from experiments.downstream_tasks import repeated_train_val_test_split
+from utils.parameter import set_parameter
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
 from utils.sampling import sample_N
-from utils.metrics import calculate_mean_rocs, scale_df
+from utils.metrics import calculate_mean_rocs, compute_metrics, scale_df
 from utils.visualization import (
     plot_auc_average,
     plot_relative_bias,
@@ -42,6 +43,15 @@ def analyse_mrs(
         data_set_name, bias_type, bias_fraction=bias_fraction
     )
     mmd_list = []
+    (
+        splitter,
+        draw_with_feature_weights,
+        temperatures,
+        dropped_samples_val_dict,
+        auroc_val_dict,
+        auprc_val_dict,
+        hyperparameter_list,
+    ) = set_parameter("mrs-forest")
 
     df, columns, target = load_dataset(data_set_name)
     sample_df, _ = scale_df(df, columns)
@@ -67,6 +77,7 @@ def analyse_mrs(
                 bias_fraction=bias_fraction,
                 columns=columns,
                 bias_variable=target,
+                random_generator=sampling_random_generator,
             )
             number_of_samples = len(N)
             N["label"] = 1
@@ -87,28 +98,24 @@ def analyse_mrs(
             compute_bias=use_bias_mean,
             target=target,
             random_generator=random_generator,
+            hyperparameter_list=hyperparameter_list,
             early_stopping=False,
         )
-        aucs_complete.append(auc_list)
 
+        aucs_complete.append(auc_list)
         mmds_complete.append(mmd_list)
         mrs_iteration_list.append(mrs_iteration)
         rocs_list_list.append(roc_list)
         relative_bias_list_list.append(relative_bias_list)
 
-        min_length = np.min([len(mmd_values) for mmd_values in mmds_complete])
-        mean_mmds = np.mean(np.array(mmds_complete)[:, :min_length], axis=0)
-        std_mmds = np.std(np.array(mmds_complete)[:, :min_length], axis=0)
+        mean_mmds = np.mean(np.array(mmds_complete), axis=0)
+        std_mmds = np.std(np.array(mmds_complete), axis=0)
 
-        mean_aucs = np.mean(np.array(aucs_complete)[:, :min_length], axis=0)
-        std_aucs = np.std(np.array(aucs_complete)[:, :min_length], axis=0)
+        mean_aucs = np.mean(np.array(aucs_complete), axis=0)
+        std_aucs = np.std(np.array(aucs_complete), axis=0)
 
-        mean_relative_bias = np.mean(
-            np.array(relative_bias_list_list)[:, :min_length], axis=0
-        )
-        std_relative_bias = np.std(
-            np.array(relative_bias_list_list)[:, :min_length], axis=0
-        )
+        mean_relative_bias = np.mean(np.array(relative_bias_list_list), axis=0)
+        std_relative_bias = np.std(np.array(relative_bias_list_list), axis=0)
 
         mean_rocs = calculate_mean_rocs(rocs_list_list)
 

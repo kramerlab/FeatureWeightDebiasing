@@ -1,5 +1,4 @@
-N_CV_REPEATS=10
-N_CV_SPLITS=5
+N_CV_REPEATS=50
 
 DROP=1
 for BIAS_FRACTION in 0.1 0.2 0.3
@@ -13,7 +12,7 @@ do
             do
                 python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results
             done
         done
     done
@@ -31,7 +30,7 @@ do
             do
                 python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results
             done
         done
     done
@@ -49,7 +48,7 @@ do
             do
                 python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results
             done
         done
     done
@@ -67,7 +66,7 @@ do
             do
                 python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results
             done
         done
     done

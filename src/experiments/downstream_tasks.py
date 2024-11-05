@@ -173,6 +173,8 @@ def downstream_tasks_experiment(
                 sample_weights,
                 gamma,
             )
+
+            relative_bias = relative_bias.drop(["label"])
         else:
             weighted_mmd = np.ones(len(N.columns))
             relative_bias = np.ones(len(N.columns))
@@ -247,7 +249,7 @@ def downstream_tasks_experiment(
                 auprc_val_dict[float(temperature)].append(rf_auprc_val)
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(relative_bias.drop(["label"]))
+        biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)

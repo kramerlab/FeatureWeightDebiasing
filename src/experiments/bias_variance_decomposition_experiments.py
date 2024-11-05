@@ -160,23 +160,6 @@ def decomposition_experiment(
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
 
-        if method_name not in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
-        ):
-            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                sample_weights,
-                gamma,
-            )
-        else:
-            weighted_mmd = np.ones(len(N.columns))
-            relative_bias = np.ones(len(N.columns))
-            wasserstein_distances = np.ones(len(N.columns))
-
         (
             rf_auroc,
             rf_auprc,

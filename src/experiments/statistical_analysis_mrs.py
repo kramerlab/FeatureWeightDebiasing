@@ -158,12 +158,13 @@ def perform_statistical_analysis_mrs(
                 sample_weights,
                 gamma,
             )
+            relative_bias = relative_bias.drop(["label"])
         else:
             weighted_mmd = np.ones(len(N.columns))
             relative_bias = np.ones(len(N.columns))
             wasserstein_distances = np.ones(len(N.columns))
         wasserstein_list.append(wasserstein_distances)
-        relative_biases_list.append(relative_bias.drop(["label"]))
+        relative_biases_list.append(relative_bias)
         mmd_list.append(weighted_mmd)
 
         if data_set_name == "gbs_allensbach":

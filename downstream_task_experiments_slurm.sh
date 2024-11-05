@@ -20,7 +20,6 @@ cleanup(){
     wait
     exit 0
 }
-trap 'cleanup' SIGUSR2
 
 # Copy input file
 cp -r ${SAVEDPWD}/data /localscratch/${SLURM_JOB_ID}/data

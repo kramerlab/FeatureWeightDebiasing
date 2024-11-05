@@ -9,7 +9,6 @@ shap~=0.43.0
 tqdm~=4.66.1
 statsmodels
 adapt
-torch
 cython
 joblib
 threadpoolctl

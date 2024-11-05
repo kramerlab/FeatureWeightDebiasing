@@ -11,7 +11,6 @@ from utils.statistics import (
     write_result_dict_test_set,
 )
 from utils.sampling import repeated_train_val_test_split, sample_N
-from utils.visualization import plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,
@@ -71,7 +70,7 @@ def decomposition_experiment(
         method_name,
         bias_type,
         data_set_name,
-        experiment_name="downstream_task",
+        experiment_name="decomposition",
         bias_fraction=bias_fraction,
     )
     sample_weights_save_path = result_path / "sample_weights"
@@ -205,60 +204,16 @@ def decomposition_experiment(
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
 
-        if method_name in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
-            "mrs-forest",
-            "fw-mrs-temperature-svm",
-        ):
-            for temperature, temperature_sample_weights in sample_weights.items():
-                temperature_feature_weights = {"tmp": feature_weights[temperature]}
-                temperature_sample_weights = {"tmp": temperature_sample_weights}
-
-                (
-                    rf_auroc_val,
-                    rf_auprc_val,
-                    best_sample_weights_val,
-                    _,
-                    _,
-                    _,
-                    _,
-                    _,
-                ) = compute_classification_metrics_random_forest(
-                    N,
-                    R,
-                    columns,
-                    temperature_sample_weights,
-                    temperature_feature_weights,
-                    target,
-                    random_state=seed,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    splitter=splitter,
-                    n_estimators=500,
-                    n_splits=5,
-                    compute_feature_importance=False,
-                )
-
-                dropped_samples_val = np.count_nonzero(
-                    np.array(best_sample_weights_val) == 0.0
-                )
-                dropped_samples_val_dict[float(temperature)].append(dropped_samples_val)
-                auroc_val_dict[float(temperature)].append(rf_auroc_val)
-                auprc_val_dict[float(temperature)].append(rf_auprc_val)
-
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias.drop(["label"]))
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
 
-        # plot_sample_weights(sample_weights, sample_weights_save_path, i)
-        # plot_feature_weights(feature_weights, feature_weights_save_path, i)
 
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
 
-        plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")
         for result_list, file_name in zip(
             (
                 rf_auroc_list,

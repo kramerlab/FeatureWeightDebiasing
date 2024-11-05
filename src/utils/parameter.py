@@ -10,7 +10,7 @@ def set_parameter(method_name):
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         hyperparameter_list = [0.05, 0.025, 0.0]
-    if method_name == "fw-mrs-temperature-svm":
+    elif method_name == "fw-mrs-temperature-svm":
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]

@@ -9,23 +9,6 @@
 #SBATCH --nodes=1
 #SBATCH --mem=200000M 
 
-# Store working directory to be safe
-SAVEDPWD=$(pwd)
-# We define a bash function to do the cleaning when the signal is caught
-cleanup(){
-    # Note: The following only works on single with output on the node,
-    #       where the jobscript is running.
-    #       For multinode output, you can use the 'sgather' command or
-    #       get in touch with us, if the case is more complex.
-    cp -r /localscratch/${SLURM_JOB_ID}/results ${SAVEDPWD}/results &
-    wait
-    exit 0
-}
-
-# Copy input file
-cp -r ${SAVEDPWD}/data /localscratch/${SLURM_JOB_ID}/data
-cd /localscratch/${SLURM_JOB_ID}
-
 N_CV_REPEATS=10
 N_CV_SPLITS=5
 DROP=3
@@ -36,12 +19,10 @@ do
     do
             for DATASET in folktables_income folktables_employment  
             do
-            python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+            srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
             --bias_type less_positive_class --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
             --experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION & 
         done
     done
 done
 wait
-# Call the cleanup function when everything went fine
-cleanup

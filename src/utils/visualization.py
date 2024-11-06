@@ -18,7 +18,7 @@ default_cycle = cycler(
         (0, (3, 1, 1, 1, 1, 1)),
         (5, (10, 3)),
     ],
-) + cycler(color=["blue", "orange", "orangered", "cyan"])
+) + cycler(color=sns.color_palette()[:7])
 
 
 def plot_cumulative_distribution_function(

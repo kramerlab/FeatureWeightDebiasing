@@ -11,7 +11,6 @@ from utils.statistics import (
     write_result_dict_test_set,
 )
 from utils.sampling import repeated_train_val_test_split, sample_N
-from utils.visualization import plot_rocs_downstream
 from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,

@@ -6,6 +6,19 @@ from pathlib import Path
 from cycler import cycler
 
 sns.set_theme(style="ticks")
+# Create a custom line style and color cycler
+default_cycle = cycler(
+    "linestyle",
+    [
+        "solid",
+        "dotted",
+        "dashdot",
+        "dashed",
+        (5, (10, 3)),
+        (0, (3, 1, 1, 1, 1, 1)),
+        (5, (10, 3)),
+    ],
+) + cycler(color=["blue", "orange", "orangered", "cyan"])
 
 
 def plot_cumulative_distribution_function(
@@ -100,21 +113,6 @@ def plot_sample_weights(weights, path, iteration, title="", bins=100):
     plt.clf()
 
 
-def plot_feature_weights(weights, path, iteration, title=""):
-    """Plot the weights for a method
-
-    :param weights: Weights
-    :param path: Save path
-    :param iteration: From which iteration are the weights
-    :param title: Title for the plot, defaults to ""
-    :param bins: How many bin are used, defaults to 25
-    """
-    path.mkdir(exist_ok=True)
-    sns.barplot(weights).set_title(title)
-    plt.savefig(f"{path}/weights_{iteration}.pdf", bbox_inches="tight")
-    plt.clf()
-
-
 def plot_statistical_analysis(
     bins: int,
     N: np.ndarray,
@@ -149,32 +147,6 @@ def plot_statistical_analysis(
         sample_weights,
         method_name,
     )
-
-
-def plot_results_with_variance(
-    metric_list: list[float], visualisation_path: Path, suffix: str = "", metric="MMD"
-):
-    """Plots a mean value line with variance
-
-    :param metric_list: Mean values
-    :param visualisation_path: Save path
-    :param suffix: Suffix for the file name, defaults to ""
-    :param metric: Metric name, defaults to "MMD"
-    """
-    mean_metric = np.nanmean(metric_list, axis=0)
-    sd_metric = np.nanstd(metric_list, axis=0)
-    plt.plot(range(len(mean_metric)), mean_metric, color="blue")
-    plt.fill_between(
-        x=range(len(mean_metric)),
-        y1=mean_metric - sd_metric,
-        y2=mean_metric + sd_metric,
-        color="blue",
-        alpha=0.5,
-    )
-    plt.ylabel(f"Weighted {metric}")
-    plt.xlabel("Pass")
-    plt.savefig(Path(visualisation_path) / f"weighted_{metric}_{suffix}.pdf")
-    plt.clf()
 
 
 def plot_auc_average(
@@ -241,7 +213,12 @@ def plot_auc_average(
 
 
 def plot_mmds_average(
-    mmds, std, drop, mmd_iteration, file_name, mrs_iterations, number_of_samples
+    mmds_dicts,
+    drop,
+    file_name,
+    mrs_iterations,
+    number_of_samples,
+    n_ticks=5,
 ):
     """Plots the mean mmds with variance
 
@@ -253,12 +230,26 @@ def plot_mmds_average(
     :param mrs_iterations: In whih iterations were the mrs' returned
     :param number_of_samples: How many samples were in the original data set
     """
-    mmds_upper = mmds + std
-    mmds_lower = np.maximum(mmds - std, 0)
-    stop = number_of_samples - ((mmds.size) * drop)
-    x_labels = range(number_of_samples, stop, -(drop * mmd_iteration))
-    plt.fill_between(x_labels, mmds_lower, mmds_upper, color="blue", alpha=0.2)
-    plt.plot(x_labels, mmds, linestyle="-")
+    min_length = np.min(
+        [
+            [len(auroc_list) for auroc_list in auroc_lists.values()]
+            for auroc_lists in mmds_dicts
+        ]
+    )
+    min_number_of_samples = np.min(number_of_samples)
+    x_labels = list(range(min_number_of_samples, stop, -drop))[:min_length]
+    for i, budget in enumerate(mmds_dicts[0].keys()):
+        mmd_list = []
+        for dictionary in mmds_dicts:
+            dictionary = {float(k): v for k, v in dictionary.items()}
+            mmd_list.append(dictionary[float(budget)][:min_length])
+            
+        mmds_upper = mmds_dicts + std
+        mmds_lower = np.maximum(mmds_dicts - std, 0)
+        stop = number_of_samples - ((mmds_dicts.size) * drop)
+        plt.fill_between(x_labels, mmds_lower, mmds_upper, color="blue", alpha=0.2)
+        plt.plot(x_labels, mmds_dicts, linestyle="-")
+
     minimum = np.min(mmds_lower) - 0.001
     maximum = plt.gca().get_ylim()[1] + 0.001
     plt.margins(0.05, 0)
@@ -266,11 +257,8 @@ def plot_mmds_average(
     plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
-    step = -((number_of_samples - (stop + drop)) // 4)
-    step = 1 if step == 0 else step
-    x_ticks = list(
-        range(number_of_samples, stop, step)
-    ) + [stop + drop]
+    step_size = len(x_labels) // n_ticks
+    x_ticks = x_labels[::-step_size]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
     xlim = plt.gca().get_xlim()
@@ -341,76 +329,6 @@ def plot_experiment_comparison_auc(
     plt.legend()
     plt.gca().invert_xaxis()
     plt.savefig(f"{file_name}.pdf")
-
-
-def plot_experiment_comparison_mmd(
-    mean_mmd,
-    std_mmd,
-    mean_mmd_experiment,
-    std_mmd_experiment,
-    experiment_label,
-    drop,
-    mmd_iteration,
-    file_name,
-    number_of_samples,
-):
-    """Plots the mmd of a comparison with a variant
-
-    :param mean_mmd: Mean mmds of mrs
-    :param std_mmd: Standard deviation for the mmds of mrs
-    :param mean_mmd_experiment: Mean mmds of the mrs variant
-    :param std_mmd_experiment: Standard deviation for the mmds of the mrs variant
-    :param experiment_label: Name of the mrs variant
-    :param drop: Number of dropped samples per iteration
-    :param mmd_iteration: Number of iteration the mmd was computed
-    :param file_name: File name for the plot
-    :param number_of_samples: Number of sample sin the original data set
-    """
-    mmd_upper = np.minimum(mean_mmd + std_mmd, 1)
-    mmd_lower = np.maximum(mean_mmd - std_mmd, 0)
-
-    mmd_upper_experiment = np.minimum(mean_mmd_experiment + std_mmd_experiment, 1)
-    mmd_lower_experiment = np.maximum(mean_mmd_experiment - std_mmd_experiment, 0)
-
-    stop = number_of_samples - ((mean_mmd.size) * drop)
-    x_labels = range(number_of_samples, stop, -(drop * mmd_iteration))
-
-    plt.fill_between(x_labels, mmd_lower, mmd_upper, color="blue", alpha=0.2)
-    plt.plot(x_labels, mean_mmd, color="blue", linestyle="-", label="MRS")
-
-    plt.fill_between(
-        x_labels, mmd_lower_experiment, mmd_upper_experiment, color="orange", alpha=0.2
-    )
-    plt.plot(
-        x_labels,
-        mean_mmd_experiment,
-        linestyle=":",
-        color="orange",
-        label=experiment_label,
-    )
-
-    plt.ylabel("Maximum Mean Discrepancy")
-    plt.xlabel("Number of Remaining Samples")
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
-    plt.xticks(x_ticks)
-    plt.legend()
-    plt.gca().invert_xaxis()
-    plt.savefig(f"{file_name}.pdf")
-    plt.close()
-
-
-# Create a custom line style and color cycler
-default_cycle = cycler(
-    "linestyle",
-    [
-        ":",
-        "-.",
-        (0, (3, 5, 1, 5, 1, 5)),
-        "-",
-    ],
-) + cycler(color=["blue", "orange", "orangered", "cyan"])
 
 
 def plot_rocs_mrs(roc_list, file_name):

@@ -38,7 +38,7 @@ do
             do
             python ${SAVEDPWD}/src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
             --bias_type less_positive_class --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
-            --experiment_name temperature_comparison --drop $DROP --bias_fraction 0.1 & 
+            --experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION & 
         done
     done
 done

@@ -1,7 +1,6 @@
 import random
 import numpy as np
 from pathlib import Path
-from sklearn.model_selection import RepeatedStratifiedKFold
 
 from experiments.downstream_tasks import repeated_train_val_test_split
 from utils.parameter import set_parameter
@@ -9,7 +8,7 @@ from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
 from utils.sampling import sample_N
-from utils.metrics import calculate_mean_rocs, compute_metrics, scale_df
+from utils.metrics import calculate_mean_rocs, scale_df
 from utils.visualization import (
     plot_auc_average,
     plot_relative_bias,
@@ -108,44 +107,31 @@ def analyse_mrs(
         rocs_list_list.append(roc_list)
         relative_bias_list_list.append(relative_bias_list)
 
-        mean_mmds = np.mean(np.array(mmds_complete), axis=0)
-        std_mmds = np.std(np.array(mmds_complete), axis=0)
-
-        mean_aucs = np.mean(np.array(aucs_complete), axis=0)
-        std_aucs = np.std(np.array(aucs_complete), axis=0)
-
-        mean_relative_bias = np.mean(np.array(relative_bias_list_list), axis=0)
-        std_relative_bias = np.std(np.array(relative_bias_list_list), axis=0)
-
         mean_rocs = calculate_mean_rocs(rocs_list_list)
 
-        plot_mmds_average(
-            mean_mmds,
-            std_mmds,
-            drop,
-            1,
-            result_path / "mmd",
-            mrs_iteration_list,
-            number_of_samples,
-        )
-        plot_auc_average(
-            mean_aucs,
-            std_aucs,
-            drop,
-            result_path / "auroc",
-            number_of_samples,
-            mrs_iteration_list,
-        )
+    plot_mmds_average(
+        mmds_complete,
+        drop,
+        result_path / "mmd",
+        mrs_iteration_list,
+        number_of_samples,
+    )
+    plot_auc_average(
+        aucs_complete,
+        drop,
+        result_path / "auroc",
+        number_of_samples,
+        mrs_iteration_list,
+    )
 
-        plot_rocs_mrs(mean_rocs, result_path / "rocs")
-        plot_relative_bias(
-            mean_relative_bias,
-            std_relative_bias,
-            result_path / "relative_bias",
-            mrs_iteration_list,
-            number_of_samples,
-            drop,
-        )
+    plot_rocs_mrs(mean_rocs, result_path / "rocs")
+    plot_relative_bias(
+        relative_bias_list_list,
+        result_path / "relative_bias",
+        mrs_iteration_list,
+        number_of_samples,
+        drop,
+    )
 
 
 def create_save_path(data_set_name, bias_type, bias_fraction):

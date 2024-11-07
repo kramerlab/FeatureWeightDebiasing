@@ -1,5 +1,15 @@
-N_CV_REPEATS=10
-N_CV_SPLITS=5
+#!/bin/bash
+
+#SBATCH -A m2_datamining
+#SBATCH -p parallel 
+#SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
+#SBATCH -n 10 # gives SLURM_NTASKS
+#SBATCH -t 7200 # <time in minutes>
+#SBATCH --cpus-per-task=4
+#SBATCH --nodes=1
+#SBATCH --mem=200000M 
+
+N_CV_REPEATS=50
 
 DROP=1
 for BIAS_FRACTION in 0.1 0.2 0.3
@@ -11,9 +21,9 @@ do
         do
             for DATASET in breast_cancer loan_prediction
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
-                --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results
+                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done
         done
     done
@@ -29,9 +39,9 @@ do
         do
             for DATASET in folktables_income hr_analytics folktables_employment
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
-                --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results
+                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done
         done
     done
@@ -47,9 +57,9 @@ do
         do
             for DATASET in breast_cancer loan_prediction
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
-                --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS  --load_previous_results
+                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done
         done
     done
@@ -65,9 +75,9 @@ do
         do
             for DATASET in folktables_income hr_analytics folktables_employment
             do
-                python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
-                --bias_type $BIAS_TYPE --experiment_name downstream_task --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results
+                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done
         done
     done

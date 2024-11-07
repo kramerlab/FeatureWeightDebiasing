@@ -18,7 +18,7 @@ do
     done
 done
 
-DROP=3
+DROP=5
 for BIAS_FRACTION in 0.1 0.2 0.3
 do
     for BIAS_TYPE in less_positive_class less_negative_class 
@@ -54,7 +54,7 @@ do
     done
 done
 
-DROP=3
+DROP=5
 for BIAS_FRACTION in 0.8 0.9
 do
     for BIAS_TYPE in mean_difference

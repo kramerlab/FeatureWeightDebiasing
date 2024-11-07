@@ -5,7 +5,7 @@ python src/mrs_analysis.py --data_set_name gbs_gesis --number_of_repetitions $NU
 python src/mrs_analysis.py --data_set_name gbs_allensbach --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP
 
 
-DROP=3
+DROP=5
 for BIAS_FRACTION in 0.1 0.2 0.3
 do
     for BIAS_TYPE in less_positive_class less_negative_class none mean_difference

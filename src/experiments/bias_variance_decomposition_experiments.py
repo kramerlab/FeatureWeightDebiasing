@@ -75,6 +75,9 @@ def decomposition_experiment(
     if temperatures is not None:
         predictions_val_dict = {temperature: [] for temperature in temperatures}
         probabilities_val_dict = {temperature: [] for temperature in temperatures}
+    elif method_name == "mrs-forest":
+        predictions_val_dict = {0.0: []}
+        probabilities_val_dict = {0.0: []}
 
     mean = True if method_name == "fw-mrs-temperature-mean" else False
 
@@ -202,7 +205,8 @@ def decomposition_experiment(
     mse_main_predictions = np.mean(probabilities_list, axis=0)
     mse_avg_bias = np.sum((mse_main_predictions - y_true) ** 2) / y_true.size
     mse_avg_var = (
-        np.sum((mse_main_predictions - probabilities_list) ** 2) / probabilities_list.size
+        np.sum((mse_main_predictions - probabilities_list) ** 2)
+        / probabilities_list.size
     )
 
     result_dict = {
@@ -219,37 +223,3 @@ def decomposition_experiment(
     }
     with open(result_path / "bias_variance_decomposition.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
-
-    if method_name in (
-        "fw-mrs-temperature",
-        "fw-mrs-temperature-mean",
-        "fw-mrs-temperature-svm",
-        "mrs-forest",
-    ):
-
-        for key, value in predictions_val_dict.items():
-            value = np.array(value).squeeze()
-            main_predictions = np.apply_along_axis(
-                lambda x: np.argmax(np.bincount(x)), axis=0, arr=value
-            )
-
-            avg_expected_loss = np.apply_along_axis(
-                lambda x: (x != y_true).mean(), axis=1, arr=value
-            ).mean()
-            avg_bias = np.sum(main_predictions != y_true) / len(y_true)
-            var = np.zeros_like(value[0])
-
-            for pred in predictions:
-                var += (pred != main_predictions).astype(np.int_)
-            var /= n_cv_repeats
-            result_dict = {
-                key: {
-                    "average expected loss": avg_expected_loss,
-                    "average_bias": avg_bias,
-                    "average variance": avg_var,
-                }
-            }
-            with open(
-                result_path / "bias_variance_decomposition_val.json", "w"
-            ) as result_file:
-                result_file.write(json.dumps(result_dict))

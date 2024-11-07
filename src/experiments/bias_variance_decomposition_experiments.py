@@ -5,17 +5,9 @@ from sklearn.preprocessing import StandardScaler
 
 from utils.data_loader import load_weights, save_weights
 from utils.parameter import set_parameter
-from utils.statistics import (
-    create_result_path,
-    write_result_dict,
-    write_result_dict_test_set,
-)
+from utils.statistics import create_result_path
 from utils.sampling import repeated_train_val_test_split_fixed_test_set, sample_N
-from utils.metrics import (
-    calculate_rbf_gamma,
-    compute_classification_metrics_random_forest,
-)
-from utils.visualization_fw_mrs import visualize_boxplot
+from utils.metrics import compute_decomposition_metrics_random_forest
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
@@ -49,20 +41,8 @@ def decomposition_experiment(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    rf_auroc_list = []
-    rf_auprc_list = []
-
-    weighted_mmds_list = []
-    biases_list = []
-    wasserstein_distance_list = []
-
-    abs_feature_importance_list = []
-    feature_importance_list = []
-    roc_curves_list = []
-    best_temperature_list = []
-    best_hyperparameter_list = []
-
-    dropped_samples_list = []
+    predictions_list = []
+    probabilities_list = []
 
     result_path = create_result_path(
         method_name,
@@ -73,16 +53,10 @@ def decomposition_experiment(
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
-    classificiation_result_path = result_path / "classification_results"
-    validation_path = result_path / "validation"
-    roc_path = result_path / "rocs"
 
     result_path.mkdir(exist_ok=True)
-    classificiation_result_path.mkdir(exist_ok=True)
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
-    roc_path.mkdir(exist_ok=True)
-    validation_path.mkdir(exist_ok=True)
 
     sample_weight_list = load_weights(sample_weights_save_path)
     feature_weight_list = load_weights(feature_weights_save_path)
@@ -93,11 +67,14 @@ def decomposition_experiment(
         splitter,
         draw_with_feature_weights,
         temperatures,
-        dropped_samples_val_dict,
-        auroc_val_dict,
-        auprc_val_dict,
+        _,
+        _,
+        _,
         hyperparameter_list,
     ) = set_parameter(method_name)
+    if temperatures is not None:
+        predictions_val_dict = {temperature: [] for temperature in temperatures}
+        probabilities_val_dict = {temperature: [] for temperature in temperatures}
 
     mean = True if method_name == "fw-mrs-temperature-mean" else False
 
@@ -112,6 +89,7 @@ def decomposition_experiment(
         N[columns] = scaler.fit_transform(N[columns])
         R[columns] = scaler.transform(R[columns])
         T[columns] = scaler.transform(T[columns])
+
         N = sample_N(
             train=N,
             bias_type=bias_type,
@@ -122,8 +100,6 @@ def decomposition_experiment(
         )
         N["label"] = 1
         R["label"] = 0
-
-        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
 
         if len(sample_weight_list) > i and load_previous_results:
             sample_weights = sample_weight_list[i]
@@ -157,16 +133,7 @@ def decomposition_experiment(
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
 
-        (
-            rf_auroc,
-            rf_auprc,
-            best_sample_weights,
-            abs_feature_importance,
-            roc_curve_values,
-            best_temperature,
-            best_hyperparameter,
-            best_clf,
-        ) = compute_classification_metrics_random_forest(
+        predictions, probabilities = compute_decomposition_metrics_random_forest(
             N,
             T,
             columns,
@@ -179,107 +146,110 @@ def decomposition_experiment(
             n_estimators=500,
             n_splits=5,
         )
-        dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
-        dropped_samples_list.append(dropped_samples)
-        best_temperature_list.append(best_temperature)
-        best_hyperparameter_list.append(best_hyperparameter)
+        predictions_list.append(predictions)
+        probabilities_list.append(probabilities)
 
-        rf_auroc_list.append(rf_auroc)
-        rf_auprc_list.append(rf_auprc)
-
-        abs_feature_importance_list.append(abs_feature_importance.tolist())
-        roc_curves_list.append(roc_curve_values)
-
-        for result_list, file_name in zip(
-            (
-                rf_auroc_list,
-                rf_auprc_list,
-                dropped_samples_list,
-                abs_feature_importance_list,
-                feature_importance_list,
-                roc_curves_list,
-                best_temperature_list,
-                best_hyperparameter_list,
-            ),
-            (
-                "rf_auroc",
-                "rf_auprc",
-                "dropped_samples",
-                "abs_feature_importance",
-                "feature_importance",
-                "roc_curves",
-                "best_temperature",
-                "best_hyperparameter",
-            ),
+        if method_name in (
+            "fw-mrs-temperature",
+            "fw-mrs-temperature-mean",
+            "fw-mrs-temperature-svm",
+            "mrs-forest",
         ):
-            with open(
-                classificiation_result_path / f"{file_name}.json", "w"
-            ) as result_file:
-                result_file.write(json.dumps(result_list))
+            for temperature, temperature_sample_weights in sample_weights.items():
+                temperature_feature_weights = {"tmp": feature_weights[temperature]}
+                temperature_sample_weights = {"tmp": temperature_sample_weights}
 
-    result_dict = write_result_dict(
-        N.drop(["label"], axis="columns").columns,
-        weighted_mmds_list,
-        biases_list,
-        wasserstein_distance_list,
+                predictions, probabilities = (
+                    compute_decomposition_metrics_random_forest(
+                        N,
+                        R,
+                        columns,
+                        temperature_sample_weights,
+                        temperature_feature_weights,
+                        target,
+                        random_state=seed,
+                        draw_with_feature_weights=draw_with_feature_weights,
+                        splitter=splitter,
+                        n_estimators=500,
+                        n_splits=5,
+                    )
+                )
+
+                predictions_val_dict[float(temperature)].append(predictions)
+                probabilities_val_dict[float(temperature)].append(probabilities)
+
+    predictions_list = np.array(predictions_list).squeeze()
+    probabilities_list = np.array(probabilities_list).squeeze()
+    y_true = T[target].values
+
+    main_predictions = np.apply_along_axis(
+        lambda x: np.argmax(np.bincount(x)), axis=0, arr=predictions_list
+    ).squeeze()
+
+    avg_expected_loss = np.apply_along_axis(
+        lambda x: (x != y_true).mean(), axis=1, arr=predictions_list
+    ).mean()
+    avg_bias = np.sum(main_predictions != y_true) / y_true.size
+    var = np.zeros_like(predictions_list[0])
+    for pred in predictions_list:
+        var += (pred != main_predictions).astype(np.int_)
+    var = var / n_cv_repeats
+    avg_var = np.sum(var) / y_true.shape[0]
+
+    mse_avg_expected_loss = np.apply_along_axis(
+        lambda x: ((x - y_true) ** 2).mean(), axis=1, arr=probabilities_list
+    ).mean()
+    mse_main_predictions = np.mean(probabilities_list, axis=0)
+    mse_avg_bias = np.sum((mse_main_predictions - y_true) ** 2) / y_true.size
+    mse_avg_var = (
+        np.sum((mse_main_predictions - probabilities_list) ** 2) / probabilities_list.size
     )
 
-    with open(result_path / "similarity_results.json", "w") as result_file:
-        result_file.write(json.dumps(result_dict))
-
-    result_dict = {}
-    result_dict = write_result_dict_test_set(
-        rf_auroc_list,
-        rf_auprc_list,
-        dropped_samples_list,
-        len(N),
-    )
-
-    with open(result_path / "classification_results.json", "w") as result_file:
+    result_dict = {
+        "0-1 loss": {
+            "average expected loss": avg_expected_loss,
+            "average_bias": avg_bias,
+            "average variance": avg_var,
+        },
+        "mse loss": {
+            "average expected loss": mse_avg_expected_loss,
+            "average_bias": mse_avg_bias,
+            "average variance": mse_avg_var,
+        },
+    }
+    with open(result_path / "bias_variance_decomposition.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
 
     if method_name in (
         "fw-mrs-temperature",
         "fw-mrs-temperature-mean",
         "fw-mrs-temperature-svm",
-    ):
-        visualize_boxplot(auroc_val_dict, "AUROC", validation_path / "auroc_comparison")
-        visualize_boxplot(auprc_val_dict, "AUPRC", validation_path / "auprc_comparison")
-        visualize_boxplot(
-            dropped_samples_val_dict,
-            "Dropped Samples",
-            validation_path / "dropped_samples_comparison",
-        )
-
-        for result_list, file_name in zip(
-            (
-                auroc_val_dict,
-                auprc_val_dict,
-                dropped_samples_val_dict,
-            ),
-            (
-                "auroc_val_dict",
-                "auprc_val_dict",
-                "dropped_samples_val_dict",
-            ),
-        ):
-            with open(validation_path / f"{file_name}.json", "w") as result_file:
-                result_file.write(json.dumps(result_list))
-
-    if method_name in (
-        "fw-mrs-temperature",
-        "fw-mrs-temperature-mean",
         "mrs-forest",
-        "fw-mrs-temperature-svm",
     ):
-        dropped_samples_val_results_dict = {}
-        for temperature in dropped_samples_val_dict.keys():
-            dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(
-                dropped_samples_val_dict[temperature]
-            )
-            dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(
-                dropped_samples_val_dict[temperature]
+
+        for key, value in predictions_val_dict.items():
+            value = np.array(value).squeeze()
+            main_predictions = np.apply_along_axis(
+                lambda x: np.argmax(np.bincount(x)), axis=0, arr=value
             )
 
-        with open(result_path / "dropped_elements.json", "w") as result_file:
-            result_file.write(json.dumps(dropped_samples_val_results_dict))
+            avg_expected_loss = np.apply_along_axis(
+                lambda x: (x != y_true).mean(), axis=1, arr=value
+            ).mean()
+            avg_bias = np.sum(main_predictions != y_true) / len(y_true)
+            var = np.zeros_like(value[0])
+
+            for pred in predictions:
+                var += (pred != main_predictions).astype(np.int_)
+            var /= n_cv_repeats
+            result_dict = {
+                key: {
+                    "average expected loss": avg_expected_loss,
+                    "average_bias": avg_bias,
+                    "average variance": avg_var,
+                }
+            }
+            with open(
+                result_path / "bias_variance_decomposition_val.json", "w"
+            ) as result_file:
+                result_file.write(json.dumps(result_dict))

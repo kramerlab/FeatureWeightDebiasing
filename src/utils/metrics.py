@@ -17,6 +17,16 @@ from sklearn.metrics import (
 from sklearn.svm import LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
+param_grid = {
+        "min_weight_fraction_leaf": [
+            0.0,
+            0.01,
+            0.025,
+            0.05,
+            0.1,
+        ],
+        "class_weight": [None, "balanced"],
+    }
 
 def compute_weighted_means(N, weights):
     """Compute the weighted mean
@@ -177,9 +187,7 @@ def compute_metrics(
         best_sample_biases = np.inf
         best_wasserstein_distances = np.inf
         for temperature in sample_weights_list.keys():
-            for _, sample_weights in sample_weights_list[
-                temperature
-            ].items():
+            for _, sample_weights in sample_weights_list[temperature].items():
                 wasserstein_distances = []
                 N_dropped = scaled_N[columns].values
                 R_dropped = scaled_R[columns].values
@@ -348,6 +356,82 @@ def compute_classification_metrics_random_forest(
     )
 
 
+def compute_decomposition_metrics_random_forest(
+    N,
+    T,
+    columns,
+    sample_weights_list,
+    feature_weights,
+    label,
+    random_state=None,
+    n_splits=5,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    draw_with_feature_weights=False,
+    max_features="sqrt",
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+
+    if isinstance(sample_weights_list, dict):
+        best_clf = None
+        best_score = -1
+        for temperature in sample_weights_list.keys():
+            for hyperparameter, sample_weights in sample_weights_list[
+                temperature
+            ].items():
+                feature_weight = feature_weights[temperature][hyperparameter]
+                not_zero_indices = np.array(sample_weights) > 0
+                N_train = N.loc[not_zero_indices, :]
+                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+
+                clf, score = train_random_forest_classifier(
+                    N_train[columns].values,
+                    N_train[label].values,
+                    train_sample_weights,
+                    feature_weight,
+                    random_state=random_state,
+                    n_splits=n_splits,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    splitter=splitter,
+                    n_estimators=n_estimators,
+                    max_features=max_features,
+                    scoring="accuracy",
+                )
+                if score > best_score:
+                    best_score = score
+                    best_clf = clf
+    else:
+        N_train = N.copy()
+        train_sample_weights = sample_weights_list.copy()
+
+        best_clf, _ = train_random_forest_classifier(
+            N_train[columns].values,
+            N_train[label].values,
+            train_sample_weights,
+            feature_weights,
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=n_estimators,
+            max_features=max_features,
+            scoring="accuracy",
+        )
+
+    y_predictions = best_clf.predict(T[columns].values)
+    probabilities = best_clf.predict_proba(T[columns].values)[:, 1]
+
+    return y_predictions, probabilities
+
+
 def train_pu_classifier(
     X,
     y,
@@ -436,6 +520,7 @@ def train_random_forest_classifier(
     splitter="feature_weighted_best",
     n_estimators=500,
     max_features="sqrt",
+    scoring="roc_auc",
     **kwargs,
 ):
     """Train a classifier to measure the auroc
@@ -454,18 +539,11 @@ def train_random_forest_classifier(
         n_splits = len(y) - target_sum
     if n_splits == 1:
         n_splits = 2
-    skf = StratifiedKFold(n_splits=int(n_splits), shuffle=True, random_state=random_state)
+    skf = StratifiedKFold(
+        n_splits=int(n_splits), shuffle=True, random_state=random_state
+    )
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
-    param_grid = {
-        "min_weight_fraction_leaf": [
-            0.0,
-            0.01,
-            0.025,
-            0.05,
-            0.1,
-        ],
-    }
     clf = RandomForestClassifier(
         random_state=random_state,
         splitter=splitter,
@@ -477,7 +555,7 @@ def train_random_forest_classifier(
         param_grid,
         cv=skf,
         n_jobs=-1,
-        scoring="roc_auc",
+        scoring=scoring,
         refit=True,
     )
 
@@ -640,15 +718,7 @@ def train_random_forest_classifier_fairness(
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
-    param_grid = {
-        "min_weight_fraction_leaf": [
-            0.0,
-            0.01,
-            0.025,
-            0.05,
-            0.1,
-        ],
-    }
+    
     clf = RandomForestClassifier(
         random_state=random_state,
         splitter=splitter,

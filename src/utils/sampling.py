@@ -221,15 +221,15 @@ def repeated_train_val_test_split_fixed_test_set(
         target_values,
         stratify=target_values,
         random_state=random_generator.randint(max_int),
-        test_size=0.5,
+        test_size=(1 / 3),
     )
     for _ in range(n_cv_repeats):
         train_samples, val_samples, _, _ = train_test_split(
-        train_val_samples,
-        train_val_targets,
-        stratify=train_val_targets,
-        random_state=random_generator.randint(max_int),
-        test_size=0.5,
-    )
+            train_val_samples,
+            train_val_targets,
+            stratify=train_val_targets,
+            random_state=random_generator.randint(max_int),
+            test_size=0.5,
+        )
 
-        yield train_samples, val_samples, test_samples
+        yield train_samples.copy(), val_samples.copy(), test_samples.copy()

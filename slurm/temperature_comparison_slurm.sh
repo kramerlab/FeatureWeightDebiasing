@@ -13,6 +13,10 @@
 N_CV_REPEATS=10
 N_CV_SPLITS=5
 DROP=5
+CONFIG=temperature_comparison.config
+BIAS_FRACTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $CONFIG)
+SAMPLE_WEIGHTING_METHOD=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $3}' $CONFIG)
+DATASET=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $4}' $CONFIG)
 
 for BIAS_FRACTION in 0.1 0.2 0.3
 do

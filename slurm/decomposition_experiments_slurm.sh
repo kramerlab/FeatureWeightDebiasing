@@ -23,7 +23,7 @@ do
             do
                 srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results 
             done
         done
     done
@@ -41,7 +41,7 @@ do
             do
                 srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results 
             done
         done
     done
@@ -59,7 +59,7 @@ do
             do
                 srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
+                 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results 
             done
         done
     done
@@ -77,7 +77,7 @@ do
             do
                 srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
-              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
+              --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results 
             done
         done
     done

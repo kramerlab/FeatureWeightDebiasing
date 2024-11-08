@@ -26,7 +26,7 @@ do
         for DATASET in folktables_income folktables_employment  
         do
             srun python ../src/mrs_analysis.py --data_set_name $DATASET --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
-            --drop $DROP --bias_fraction $BIAS_FRACTION &
+            --drop $DROP --bias_fraction $BIAS_FRACTION 
         done
     done
 done
@@ -38,7 +38,7 @@ do
         for DATASET in folktables_income folktables_employment  
         do
             srun python ../src/mrs_analysis.py --data_set_name folktables_income --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
-            --drop $DROP --bias_fraction $BIAS_FRACTION &
+            --drop $DROP --bias_fraction $BIAS_FRACTION 
         done
     done
 done

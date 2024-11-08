@@ -1,14 +1,14 @@
 #!/bin/bash
 
 #SBATCH -A m2_datamining
-#SBATCH -p parallel 
-#SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
+#SBATCH -p longtime 
+#SBATCH -J "feature_weighting_temperature_comparison" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 5-00 # <time in minutes>
-#SBATCH --cpus-per-task=5
+#SBATCH -t 9-00 # <time in minutes>
+#SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
-#SBATCH --mem=16G 
-#SBATCH --array=1-18
+#SBATCH --mem=4G 
+#SBATCH --array=1-36
 
 source ~/.bashrc
 conda_initialize
@@ -21,7 +21,8 @@ CONFIG=temperature_comparison.config
 BIAS_FRACTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $CONFIG)
 SAMPLE_WEIGHTING_METHOD=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $3}' $CONFIG)
 DATASET=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $4}' $CONFIG)
+BIAS_TYPE=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}' $CONFIG)
 
 srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
---bias_type less_positive_class --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
---experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION & 
+--bias_type $BIAS_TYPE --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
+--experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION

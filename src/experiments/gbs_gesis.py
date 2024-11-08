@@ -2,6 +2,7 @@ import json
 import numpy as np
 from pathlib import Path
 from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
+from utils.statistics import create_result_path
 from utils.visualization import (
     plot_statistical_analysis,
     plot_sample_weights,
@@ -27,7 +28,9 @@ def gbs_gesis_experiment(
     :param method: Method name, defaults to ""
     """
     random_generator = np.random.RandomState(seed)
-    visualisation_path = create_result_path(method)
+    result_path = create_result_path(
+        "mrs", "", "gbs_gesis", experiment_name="mrs_analysis"
+    )
     df = df.sample(frac=1)
     mmd_list = []
     mean_list = []
@@ -42,7 +45,7 @@ def gbs_gesis_experiment(
         scaled_N,
         scaled_R,
         columns,
-        save_path=visualisation_path,
+        save_path=result_path,
         mean_list=mean_list,
         mmd_list=mmd_list,
         drop=1,
@@ -64,7 +67,7 @@ def gbs_gesis_experiment(
     )
 
     remaining_samples = np.count_nonzero(sample_weights != 0)
-    plot_sample_weights(sample_weights, visualisation_path, 0, "GBS")
+    plot_sample_weights(sample_weights, result_path, 0, "GBS")
 
     result_dict = {
         "MMDs": weighted_mmd,
@@ -78,25 +81,13 @@ def gbs_gesis_experiment(
             "wasserstein": wasserstein_distances[index],
         }
 
-    with open(visualisation_path / "results.json", "w") as result_file:
+    with open(result_path / "results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
 
     plot_statistical_analysis(
         bins,
         scaled_N[columns],
         scaled_R[columns],
-        visualisation_path,
+        result_path,
         sample_weights,
     )
-
-
-def create_result_path(method):
-    """Creates the result path and makes the directory.
-
-    :param method: Method name
-    :return: The result path
-    """
-    result_path = Path("../results")
-    result_path = result_path / method / "gbs_gesis"
-    result_path.mkdir(exist_ok=True, parents=True)
-    return result_path

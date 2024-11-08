@@ -116,6 +116,7 @@ def create_result_path(
     data_set_name,
     experiment_name="downstream",
     bias_fraction="",
+    prefix="../.."
 ):
     """The function creates the save path and makes the directory.
 
@@ -125,7 +126,7 @@ def create_result_path(
     :return: The result path
     """
     file_directory = Path(__file__).parent
-    result_path = Path(file_directory, "../../results")
+    result_path = Path(file_directory, f"{prefix}/results")
     result_path = (
         result_path
         / experiment_name

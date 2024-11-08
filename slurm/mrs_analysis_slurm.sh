@@ -3,14 +3,15 @@
 #SBATCH -A m2_datamining
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
-#SBATCH -n 10 # gives SLURM_NTASKS
-#SBATCH -t 7200 # <time in minutes>
+#SBATCH -n 1 # gives SLURM_NTASKS
+#SBATCH -t 5-00 # <time in minutes>
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
-#SBATCH --mem=200000M 
+#SBATCH --mem=8G 
 
 
-NUMBER_OF_REPETETIONS=1
+NUMBER_OF_REPETETIONS=10
+N_CV_SPLITS=5
 DROP=1
 
 python srun src/mrs_analysis.py --data_set_name gbs_gesis --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP &
@@ -24,7 +25,7 @@ do
     do 
         for DATASET in folktables_income folktables_employment  
         do
-            srun python src/mrs_analysis.py --data_set_name $DATASET --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
+            srun python ../src/mrs_analysis.py --data_set_name $DATASET --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
             --drop $DROP --bias_fraction $BIAS_FRACTION &
         done
     done
@@ -36,7 +37,7 @@ do
     do 
         for DATASET in folktables_income folktables_employment  
         do
-            srun python /src/mrs_analysis.py --data_set_name folktables_income --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
+            srun python ../src/mrs_analysis.py --data_set_name folktables_income --bias_type $BIAS_TYPE --number_of_repetitions $NUMBER_OF_REPETETIONS\
             --drop $DROP --bias_fraction $BIAS_FRACTION &
         done
     done

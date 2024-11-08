@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 
 from utils.metrics import calculate_rbf_gamma, compute_metrics, scale_df
-from utils.statistics import logistic_regression
+from utils.statistics import create_result_path, logistic_regression
 from utils.visualization import (
     plot_statistical_analysis,
     plot_sample_weights,
@@ -32,7 +32,9 @@ def gbs_allensbach_experiment(
     :param number_of_repetitions: Number of repetetions of the experiment
     """
     random_generator = np.random.RandomState(seed)
-    result_path = create_result_path(method)
+    result_path = create_result_path(
+        "mrs", "", "gbs_allensbach", experiment_name="mrs_analysis"
+    )
     df = df.sample(frac=1)
     mmd_list = []
     mean_list = []
@@ -64,9 +66,7 @@ def gbs_allensbach_experiment(
             weighted_mmd,
             sample_biases,
             wasserstein_distances,
-        ) = compute_metrics(
-            scaled_N, scaled_R, scaler, weights, columns, gamma
-        )
+        ) = compute_metrics(scaled_N, scaled_R, scaler, weights, columns, gamma)
 
         plot_sample_weights(weights, result_path / "weights", i)
         remaining_samples = np.count_nonzero(weights != 0)
@@ -105,16 +105,3 @@ def gbs_allensbach_experiment(
     plot_statistical_analysis(
         bins, scaled_N[columns], scaled_R[columns], result_path, weights, method
     )
-
-
-def create_result_path(method):
-    """Creates the result path and makes the directory.
-
-    :param method: Method name
-    :return: Result path
-    """
-    file_directory = Path(__file__).parent
-    result_path = Path(file_directory, "../../results")
-    result_path = result_path / method / "gbs_allensbach"
-    result_path.mkdir(exist_ok=True, parents=True)
-    return result_path

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from experiments.downstream_tasks import repeated_train_val_test_split
 from utils.parameter import set_parameter
+from utils.statistics import create_result_path
 from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset
@@ -38,17 +39,22 @@ def analyse_mrs(
     mrs_iteration_list = []
     rocs_list_list = []
     relative_bias_list_list = []
-    result_path = create_save_path(
-        data_set_name, bias_type, bias_fraction=bias_fraction
+    result_path = create_result_path(
+        "mrs",
+        bias_type,
+        data_set_name,
+        bias_fraction=bias_fraction,
+        experiment_name="mrs_analysis",
+        prefix=".."
     )
     mmd_list = []
     (
-        splitter,
-        draw_with_feature_weights,
-        temperatures,
-        dropped_samples_val_dict,
-        auroc_val_dict,
-        auprc_val_dict,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
         hyperparameter_list,
     ) = set_parameter("mrs-forest")
 
@@ -132,22 +138,6 @@ def analyse_mrs(
         number_of_samples,
         drop,
     )
-
-
-def create_save_path(data_set_name, bias_type, bias_fraction):
-    """Creates the path for result files
-
-    :param data_set_name: Data set name
-    :param bias_type: Bias type name
-    :return: File path
-    """
-    file_directory = Path(__file__).parent
-    result_path = Path(file_directory, "../results")
-    result_path = (
-        result_path / "mrs_analysis" / data_set_name / bias_type / str(bias_fraction)
-    )
-    result_path.mkdir(exist_ok=True, parents=True)
-    return result_path
 
 
 if __name__ == "__main__":

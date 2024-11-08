@@ -3,11 +3,11 @@
 #SBATCH -A m2_datamining
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
-#SBATCH -n 10 # gives SLURM_NTASKS
-#SBATCH -t 7200 # <time in minutes>
-#SBATCH --cpus-per-task=4
+#SBATCH -n 1 # gives SLURM_NTASKS
+#SBATCH -t 5-00 # <time in minutes>
+#SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
-#SBATCH --mem=200000M 
+#SBATCH --mem=16G
 
 N_CV_REPEATS=50
 
@@ -57,7 +57,7 @@ do
         do
             for DATASET in breast_cancer loan_prediction
             do
-                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
                  --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done
@@ -75,7 +75,7 @@ do
         do
             for DATASET in folktables_income hr_analytics folktables_employment
             do
-                srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+                srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
                 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
               --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results &
             done

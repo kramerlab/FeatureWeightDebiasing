@@ -9,6 +9,10 @@
 #SBATCH --nodes=1
 #SBATCH --mem=8G 
 
+source ~/.bashrc
+conda_initialize
+micromamba activate feature_weighted_mrs
+
 DROP=1
 N_CV_REPEATS=50
 DATASET=gbs_allensbach

@@ -17,6 +17,9 @@ DROP=1
 python srun src/mrs_analysis.py --data_set_name gbs_gesis --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP &
 python srun src/mrs_analysis.py --data_set_name gbs_allensbach --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP &
 
+source ~/.bashrc
+conda_initialize
+micromamba activate feature_weighted_mrs
 
 DROP=5
 for BIAS_FRACTION in 0.1 0.2 0.3

@@ -7,7 +7,7 @@
 #SBATCH -t 9-00 # <time in minutes>
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
-#SBATCH --mem=4G 
+#SBATCH --mem=16G 
 #SBATCH --array=1-36
 
 source ~/.bashrc

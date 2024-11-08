@@ -3,11 +3,11 @@
 #SBATCH -A m2_datamining
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
-#SBATCH -n 4 # gives SLURM_NTASKS
-#SBATCH -t 7200 # <time in minutes>
-#SBATCH --cpus-per-task=10
+#SBATCH -n 1 # gives SLURM_NTASKS
+#SBATCH -t 1-00 # 
+#SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
-#SBATCH --mem=200000M 
+#SBATCH --mem=8G 
 
 DROP=1
 N_CV_REPEATS=50

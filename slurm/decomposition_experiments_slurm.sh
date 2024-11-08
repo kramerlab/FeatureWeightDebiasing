@@ -14,6 +14,10 @@ source ~/.bashrc
 conda_initialize
 micromamba activate feature_weighted_mrs
 
+source ~/.bashrc
+conda_initialize
+micromamba activate feature_weighted_mrs
+
 N_CV_REPEATS=50
 
 CONFIG=downstream_task_experiment.config

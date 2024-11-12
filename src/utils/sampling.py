@@ -4,49 +4,6 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 
 seed = 5
 
-
-def sample(
-    bias_type,
-    df,
-    bias_variable,
-    bias_fraction=0.1,
-    train_fraction=0.25,
-    columns=None,
-    random_generator=None,
-):
-    """Samples a biased and a representative data set.
-
-    :param bias_type: Defines how the data should be biased
-    :param df: Data set as pandas.DataFrame
-    :param bias_variable: The target variable
-    :param bias_fraction: Defines which fraction of the biased class is samples, defaults to 0.1
-    :param train_fraction: Defines the size of the train set, defaults to 0.25
-    :param columns: Columns that are used to compute the mean sample, defaults to None
-    :return: A biased and a representative data set
-    """
-    # Sample from the data set because the complete one is too big.
-    if len(df) > 5000:
-        df = df.sample(5000, random_state=random_generator, replace=False)
-    train = df.groupby(bias_variable, group_keys=False).apply(
-        lambda x: x.sample(
-            frac=train_fraction, random_state=random_generator, replace=False
-        )
-    )
-    R = df.drop(train.index).reset_index(drop=True)
-    N = sample_N(
-        bias_type,
-        bias_fraction,
-        columns,
-        train,
-        bias_variable,
-    )
-
-    N["label"] = 1
-    R["label"] = 0
-
-    return N, R
-
-
 def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_generator):
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]

@@ -179,6 +179,7 @@ def decomposition_experiment(
                 probabilities_val_dict[float(temperature)].append(probabilities)
 
     predictions_list = np.array(predictions_list).squeeze()
+    predictions_list = predictions_list.astype(int)
     probabilities_list = np.array(probabilities_list).squeeze()
     y_true = T[target].values
 

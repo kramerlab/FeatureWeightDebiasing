@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
 #SBATCH --mem=16G
-#SBATCH --array=1-356
+#SBATCH --array=1-360
 
 source ~/.bashrc
 conda_initialize
@@ -23,6 +23,6 @@ SAMPLE_WEIGHTING_METHOD=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTask
 DATASET=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}' $CONFIG)
 DROP=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $6}' $CONFIG)
 
-srun python src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
 --bias_type $BIAS_TYPE --experiment_name decomposition --bias_fraction $BIAS_FRACTION \
 --drop $DROP --n_cv_repeats $N_CV_REPEATS --load_previous_results 

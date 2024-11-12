@@ -43,7 +43,7 @@ do
     for BIAS_TYPE in mean_difference 
     do
         for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform fw-mrs-temperature-mean \
-            soft-mrs-linear soft-mrs-exponential
+            soft-mrs-linear soft-mrs-exponential fw-mrs-temperature-svm
         do
             for DATASET in breast_cancer loan_prediction
             do

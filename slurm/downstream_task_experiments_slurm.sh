@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
 #SBATCH --mem=16G
-#SBATCH --array=1-356
+#SBATCH --array=1-360
 
 source ~/.bashrc
 conda_initialize

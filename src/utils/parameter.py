@@ -2,7 +2,7 @@ def set_parameter(method_name):
     dropped_samples_val_dict = None
     auroc_val_dict = None
     auprc_val_dict = None
-    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature-mean"):
+    if method_name in ("fw-mrs-temperature", ):
         splitter = "feature_weighted_best"
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]

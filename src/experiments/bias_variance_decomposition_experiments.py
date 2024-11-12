@@ -79,7 +79,6 @@ def decomposition_experiment(
         predictions_val_dict = {0.0: []}
         probabilities_val_dict = {0.0: []}
 
-    mean = True if method_name == "fw-mrs-temperature-mean" else False
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split_fixed_test_set(
@@ -122,7 +121,6 @@ def decomposition_experiment(
                 budgets=temperatures,
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
-                mean=mean,
                 compute_bias=False,
             )
 
@@ -154,7 +152,6 @@ def decomposition_experiment(
 
         if method_name in (
             "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
             "fw-mrs-temperature-svm",
             "mrs-forest",
         ):

@@ -74,8 +74,6 @@ def perform_statistical_analysis_mrs(
         hyperparameter_list,
     ) = set_parameter(method_name)
 
-    mean = True if method_name == "fw-mrs-temperature-mean" else False
-
     scaler = StandardScaler()
 
     for i, (N, R, T) in enumerate(
@@ -101,7 +99,6 @@ def perform_statistical_analysis_mrs(
             early_stopping=True,
             random_generator=random_generator,
             budgets=temperatures,
-            mean=mean,
             hyperparameter_list=hyperparameter_list,
             target=target,
         )
@@ -148,7 +145,6 @@ def perform_statistical_analysis_mrs(
 
         if method_name not in (
             "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,

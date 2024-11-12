@@ -4,7 +4,7 @@ DROP=5
 
 for BIAS_FRACTION in 0.1 0.2 0.3
 do
-    for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature fw-mrs-temperature-mean fw-mrs-temperature-svm
+    for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature fw-mrs-temperature-svm
     do
             for DATASET in folktables_income folktables_employment  
             do

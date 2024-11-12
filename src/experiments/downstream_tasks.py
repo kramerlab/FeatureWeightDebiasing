@@ -101,7 +101,6 @@ def downstream_tasks_experiment(
         hyperparameter_list,
     ) = set_parameter(method_name)
 
-    mean = True if method_name == "fw-mrs-temperature-mean" else False
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
@@ -146,7 +145,6 @@ def downstream_tasks_experiment(
                 budgets=temperatures,
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
-                mean=mean,
                 compute_bias=False,
             )
 
@@ -160,25 +158,6 @@ def downstream_tasks_experiment(
             save_weights(sample_weights_save_path, sample_weight_list)
             save_weights(feature_weights_save_path, feature_weight_list)
 
-        if method_name not in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
-        ):
-            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                sample_weights,
-                gamma,
-            )
-
-            relative_bias = relative_bias.drop(["label"])
-        else:
-            weighted_mmd = np.ones(len(N.columns))
-            relative_bias = np.ones(len(N.columns))
-            wasserstein_distances = np.ones(len(N.columns))
-
         (
             rf_auroc,
             rf_auprc,
@@ -187,7 +166,7 @@ def downstream_tasks_experiment(
             roc_curve_values,
             best_temperature,
             best_hyperparameter,
-            best_clf,
+            _,
         ) = compute_classification_metrics_random_forest(
             N,
             T,
@@ -206,9 +185,27 @@ def downstream_tasks_experiment(
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
 
+        if method_name not in (
+            "fw-mrs-temperature",
+            "fw-mrs-temperature-svm",
+        ):
+            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+                N,
+                R,
+                scaler,
+                columns,
+                best_sample_weights,
+                gamma,
+            )
+
+            relative_bias = relative_bias.drop(["label"])
+        else:
+            weighted_mmd = np.ones(len(N.columns))
+            relative_bias = np.ones(len(N.columns))
+            wasserstein_distances = np.ones(len(N.columns))
+
         if method_name in (
             "fw-mrs-temperature",
-            "fw-mrs-temperature-mean",
             "fw-mrs-temperature-svm",
             "mrs-forest",
         ):
@@ -310,7 +307,6 @@ def downstream_tasks_experiment(
 
     if method_name in (
         "fw-mrs-temperature",
-        "fw-mrs-temperature-mean",
         "fw-mrs-temperature-svm",
     ):
         visualize_boxplot(auroc_val_dict, "AUROC", validation_path / "auroc_comparison")
@@ -338,7 +334,6 @@ def downstream_tasks_experiment(
 
     if method_name in (
         "fw-mrs-temperature",
-        "fw-mrs-temperature-mean",
         "mrs-forest",
         "fw-mrs-temperature-svm",
     ):

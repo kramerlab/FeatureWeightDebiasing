@@ -182,70 +182,32 @@ def compute_metrics(
     :param gamma: Gamma for the rbf kernel
     :return: Result metrics
     """
-    if isinstance(sample_weights_list, dict):
-        best_weighted_mmd = np.inf
-        best_sample_biases = np.inf
-        best_wasserstein_distances = np.inf
-        for temperature in sample_weights_list.keys():
-            for _, sample_weights in sample_weights_list[temperature].items():
-                wasserstein_distances = []
-                N_dropped = scaled_N[columns].values
-                R_dropped = scaled_R[columns].values
-                weighted_mmd = weighted_maximum_mean_discrepancy(
-                    N_dropped,
-                    R_dropped,
-                    sample_weights,
-                    gamma,
-                )
-                for i in range(scaled_N.values.shape[1]):
-                    u_values = scaled_N.values[:, i]
-                    v_values = scaled_R.values[:, i]
-                    wasserstein_distance_value = wasserstein_distance(
-                        u_values, v_values, sample_weights
-                    )
-                    wasserstein_distances.append(wasserstein_distance_value)
+    best_wasserstein_distances = []
+    N_dropped = scaled_N[columns].values
+    R_dropped = scaled_R[columns].values
 
-                sample_biases = compute_relative_bias(
-                    scaled_N, scaled_R, sample_weights
-                )
-                unscaled_N = scaled_N.copy()
-                unscaled_R = scaled_R.copy()
-                unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
-                unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
-                sample_biases = compute_relative_bias(
-                    unscaled_N, unscaled_R, sample_weights
-                )
-                if weighted_mmd < best_weighted_mmd:
-                    best_weighted_mmd = weighted_mmd
-                    best_sample_biases = sample_biases
-                    best_wasserstein_distances = wasserstein_distances
-    else:
-        best_wasserstein_distances = []
-        N_dropped = scaled_N[columns].values
-        R_dropped = scaled_R[columns].values
+    best_weighted_mmd = weighted_maximum_mean_discrepancy(
+        N_dropped,
+        R_dropped,
+        sample_weights_list,
+        gamma,
+    )
 
-        best_weighted_mmd = weighted_maximum_mean_discrepancy(
-            N_dropped,
-            R_dropped,
-            sample_weights_list,
-            gamma,
+    for i in range(scaled_N.values.shape[1]):
+        u_values = scaled_N.values[:, i]
+        v_values = scaled_R.values[:, i]
+        wasserstein_distance_value = wasserstein_distance(
+            u_values, v_values, sample_weights_list
         )
+        best_wasserstein_distances.append(wasserstein_distance_value)
 
-        for i in range(scaled_N.values.shape[1]):
-            u_values = scaled_N.values[:, i]
-            v_values = scaled_R.values[:, i]
-            wasserstein_distance_value = wasserstein_distance(
-                u_values, v_values, sample_weights_list
-            )
-            best_wasserstein_distances.append(wasserstein_distance_value)
-
-        unscaled_N = scaled_N.copy()
-        unscaled_R = scaled_R.copy()
-        unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
-        unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
-        best_sample_biases = compute_relative_bias(
-            unscaled_N, unscaled_R, sample_weights_list
-        )
+    unscaled_N = scaled_N.copy()
+    unscaled_R = scaled_R.copy()
+    unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
+    unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
+    best_sample_biases = compute_relative_bias(
+        unscaled_N, unscaled_R, sample_weights_list
+    )
 
     return (
         best_weighted_mmd,

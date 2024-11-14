@@ -171,12 +171,6 @@ def temperature_comparison(
                 auroc_save_path, feature_weighted_aurocs_list, file_name="method_aurocs"
             )
 
-        plot_budget_comparison_auroc_mean(
-            feature_weighted_aurocs_list,
-            number_of_samples_list,
-            drop,
-            result_path / "mean_auroc",
-        )
 
         for temperature, values in sample_weights.items():
             key = next(iter(values.keys()))
@@ -190,6 +184,13 @@ def temperature_comparison(
             number_of_samples_list,
             drop,
             auroc_save_path / f"auroc_{i}",
+        )
+
+        plot_budget_comparison_auroc_mean(
+            feature_weighted_aurocs_list,
+            number_of_samples_list,
+            drop,
+            result_path / "mean_auroc",
         )
 
     for temperature, values in dropped_samples_dict.items():

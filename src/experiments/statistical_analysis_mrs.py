@@ -61,7 +61,6 @@ def perform_statistical_analysis_mrs(
     mmd_list = []
     pvalue_list = []
     abs_feature_importance_list = []
-    feature_importance_list = []
     roc_curves_list = []
 
     (
@@ -214,7 +213,6 @@ def perform_statistical_analysis_mrs(
             "rf_auprc.json",
             "dropped_samples.json",
             "abs_feature_importance.json",
-            "feature_importance.json",
             "roc_curves.json",
         ),
         (
@@ -225,7 +223,6 @@ def perform_statistical_analysis_mrs(
             rf_auprc_list,
             dropped_samples_list,
             abs_feature_importance_list,
-            feature_importance_list,
             roc_curves_list,
         ),
     ):
@@ -244,6 +241,13 @@ def perform_statistical_analysis_mrs(
         sample_weights_list[-1],
         method_name,
     )
+
+    mean_feature_importances_dict = {}
+    for i, feature_name in enumerate(columns):
+        feature_importances = abs_feature_importance_list[:, i]
+        mean_feature_importances_dict[feature_name] = np.mean(feature_importances)
+    with open(result_path / "mean_feature_importances.json", "w") as result_file:
+            result_file.write(json.dumps(data))
 
 
 def compute_confidence_interval(data, confidence=0.95):

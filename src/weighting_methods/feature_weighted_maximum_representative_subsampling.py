@@ -114,7 +114,6 @@ def feature_weighted_repeated_MRS(
     random_generator=None,
     n_pu_splits=5,
     hyperparameter_list=[],
-    mean=False,
     return_metrics=False,
     *args,
     **attributes,
@@ -174,7 +173,6 @@ def feature_weighted_repeated_MRS(
         switched_dict,
         auroc_dict,
         mmd_dict,
-        mean,
     )
 
     for i in trange(number_of_iterations):

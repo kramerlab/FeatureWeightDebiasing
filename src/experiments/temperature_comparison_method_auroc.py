@@ -45,7 +45,7 @@ def temperature_comparison(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    if method_name in ("fw-mrs-temperature", ):
+    if method_name in ("fw-mrs-temperature",):
         temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [0.05, 0.025, 0.0]
     if method_name == "fw-mrs-temperature-svm":
@@ -170,6 +170,13 @@ def temperature_comparison(
             save_weights(
                 auroc_save_path, feature_weighted_aurocs_list, file_name="method_aurocs"
             )
+
+        plot_budget_comparison_auroc_mean(
+            feature_weighted_aurocs_list,
+            number_of_samples_list,
+            drop,
+            result_path / "mean_auroc",
+        )
 
         for temperature, values in sample_weights.items():
             key = next(iter(values.keys()))

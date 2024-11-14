@@ -244,7 +244,7 @@ def downstream_tasks_experiment(
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
-            rf_auroc_list.append(rf_auroc)
+        rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
 
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)

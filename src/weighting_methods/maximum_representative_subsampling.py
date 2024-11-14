@@ -101,14 +101,7 @@ def mrs_step(
 
 
 def mrs_without_cv(
-    N,
-    R,
-    columns,
-    target,
-    n_drop: int = 1,
-    random_state=None,
-    *args,
-    **attributes
+    N, R, columns, target, n_drop: int = 1, random_state=None, *args, **attributes
 ):
     """Performs one iteration of maximum representative sampling without cross-validation
 
@@ -241,7 +234,9 @@ def mrs(
                 relative_bias_dict[hyperparameter].append(relative_bias)
 
             auc_difference = abs(auroc - 0.5)
-            if auc_difference <= best_difference_dict[hyperparameter] or auroc <= 0.5:
+            if auc_difference <= best_difference_dict[hyperparameter] or (
+                not switched_dict[hyperparameter] and auroc <= 0.5
+            ):
                 best_weights_dict[hyperparameter] = (
                     sample_weights_dict[hyperparameter]
                     .copy()
@@ -278,7 +273,7 @@ def mrs(
             if (
                 len(remaining) <= drop
                 or len(remaining) <= n_pu_splits
-                or (auc_difference <= delta and early_stopping)
+                or auc_difference <= delta
                 or switched_dict[hyperparameter]
             ):
                 finished_dict[hyperparameter] = True

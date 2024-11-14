@@ -268,7 +268,6 @@ def initialize_dictionaries(
     switched_dict={},
     auc_dict={},
     mmd_dict={},
-    mean=False,
     mrs_step=mrs_step,
 ):
     for temperature in budgets:

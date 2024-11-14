@@ -92,7 +92,6 @@ def downstream_tasks_experiment(
     scaler = StandardScaler()
 
     (
-        splitter,
         draw_with_feature_weights,
         temperatures,
         dropped_samples_val_dict,
@@ -176,7 +175,6 @@ def downstream_tasks_experiment(
             target,
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
-            splitter=splitter,
             n_estimators=500,
             n_splits=5,
         )
@@ -231,7 +229,6 @@ def downstream_tasks_experiment(
                     target,
                     random_state=seed,
                     draw_with_feature_weights=draw_with_feature_weights,
-                    splitter=splitter,
                     n_estimators=500,
                     n_splits=5,
                     compute_feature_importance=False,
@@ -308,6 +305,7 @@ def downstream_tasks_experiment(
     if method_name in (
         "fw-mrs-temperature",
         "fw-mrs-temperature-svm",
+        "mrs-forest",
     ):
         visualize_boxplot(auroc_val_dict, "AUROC", validation_path / "auroc_comparison")
         visualize_boxplot(auprc_val_dict, "AUPRC", validation_path / "auprc_comparison")

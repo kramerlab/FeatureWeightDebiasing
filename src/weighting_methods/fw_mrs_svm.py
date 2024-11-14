@@ -42,7 +42,7 @@ def mrs_step(
     """
     auroc_list = []
     abs_feature_importance_list = []
-    dropped_N = N[sample_weights != 0]
+    dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -236,8 +236,7 @@ def fw_MRS_SVM(
                     auroc_dict[temperature][hyperparameter].append(auroc)
 
                 if (
-                    (auc_difference + delta)
-                    <= best_difference_dict[temperature][hyperparameter]
+                    auc_difference <= best_difference_dict[temperature][hyperparameter]
                     or (not switched_dict[temperature][hyperparameter] and auroc <= 0.5)
                 ) and not finished_dict[temperature][hyperparameter]:
                     best_difference_dict[temperature][hyperparameter] = auc_difference
@@ -264,7 +263,7 @@ def fw_MRS_SVM(
 
         if (
             all(all(finished.values()) for finished in finished_dict.values())
-            and not return_metrics
+            and early_stopping
         ):
             break
 

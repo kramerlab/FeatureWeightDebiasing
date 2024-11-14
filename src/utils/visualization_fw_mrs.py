@@ -71,7 +71,6 @@ def plot_budget_comparison_auroc_mean(
 ):
     if wide:
         plt.figure(figsize=(10, 5))
-    stop = 0
     min_length = np.min(
         [
             [len(auroc_list) for auroc_list in auroc_lists.values()]
@@ -79,7 +78,7 @@ def plot_budget_comparison_auroc_mean(
         ]
     )
     min_number_of_samples = np.min(number_of_samples)
-    x_labels = list(range(min_number_of_samples, stop, -drop))[:min_length]
+    x_labels = list(range(min_number_of_samples, 0, -drop))[:min_length]
     for i, budget in enumerate(auroc_list_of_dictionaries[0].keys()):
         auroc_list = []
         for dictionary in auroc_list_of_dictionaries:

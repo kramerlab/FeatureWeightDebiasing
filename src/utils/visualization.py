@@ -20,6 +20,16 @@ default_cycle = cycler(
     ],
 ) + cycler(color=sns.color_palette()[:7])
 
+line_styles = [
+    "solid",
+    "dotted",
+    "dashdot",
+    "dashed",
+    (5, (10, 3)),
+    (0, (3, 1, 1, 1, 1, 1)),
+    (5, (10, 3)),
+]
+
 
 def plot_cumulative_distribution_function(
     N,
@@ -150,13 +160,13 @@ def plot_statistical_analysis(
 
 
 def plot_auc_average(
-    auc_score,
-    std_aucs,
+    auc_dicts,
     drop,
     file_name,
     number_of_samples,
     mrs_iterations,
     wide=True,
+    n_ticks=5,
 ):
     """Plots average aurocs with variance
 
@@ -171,12 +181,29 @@ def plot_auc_average(
     if wide:
         plt.figure(figsize=(12.8, 4.8))
 
-    aucs_upper = np.minimum(auc_score + std_aucs, 1)
-    aucs_lower = np.maximum(auc_score - std_aucs, 0)
-    stop = number_of_samples - ((auc_score.size) * drop)
-    x_labels = list(range(number_of_samples, stop, -drop))
-    plt.fill_between(x_labels, aucs_lower, aucs_upper, color="blue", alpha=0.2)
-    plt.plot(x_labels, auc_score, color="blue", linestyle="-")
+    min_length = np.min(
+        [
+            [len(auroc_list) for auroc_list in auroc_lists.values()]
+            for auroc_lists in auc_dicts
+        ]
+    )
+    min_number_of_samples = np.min(number_of_samples)
+    x_labels = list(range(min_number_of_samples, 0, -drop))[:min_length]
+    for i, hyperparameter in enumerate(auc_dicts[0].keys()):
+        mmd_list = []
+        for dictionary in auc_dicts:
+            mmd_list.append(dictionary[float(hyperparameter)][:min_length])
+
+        mean = np.mean(mmd_list, axis=0)
+        std = np.std(mmd_list, axis=0)
+        aucs_upper = np.minimum(mean + std, 1)
+        aucs_lower = np.maximum(mean - std, 0)
+
+        sns.lineplot(
+            x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
+        )
+        plt.fill_between(x_labels, aucs_lower, aucs_upper, alpha=0.2)
+
     random_line = len(x_labels) * [0.5]
     plt.plot(
         x_labels,
@@ -186,28 +213,12 @@ def plot_auc_average(
         label="Random",
     )
     plt.ylabel("AUROC")
-    mrs_iterations = number_of_samples - (np.array(mrs_iterations))
-    minimum = min(0.5, np.min(aucs_lower)) - 0.01
-    maximum = plt.gca().get_ylim()[1] + 0.01
-    plt.margins(0.05, 0)
-    plt.vlines(
-        mrs_iterations,
-        minimum,
-        maximum,
-        colors="black",
-        linestyles="solid",
-    )
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
+    plt.xlabel("Number of Remaining Samples")
+    step_size = len(x_labels) // n_ticks
+    x_ticks = x_labels[::-step_size]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
-    plt.xlabel("Number of Remaining Samples")
-    xlim = plt.gca().get_xlim()
-    ax2 = plt.gca().twiny()
-    ax2.set_xlim(xlim)
-    plt.xticks(list(mrs_iterations))
-    [tick.set_color("blue") for tick in plt.gca().get_xticklabels()]
+
     plt.savefig(f"{file_name}.pdf")
     plt.close()
 
@@ -237,35 +248,28 @@ def plot_mmds_average(
         ]
     )
     min_number_of_samples = np.min(number_of_samples)
-    x_labels = list(range(min_number_of_samples, stop, -drop))[:min_length]
-    for i, budget in enumerate(mmds_dicts[0].keys()):
+    x_labels = list(range(min_number_of_samples, 0, -drop))[:min_length]
+    for i, hyperparameter in enumerate(mmds_dicts[0].keys()):
         mmd_list = []
         for dictionary in mmds_dicts:
-            dictionary = {float(k): v for k, v in dictionary.items()}
-            mmd_list.append(dictionary[float(budget)][:min_length])
-            
-        mmds_upper = mmds_dicts + std
-        mmds_lower = np.maximum(mmds_dicts - std, 0)
-        stop = number_of_samples - ((mmds_dicts.size) * drop)
-        plt.fill_between(x_labels, mmds_lower, mmds_upper, color="blue", alpha=0.2)
-        plt.plot(x_labels, mmds_dicts, linestyle="-")
+            mmd_list.append(dictionary[float(hyperparameter)][:min_length])
 
-    minimum = np.min(mmds_lower) - 0.001
-    maximum = plt.gca().get_ylim()[1] + 0.001
-    plt.margins(0.05, 0)
-    mrs_iterations = number_of_samples - np.array(mrs_iterations)
-    plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
+        mean = np.mean(mmd_list, axis=0)
+        std = np.std(mmd_list, axis=0)
+        mmds_upper = mean + std
+        mmds_lower = np.maximum(mean - std, 0)
+        sns.lineplot(
+            x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
+        )
+        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
+
     plt.ylabel("Maximum Mean Discrepancy")
     plt.xlabel("Number of Remaining Samples")
     step_size = len(x_labels) // n_ticks
     x_ticks = x_labels[::-step_size]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
-    xlim = plt.gca().get_xlim()
-    ax2 = plt.gca().twiny()
-    ax2.set_xlim(xlim)
-    plt.xticks(mrs_iterations)
-    [tick.set_color("blue") for tick in plt.gca().get_xticklabels()]
+
     plt.savefig(f"{file_name}.pdf")
     plt.close()
 
@@ -376,12 +380,12 @@ def plot_rocs_downstream(roc_list, file_name):
 
 
 def plot_relative_bias(
-    mean_relative_bias_list,
-    std_relative_bias_list,
+    relative_bias_dict,
     file_name,
     mrs_iterations,
     number_of_samples,
     drop,
+    n_ticks=5,
 ):
     """Plots relative biases
 
@@ -392,34 +396,35 @@ def plot_relative_bias(
     :param number_of_samples: Number of samples in the original data set
     :param drop: Number of dropped elements per iteration
     """
+    min_length = np.min(
+        [
+            [len(auroc_list) for auroc_list in auroc_lists.values()]
+            for auroc_lists in relative_bias_dict
+        ]
+    )
+    min_number_of_samples = np.min(number_of_samples)
+    x_labels = list(range(min_number_of_samples, 0, -drop))[:min_length]
+    for i, hyperparameter in enumerate(relative_bias_dict[0].keys()):
+        mmd_list = []
+        for dictionary in relative_bias_dict:
+            mmd_list.append(dictionary[float(hyperparameter)][:min_length])
+
+        mean = np.mean(mmd_list, axis=0)
+        std = np.std(mmd_list, axis=0)
+        mmds_upper = mean + std
+        mmds_lower = np.maximum(mean - std, 0)
+        sns.lineplot(
+            x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
+        )
+        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
+
+
     plt.xlabel("Number of Remaining Samples")
     plt.ylabel("Relative Bias")
-    ratio_upper = mean_relative_bias_list + std_relative_bias_list
-    ratio_lower = (mean_relative_bias_list - std_relative_bias_list).clip(min=0)
-    stop = number_of_samples - (mean_relative_bias_list.size * drop)
-    x_labels = list(range(number_of_samples, stop, -drop))
-
-    plt.plot(
-        x_labels,
-        mean_relative_bias_list,
-        linestyle="-",
-        color="blue",
-    )
-    plt.fill_between(x_labels, ratio_lower, ratio_upper, color="blue", alpha=0.2)
-    minimum = plt.gca().get_ylim()[0]
-    maximum = plt.gca().get_ylim()[1]
-    plt.margins(0.05, 0)
-    mrs_iterations = number_of_samples - np.array(mrs_iterations)
-    plt.vlines(mrs_iterations, minimum, maximum, colors="black", linestyles="solid")
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
+    step_size = len(x_labels) // n_ticks
+    x_ticks = x_labels[::-step_size]
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
-    xlim = plt.gca().get_xlim()
-    ax2 = plt.gca().twiny()
-    ax2.set_xlim(xlim)
-    plt.xticks(mrs_iterations)
-    [tick.set_color("blue") for tick in plt.gca().get_xticklabels()]
+
     plt.savefig(f"{file_name}.pdf")
     plt.close()

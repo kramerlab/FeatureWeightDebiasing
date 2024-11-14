@@ -64,7 +64,6 @@ def decomposition_experiment(
     scaler = StandardScaler()
 
     (
-        splitter,
         draw_with_feature_weights,
         temperatures,
         _,
@@ -143,7 +142,6 @@ def decomposition_experiment(
             target,
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
-            splitter=splitter,
             n_estimators=500,
             n_splits=5,
         )
@@ -169,7 +167,6 @@ def decomposition_experiment(
                         target,
                         random_state=seed,
                         draw_with_feature_weights=draw_with_feature_weights,
-                        splitter=splitter,
                         n_estimators=500,
                         n_splits=5,
                     )

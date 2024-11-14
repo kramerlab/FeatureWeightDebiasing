@@ -65,7 +65,6 @@ def perform_statistical_analysis_mrs(
     roc_curves_list = []
 
     (
-        splitter,
         draw_with_feature_weights,
         temperatures,
         _,
@@ -88,12 +87,13 @@ def perform_statistical_analysis_mrs(
 
         N = pd.concat([N, R])
         N[columns] = scaler.fit_transform(N[columns])
-        allensbach[columns] = scaler.transform(allensbach[columns])
+        allensbach_copy = allensbach.copy()
+        allensbach_copy[columns] = scaler.transform(allensbach[columns])
         T[columns] = scaler.transform(T[columns])
         gamma = calculate_rbf_gamma(N[columns])
         sample_weights, feature_weights = sample_weighting_method(
             N=N,
-            R=allensbach,
+            R=allensbach_copy,
             columns=columns,
             drop=drop,
             early_stopping=True,
@@ -127,7 +127,6 @@ def perform_statistical_analysis_mrs(
             target,
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
-            splitter=splitter,
             n_estimators=500,
             n_splits=5,
         )
@@ -148,7 +147,7 @@ def perform_statistical_analysis_mrs(
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
-                R,
+                allensbach_copy,
                 scaler,
                 columns,
                 sample_weights,
@@ -234,13 +233,13 @@ def perform_statistical_analysis_mrs(
             result_file.write(json.dumps(data))
 
     N.loc[:, columns] = scaler.inverse_transform(N[columns])
-    R.loc[:, columns] = scaler.inverse_transform(R[columns])
+    allensbach_copy.loc[:, columns] = scaler.inverse_transform(allensbach_copy[columns])
 
     # Plot exemplary last iteration
     plot_statistical_analysis(
         bins,
         N[columns],
-        R[columns],
+        allensbach_copy[columns],
         result_path,
         sample_weights_list[-1],
         method_name,

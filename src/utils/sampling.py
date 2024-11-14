@@ -99,6 +99,7 @@ def sample_with_test_set(
         columns,
         train,
         bias_variable,
+        random_generator=random_generator
     )
 
     N["label"] = 1

@@ -45,7 +45,6 @@ def mrs_step(
     :param columns: Columns names used for training
     :param n_drop: Number of samples to drop every iteration, defaults to 1
     :param cv: Number of cross-validation iterations, defaults to 5
-    :param class_weight: Type of class weights, defaults to "balanced"
     :param random_state: Random state to make results reproducible
     :return: _description_
     """
@@ -107,7 +106,6 @@ def mrs_without_cv(
     columns,
     target,
     n_drop: int = 1,
-    class_weight="balanced",
     random_state=None,
     *args,
     **attributes
@@ -118,7 +116,6 @@ def mrs_without_cv(
     :param R: Representative data set
     :param columns: Name of columns used for training
     :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param class_weights: Type of class weights, defaults to "balanced"
     :param random_state: Random state to make the experiment reproducible, defaults to None
     :return: The index of the element to drop
     """
@@ -126,7 +123,6 @@ def mrs_without_cv(
     clf = train_pu_classifier_mrs(
         data[columns],
         data.label,
-        class_weight=class_weight,
         random_state=random_state,
     )
     predictions = clf.predict_proba(N[columns])[:, 1]
@@ -165,7 +161,6 @@ def mrs(
     :param compute_bias: If true, compute relative bias, defaults to True
     :param bias_variable: Name of the biased variable, defaults to None
     :param cv: Number of cross-validation iterations, defaults to 5
-    :param class_weights: Type of class weights, defaults to "balanced"
     :param drop: Defines how many samples are dropped per iteration, defaults to 1
     :param random_generator: Random generator to create random_states to make results reproducible
     :return: Sample weights or test metrics
@@ -198,7 +193,6 @@ def mrs(
     dropped_N = N.copy().reset_index(drop=True)
     roc_iteration = (len(N) // drop // 3.5) + 1
 
-    N = N.reset_index(drop=True)
     # Compute and save mmd inputs to save time
     # Start values
     if return_metrics:
@@ -208,23 +202,12 @@ def mrs(
             x_x_rbf_matrix = rbf_kernel(N[columns], N[columns], gamma=gamma)
             x_y_rbf_matrix = rbf_kernel(N[columns], R[columns], gamma=gamma)
             y_y_rbf_matrix = rbf_kernel(R[columns], R[columns], gamma=gamma)
-            mmd_dict[hyperparameter].append(
-                weighted_maximum_mean_discrepancy(
-                    N[columns],
-                    R[columns],
-                    sample_weights_dict[hyperparameter],
-                    gamma=gamma,
-                    x_x_rbf_matrix=x_x_rbf_matrix,
-                    x_y_rbf_matrix=x_y_rbf_matrix,
-                    y_y_rbf_matrix=y_y_rbf_matrix,
-                )
-            )
 
     for i in trange(number_of_iterations):
         for hyperparameter in hyperparameter_list:
             if i % roc_iteration == 0 and return_metrics:
                 drop_ids, auroc, mean_ifpr_list, mean_itpr_list, std_tpr = mrs_function(
-                    N=N,
+                    N=dropped_N,
                     R=R,
                     columns=columns,
                     target=target,
@@ -240,7 +223,7 @@ def mrs(
                 )
             else:
                 drop_ids, auroc = mrs_function(
-                    N=N,
+                    N=dropped_N,
                     R=R,
                     columns=columns,
                     target=target,
@@ -253,7 +236,7 @@ def mrs(
 
             if compute_bias and target is not None:
                 relative_bias = compute_relative_bias(
-                    N[target], R[target], sample_weights_dict[hyperparameter]
+                    dropped_N[target], R[target], sample_weights_dict[hyperparameter]
                 )
                 relative_bias_dict[hyperparameter].append(relative_bias)
 
@@ -276,23 +259,11 @@ def mrs(
             else:
                 current_patience_dict[hyperparameter] += 1
 
-            sample_weights_dict[hyperparameter][drop_ids] = 0.0
-            remaining = N[sample_weights_dict[hyperparameter] != 0.0]
-
-            remaining = dropped_N[sample_weights_dict[hyperparameter] != 0.0]
-            if (
-                len(remaining) <= drop
-                or len(remaining) <= n_pu_splits
-                or (auc_difference <= delta and early_stopping)
-                or switched_dict[hyperparameter]
-            ):
-                finished_dict[hyperparameter] = True
-
             if return_metrics:
                 auc_dict[hyperparameter].append(auroc)
                 mmd_dict[hyperparameter].append(
                     weighted_maximum_mean_discrepancy(
-                        N[columns],
+                        dropped_N[columns],
                         R[columns],
                         sample_weights_dict[hyperparameter],
                         gamma=gamma,
@@ -302,9 +273,18 @@ def mrs(
                     )
                 )
 
-        if all(finished for finished in finished_dict.values()):
-            break
+            sample_weights_dict[hyperparameter][drop_ids] = 0.0
+            remaining = dropped_N[sample_weights_dict[hyperparameter] != 0.0]
+            if (
+                len(remaining) <= drop
+                or len(remaining) <= n_pu_splits
+                or (auc_difference <= delta and early_stopping)
+                or switched_dict[hyperparameter]
+            ):
+                finished_dict[hyperparameter] = True
 
+        if all(finished for finished in finished_dict.values()) and early_stopping:
+            break
 
     feature_weights = {}
     for hyperparameter in hyperparameter_list:

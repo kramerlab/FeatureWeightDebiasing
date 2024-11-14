@@ -18,15 +18,16 @@ from sklearn.svm import LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
 param_grid = {
-        "min_weight_fraction_leaf": [
-            0.0,
-            0.01,
-            0.025,
-            0.05,
-            0.1,
-        ],
-        "class_weight": [None, "balanced"],
-    }
+    "min_weight_fraction_leaf": [
+        0.0,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+    ],
+    "class_weight": [None, "balanced"],
+}
+
 
 def compute_weighted_means(N, weights):
     """Compute the weighted mean
@@ -182,37 +183,35 @@ def compute_metrics(
     :param gamma: Gamma for the rbf kernel
     :return: Result metrics
     """
-    best_wasserstein_distances = []
+    wasserstein_distances = []
     N_dropped = scaled_N[columns].values
     R_dropped = scaled_R[columns].values
 
-    best_weighted_mmd = weighted_maximum_mean_discrepancy(
+    weighted_mmd = weighted_maximum_mean_discrepancy(
         N_dropped,
         R_dropped,
         sample_weights_list,
         gamma,
     )
 
-    for i in range(scaled_N.values.shape[1]):
+    for i in range(N_dropped.shape[1]):
         u_values = scaled_N.values[:, i]
         v_values = scaled_R.values[:, i]
         wasserstein_distance_value = wasserstein_distance(
             u_values, v_values, sample_weights_list
         )
-        best_wasserstein_distances.append(wasserstein_distance_value)
+        wasserstein_distances.append(wasserstein_distance_value)
 
     unscaled_N = scaled_N.copy()
     unscaled_R = scaled_R.copy()
     unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
     unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
-    best_sample_biases = compute_relative_bias(
-        unscaled_N, unscaled_R, sample_weights_list
-    )
+    sample_biases = compute_relative_bias(unscaled_N, unscaled_R, sample_weights_list)
 
     return (
-        best_weighted_mmd,
-        best_sample_biases,
-        best_wasserstein_distances,
+        weighted_mmd,
+        sample_biases,
+        wasserstein_distances,
     )
 
 
@@ -249,7 +248,7 @@ def compute_classification_metrics_random_forest(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                not_zero_indices = np.array(sample_weights) > 0
+                not_zero_indices = np.array(sample_weights) > 0.0
                 N_train = N.loc[not_zero_indices, :]
                 train_sample_weights = np.array(sample_weights)[not_zero_indices]
 
@@ -257,7 +256,7 @@ def compute_classification_metrics_random_forest(
                     N_train[columns].values,
                     N_train[label].values,
                     train_sample_weights,
-                    feature_weight,
+                    np.array(feature_weight),
                     random_state=random_state,
                     n_splits=n_splits,
                     draw_with_feature_weights=draw_with_feature_weights,
@@ -413,20 +412,18 @@ def train_pu_classifier(
     draw_with_feature_weight = False if feature_weight is None else True
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
-        n_jobs=-1,
         random_state=random_state,
         min_weight_fraction_leaf=hyperparameter,
         splitter=splitter,
+        n_jobs=-1,
     )
 
-    clf.fit(
+    return clf.fit(
         X,
         y,
         draw_with_feature_weights=draw_with_feature_weight,
         feature_weights=feature_weight,
     )
-
-    return clf
 
 
 def train_pu_classifier_mrs(
@@ -448,11 +445,14 @@ def train_pu_classifier_mrs(
         n_estimators=n_estimators,
         random_state=random_state,
         min_weight_fraction_leaf=hyperparameter,
+        n_jobs=-1,
+        splitter="feature_weighted_best",
     )
 
     return clf.fit(
         X,
         y,
+        draw_with_feature_weights=False,
     )
 
 
@@ -680,7 +680,7 @@ def train_random_forest_classifier_fairness(
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
-    
+
     clf = RandomForestClassifier(
         random_state=random_state,
         splitter=splitter,

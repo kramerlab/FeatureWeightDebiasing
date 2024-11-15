@@ -63,6 +63,7 @@ def gbs_gesis_experiment(
         scaler,
         sample_weights,
         columns,
+        [],
         gamma,
     )
 

@@ -16,7 +16,7 @@ from utils.metrics import (
 )
 import pandas as pd
 
-bins = 25
+bins = 8
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
 
@@ -141,18 +141,16 @@ def perform_statistical_analysis_mrs(
         dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
 
-        if method_name not in (
-            "fw-mrs-temperature",
-        ):
+        if method_name not in ("fw-mrs-temperature", "fw-mrs-temperature-svm"):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
                 allensbach_copy,
                 scaler,
                 columns,
+                target,
                 sample_weights,
                 gamma,
             )
-            relative_bias = relative_bias.drop(["label"])
         else:
             weighted_mmd = np.ones(len(N.columns))
             relative_bias = np.ones(len(N.columns))
@@ -172,7 +170,9 @@ def perform_statistical_analysis_mrs(
                 "relative_bias": relative_bias[index],
             }
 
-        with open(iterations_path / f"results_{method_name}_{i}.json", "w") as result_file:
+        with open(
+            iterations_path / f"results_{method_name}_{i}.json", "w"
+        ) as result_file:
             result_file.write(json.dumps(result_dict_mrs_iteration))
 
     wasserstein_std_list = np.std(wasserstein_list, axis=0)
@@ -195,12 +195,12 @@ def perform_statistical_analysis_mrs(
     # Save methods mean results
     result_dict_similarity = {}
     for index, column in enumerate(columns):
-        result_dict_similarity["MMD Mean"] = mmd_std_list.tolist()
-        result_dict_similarity["MMD Std"] = mmd_mean_list.tolist()
+        result_dict_similarity["MMD Mean"] = mmd_mean_list.tolist()
+        result_dict_similarity["MMD Std"] = mmd_std_list.tolist()
         result_dict_similarity[f"{column}_bias"] = {
             "wasserstein mean": wasserstein_mean_list[index].tolist(),
-            "relative_bias mean": relative_bias_mean_list[index].tolist(),
             "wasserstein_std": wasserstein_std_list[index].tolist(),
+            "relative_bias mean": relative_bias_mean_list[index].tolist(),
             "relative_bias_std": relative_bias_std_list[index].tolist(),
         }
 
@@ -208,7 +208,6 @@ def perform_statistical_analysis_mrs(
         (
             "similarity_metrics.json",
             "p_value_results.json",
-            "dropped_elements.json",
             "rf_auroc.json",
             "rf_auprc.json",
             "dropped_samples.json",
@@ -218,7 +217,6 @@ def perform_statistical_analysis_mrs(
         (
             result_dict_similarity,
             p_values_dict,
-            dropped_samples_list,
             rf_auroc_list,
             rf_auprc_list,
             dropped_samples_list,
@@ -242,12 +240,20 @@ def perform_statistical_analysis_mrs(
         method_name,
     )
 
-    mean_feature_importances_dict = {}
+    mean_results_dict = {}
+    abs_feature_importance_list = np.array(abs_feature_importance_list)
+
+    mean_results_dict["Mean AUROC"] = np.mean(rf_auroc_list)
+    mean_results_dict["Std AUROC"] = np.std(rf_auroc_list)
+
+    mean_results_dict["Mean AUPRC"] = np.mean(rf_auprc_list)
+    mean_results_dict["Std AUPRC"] = np.std(rf_auprc_list)
+
     for i, feature_name in enumerate(columns):
         feature_importances = abs_feature_importance_list[:, i]
-        mean_feature_importances_dict[feature_name] = np.mean(feature_importances)
+        mean_results_dict[feature_name] = np.mean(feature_importances)
     with open(result_path / "mean_feature_importances.json", "w") as result_file:
-            result_file.write(json.dumps(data))
+        result_file.write(json.dumps(mean_results_dict))
 
 
 def compute_confidence_interval(data, confidence=0.95):

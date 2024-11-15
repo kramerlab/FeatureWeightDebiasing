@@ -110,7 +110,10 @@ def visualize_boxplot(
     file_name="",
 ):
     tmp_dict = {}
-    tmp_dict.update(values_dict)
+    for temperature, temperature_values in values_dict.items():
+        for hyperparameter, values in temperature_values.items():
+            tmp_dict[f"{temperature}_{hyperparameter}"] = values
+
     ax = sns.boxplot(data=tmp_dict)
     ax.set_ylabel(y_label)
 

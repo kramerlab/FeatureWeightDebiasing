@@ -66,13 +66,13 @@ def gbs_allensbach_experiment(
             weighted_mmd,
             sample_biases,
             wasserstein_distances,
-        ) = compute_metrics(scaled_N, scaled_R, scaler, weights, columns, gamma)
+        ) = compute_metrics(scaled_N, scaled_R, [], scaler, weights, columns, gamma)
 
         plot_sample_weights(weights, result_path / "weights", i)
         remaining_samples = np.count_nonzero(weights != 0)
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(sample_biases.drop(["label"]))
+        biases_list.append(sample_biases)
         wasserstein_parameter_list.append(wasserstein_distances)
         remaining_samples_list.append(remaining_samples)
 

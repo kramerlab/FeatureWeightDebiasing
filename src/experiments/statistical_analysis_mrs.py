@@ -69,6 +69,7 @@ def perform_statistical_analysis_mrs(
         _,
         _,
         _,
+        _,
         hyperparameter_list,
     ) = set_parameter(method_name)
 
@@ -111,6 +112,7 @@ def perform_statistical_analysis_mrs(
         (
             rf_auroc,
             rf_auprc,
+            accuracy,
             sample_weights,
             abs_feature_importance,
             roc_curve_values,

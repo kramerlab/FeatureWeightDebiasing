@@ -76,6 +76,7 @@ def write_result_dict(
 def write_result_dict_test_set(
     rf_auroc_list,
     rf_auprc_list,
+    rf_accuracy_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -100,6 +101,10 @@ def write_result_dict_test_set(
             "mean": np.mean(rf_auprc_list),
             "sd": np.std(rf_auprc_list),
         },
+        "random forest accuracy": {
+            "mean": np.mean(rf_accuracy_list),
+            "sd": np.std(rf_accuracy_list),
+        },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),
             "std": np.std(dropped_samples_list),
@@ -116,7 +121,7 @@ def create_result_path(
     data_set_name,
     experiment_name="downstream",
     bias_fraction="",
-    prefix="../.."
+    prefix="../..",
 ):
     """The function creates the save path and makes the directory.
 

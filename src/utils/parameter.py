@@ -2,6 +2,7 @@ def set_parameter(method_name):
     dropped_samples_val_dict = None
     auroc_val_dict = None
     auprc_val_dict = None
+    accuracy_val_dict = None
     if method_name in ("fw-mrs-temperature",):
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]
@@ -15,6 +16,10 @@ def set_parameter(method_name):
             for temperature in temperatures
         }
         auprc_val_dict = {
+            temperature: {parameter: [] for parameter in hyperparameter_list}
+            for temperature in temperatures
+        }
+        accuracy_val_dict = {
             temperature: {parameter: [] for parameter in hyperparameter_list}
             for temperature in temperatures
         }
@@ -34,6 +39,10 @@ def set_parameter(method_name):
             temperature: {parameter: [] for parameter in hyperparameter_list}
             for temperature in temperatures
         }
+        accuracy_val_dict = {
+            temperature: {parameter: [] for parameter in hyperparameter_list}
+            for temperature in temperatures
+        }
     elif method_name == "mrs-forest":
         hyperparameter_list = [0.05, 0.025, 0.0]
         draw_with_feature_weights = False
@@ -45,6 +54,9 @@ def set_parameter(method_name):
             0.0: {hyperparameter: [] for hyperparameter in hyperparameter_list}
         }
         auprc_val_dict = {
+            0.0: {hyperparameter: [] for hyperparameter in hyperparameter_list}
+        }
+        accuracy_val_dict = {
             0.0: {hyperparameter: [] for hyperparameter in hyperparameter_list}
         }
     elif method_name == "psa":
@@ -65,5 +77,6 @@ def set_parameter(method_name):
         dropped_samples_val_dict,
         auroc_val_dict,
         auprc_val_dict,
+        accuracy_val_dict,
         hyperparameter_list,
     )

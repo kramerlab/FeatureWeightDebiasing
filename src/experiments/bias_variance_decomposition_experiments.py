@@ -69,6 +69,7 @@ def decomposition_experiment(
         _,
         _,
         _,
+        _,
         hyperparameter_list,
     ) = set_parameter(method_name)
     if temperatures is not None:

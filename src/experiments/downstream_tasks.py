@@ -53,6 +53,7 @@ def downstream_tasks_experiment(
     """
     rf_auroc_list = []
     rf_auprc_list = []
+    rf_accuracy_list = []
 
     weighted_mmds_list = []
     biases_list = []
@@ -97,8 +98,10 @@ def downstream_tasks_experiment(
         dropped_samples_val_dict,
         auroc_val_dict,
         auprc_val_dict,
+        accuracy_val_dict,
         hyperparameter_list,
     ) = set_parameter(method_name)
+
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
@@ -159,6 +162,7 @@ def downstream_tasks_experiment(
         (
             rf_auroc,
             rf_auprc,
+            rf_accuracy,
             best_sample_weights,
             abs_feature_importance,
             roc_curve_values,
@@ -218,6 +222,7 @@ def downstream_tasks_experiment(
                     (
                         rf_auroc_val,
                         rf_auprc_val,
+                        rf_accuracy_val,
                         best_sample_weights_val,
                         _,
                         _,
@@ -250,12 +255,16 @@ def downstream_tasks_experiment(
                     auprc_val_dict[float(temperature)][float(hyperparameter)].append(
                         rf_auprc_val
                     )
+                    accuracy_val_dict[float(temperature)][float(hyperparameter)].append(
+                        rf_accuracy_val
+                    )
 
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
+        rf_accuracy_list.append(rf_accuracy)
 
         # plot_sample_weights(sample_weights, sample_weights_save_path, i)
         # plot_feature_weights(feature_weights, feature_weights_save_path, i)
@@ -268,6 +277,7 @@ def downstream_tasks_experiment(
         (
             rf_auroc_list,
             rf_auprc_list,
+            rf_accuracy_list,
             dropped_samples_list,
             abs_feature_importance_list,
             feature_importance_list,
@@ -278,6 +288,7 @@ def downstream_tasks_experiment(
         (
             "rf_auroc",
             "rf_auprc",
+            "rf_accuracy",
             "dropped_samples",
             "abs_feature_importance",
             "feature_importance",
@@ -305,6 +316,7 @@ def downstream_tasks_experiment(
     result_dict = write_result_dict_test_set(
         rf_auroc_list,
         rf_auprc_list,
+        rf_accuracy_list,
         dropped_samples_list,
         len(N),
     )

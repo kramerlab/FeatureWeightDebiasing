@@ -54,6 +54,7 @@ def analyse_mrs(
         _,
         _,
         _,
+        _,
         hyperparameter_list,
     ) = set_parameter("mrs-forest")
 

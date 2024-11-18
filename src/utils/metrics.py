@@ -12,6 +12,7 @@ from sklearn.metrics import (
     roc_curve,
     roc_auc_score,
     roc_curve,
+    accuracy_score,
     average_precision_score,
 )
 from sklearn.svm import LinearSVC
@@ -20,10 +21,15 @@ from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 param_grid = {
     "min_weight_fraction_leaf": [
         0.0,
+        0.0001,
+        0.00025,
+        0.0005,
+        0.001,
+        0.0025,
+        0.005,
         0.01,
         0.025,
         0.05,
-        0.1,
     ],
     "class_weight": [None, "balanced"],
 }
@@ -244,7 +250,9 @@ def compute_metrics(
         unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
         unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
         final_sample_biases = compute_relative_bias(
-            unscaled_N[columns_and_target], unscaled_R[columns_and_target], sample_weights_list
+            unscaled_N[columns_and_target],
+            unscaled_R[columns_and_target],
+            sample_weights_list,
         )
 
     return (
@@ -330,8 +338,9 @@ def compute_classification_metrics_random_forest(
         best_weights = sample_weights_list
 
     if best_clf is not None:
-        y_predictions = best_clf.predict_proba(T[columns].values)[:, 1]
-        fpr, tpr, _ = roc_curve(T[label], y_predictions)
+        y_probabilitites = best_clf.predict_proba(T[columns].values)[:, 1]
+        y_predictions = best_clf.predict(T[columns].values)[:, 1]
+        fpr, tpr, _ = roc_curve(T[label], y_probabilitites)
 
     if compute_feature_importance:
         abs_feature_importance = calculate_feature_importance(
@@ -341,12 +350,14 @@ def compute_classification_metrics_random_forest(
     else:
         abs_feature_importance = None
 
-    auroc_score = roc_auc_score(T[label], y_predictions)
-    auprc = average_precision_score(T[label], y_predictions)
+    auroc_score = roc_auc_score(T[label], y_probabilitites)
+    auprc = average_precision_score(T[label], y_probabilitites)
+    accuracy = accuracy_score(T[label], y_predictions)
 
     return (
         auroc_score,
         auprc,
+        accuracy,
         best_weights,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),

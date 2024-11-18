@@ -138,6 +138,7 @@ def temperature_comparison(
                     _,
                     _,
                     _,
+                    _,
                     best_hyperparameter,
                     _,
                 ) = compute_classification_metrics_random_forest(

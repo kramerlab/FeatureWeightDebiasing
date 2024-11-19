@@ -339,7 +339,7 @@ def compute_classification_metrics_random_forest(
 
     if best_clf is not None:
         y_probabilitites = best_clf.predict_proba(T[columns].values)[:, 1]
-        y_predictions = best_clf.predict(T[columns].values)[:, 1]
+        y_predictions = best_clf.predict(T[columns].values)
         fpr, tpr, _ = roc_curve(T[label], y_probabilitites)
 
     if compute_feature_importance:

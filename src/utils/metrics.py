@@ -426,8 +426,8 @@ def compute_decomposition_metrics_random_forest(
         best_clf, _ = train_random_forest_classifier(
             N_train[columns].values,
             N_train[label].values,
-            train_sample_weights,
-            feature_weights,
+            np.array(train_sample_weights),
+            np.array(feature_weights),
             random_state=random_state,
             n_splits=n_splits,
             draw_with_feature_weights=draw_with_feature_weights,

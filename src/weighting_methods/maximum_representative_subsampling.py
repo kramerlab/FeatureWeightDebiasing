@@ -86,7 +86,7 @@ def mrs_step(
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, std_tpr = calculate_mean_roc(
+        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(
             ifpr_list, itpr_list
         )
         return (
@@ -94,35 +94,9 @@ def mrs_step(
             np.mean(auroc_list),
             mean_ifpr_list,
             mean_itpr_list,
-            std_tpr,
         )
     else:
         return dropped_N.index[drop_ids], np.mean(auroc_list)
-
-
-def mrs_without_cv(
-    N, R, columns, target, n_drop: int = 1, random_state=None, *args, **attributes
-):
-    """Performs one iteration of maximum representative sampling without cross-validation
-
-    :param N: Non-representative data set
-    :param R: Representative data set
-    :param columns: Name of columns used for training
-    :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param random_state: Random state to make the experiment reproducible, defaults to None
-    :return: The index of the element to drop
-    """
-    data = pd.concat([N, R])
-    clf = train_pu_classifier_mrs(
-        data[columns],
-        data.label,
-        random_state=random_state,
-    )
-    predictions = clf.predict_proba(N[columns])[:, 1]
-    drop_ids = np.argpartition(predictions, -n_drop)[-n_drop:]
-
-    drop_index = N.index[drop_ids]
-    return N.drop(N.index[drop_ids]), drop_index
 
 
 def mrs(
@@ -170,6 +144,8 @@ def mrs(
     best_weights_dict = {}
     finished_dict = {}
 
+    mrs_function = random_drops if mrs_function == "random" else mrs_step
+
     for hyperparameter in hyperparameter_list:
         auc_dict[hyperparameter] = []
         relative_bias_dict[hyperparameter] = []
@@ -199,7 +175,7 @@ def mrs(
     for i in trange(number_of_iterations):
         for hyperparameter in hyperparameter_list:
             if i % roc_iteration == 0 and return_metrics:
-                drop_ids, auroc, mean_ifpr_list, mean_itpr_list, std_tpr = mrs_function(
+                drop_ids, auroc, mean_ifpr_list, mean_itpr_list, = mrs_function(
                     N=dropped_N,
                     R=R,
                     columns=columns,
@@ -212,7 +188,7 @@ def mrs(
                     hyperparameter=hyperparameter,
                 )
                 roc_dict[hyperparameter].append(
-                    [mean_ifpr_list, mean_itpr_list, std_tpr, i * drop]
+                    [mean_ifpr_list, mean_itpr_list, i * drop]
                 )
             else:
                 drop_ids, auroc = mrs_function(
@@ -293,12 +269,74 @@ def mrs(
         return (best_weights_dict, feature_weights)
 
 
-def random_drops(N, n_drop: int = 1, *args, **attributes):
+def random_drops(
+    N,
+    R,
+    columns,
+    target,
+    n_drop: int = 1,
+    n_splits=5,
+    random_state=None,
+    calculate_roc=False,
+    sample_weights=None,
+    hyperparameter=0.0,
+    *args,
+    **attributes
+):
     """MRS variant that drops sample randomly
 
     :param N: Non-representative data set
     :param n_drop: Defines how many samples are dropped per iteration, defaults to 1
     :return: Index of the samples to drop
     """
-    drop_ids = random.sample(range(0, len(N)), n_drop)
-    return N.drop(N.index[drop_ids]), N.index[drop_ids]
+
+    auroc_list = []
+    ifpr_list = []
+    itpr_list = []
+
+    dropped_N = N[sample_weights != 0.0]
+    all_predictions = np.zeros(len(dropped_N))
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
+        skf.split(dropped_N, dropped_N[target]), kf.split(R)
+    ):
+        N_train, N_test = (
+            dropped_N.iloc[train_indices_N],
+            dropped_N.iloc[test_indices_N],
+        )
+        R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
+        train_data = pd.concat([N_train, R_train])
+        clf = train_pu_classifier_mrs(
+            train_data[columns],
+            train_data.label,
+            random_state=random_state,
+            hyperparameter=hyperparameter,
+        )
+
+        test_data = pd.concat([N_test, R_test])
+        predictions = clf.predict_proba(test_data[columns])[:, 1]
+        all_predictions[test_indices_N] += predictions[: len(N_test)]
+        auroc_list.append(roc_auc_score(test_data.label, predictions))
+
+        if calculate_roc:
+            interpolated_fpr, interpolated_tpr = interpolate_roc(
+                test_data.label, predictions
+            )
+            ifpr_list.append(interpolated_fpr)
+            itpr_list.append(interpolated_tpr)
+
+    drop_ids = random.sample(range(0, len(dropped_N)), n_drop)
+
+    if calculate_roc:
+        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(
+            ifpr_list, itpr_list
+        )
+        return (
+            dropped_N.index[drop_ids],
+            np.mean(auroc_list),
+            mean_ifpr_list,
+            mean_itpr_list,
+        )
+    else:
+        return dropped_N.index[drop_ids], np.mean(auroc_list)

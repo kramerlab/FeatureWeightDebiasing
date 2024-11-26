@@ -582,22 +582,28 @@ def train_random_forest_classifier(
     return grid_cv, grid_cv.best_score_
 
 
-def calculate_mean_rocs(rocs):
+def calculate_mean_rocs(rocs_dict_list):
     """Compute mean rocs
 
     :param rocs: Rocs list
     :return: Mean rocs
     """
-    rocs = np.array(rocs, dtype=object)
-    mean_rocs = []
-    for i in range(rocs.shape[1]):
-        rocs_at_iteration = rocs[:, i]
-        mean_fpr, mean_tpr, std_tpr = calculate_mean_roc(
-            rocs_at_iteration[:, 0], rocs_at_iteration[:, 1]
-        )
-        removed_samples = rocs_at_iteration[0, 3]
-        mean_rocs.append((mean_fpr, mean_tpr, std_tpr, removed_samples))
-    return mean_rocs
+    rocs_dict_list = np.array(rocs_dict_list, dtype=object)
+    mean_rocs_dict = {hyperparameter: [] for hyperparameter in rocs_dict_list[0].keys()}
+    for i, hyperparameter in enumerate(rocs_dict_list[0].keys()):
+        rocs_list = []
+        for dictionary in rocs_dict_list:
+            rocs_list.append(dictionary[float(hyperparameter)])
+        for i in range(len(rocs_list)):
+            rocs_at_iteration = rocs_list[i]
+            fpr = [rocs[0] for rocs in rocs_at_iteration]
+            tpr = [rocs[1] for rocs in rocs_at_iteration]
+            mean_fpr, mean_tpr, std_tpr = calculate_mean_roc(fpr, tpr)
+            removed_samples = rocs_at_iteration[0][2]
+            mean_rocs_dict[hyperparameter].append(
+                (mean_fpr, mean_tpr, std_tpr, removed_samples)
+            )
+    return mean_rocs_dict
 
 
 def calculate_mean_roc(interpolated_fpr, interpolated_tpr):

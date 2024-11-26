@@ -22,7 +22,13 @@ sampling_random_generator = np.random.RandomState(seed)
 
 
 def analyse_mrs(
-    n_cv_splits, n_cv_repeats, data_set_name, bias_type, drop, bias_fraction
+    n_cv_splits,
+    n_cv_repeats,
+    data_set_name,
+    bias_type,
+    drop,
+    bias_fraction,
+    mrs_function,
 ):
     """Run mrs on different data sets
 
@@ -36,18 +42,18 @@ def analyse_mrs(
     random_generator = np.random.RandomState(seed)
     aucs_complete = []
     mmds_complete = []
-    mrs_iteration_list = []
-    rocs_list_list = []
-    relative_bias_list_list = []
+    mrs_iteration_dict_list = []
+    rocs_dict_list = []
+    relative_bias_dict_list = []
     result_path = create_result_path(
         "mrs",
         bias_type,
         data_set_name,
         bias_fraction=bias_fraction,
-        experiment_name="mrs_analysis",
+        experiment_name=f"mrs_analysis_{mrs_function}",
     )
     load_previous_results = True
-    mmd_list = []
+    mmd_dict = []
     (
         _,
         _,
@@ -104,11 +110,11 @@ def analyse_mrs(
             feature_weights = feature_weights_list[i]
         else:
             (
-                auc_list,
-                mmd_list,
-                relative_bias_list,
-                mrs_iteration,
-                roc_list,
+                auc_dict,
+                mmd_dict,
+                relative_bias_dict,
+                mrs_iteration_dict,
+                roc_list_dict,
             ) = maximum_representative_subsampling.mrs(
                 N,
                 R,
@@ -121,21 +127,22 @@ def analyse_mrs(
                 random_generator=random_generator,
                 hyperparameter_list=hyperparameter_list,
                 early_stopping=False,
+                mrs_function=mrs_function,
             )
 
-        aucs_complete.append(auc_list)
-        mmds_complete.append(mmd_list)
-        mrs_iteration_list.append(mrs_iteration)
-        rocs_list_list.append(roc_list)
-        relative_bias_list_list.append(relative_bias_list)
+        aucs_complete.append(auc_dict)
+        mmds_complete.append(mmd_dict)
+        mrs_iteration_dict_list.append(mrs_iteration_dict)
+        rocs_dict_list.append(roc_list_dict)
+        relative_bias_dict_list.append(relative_bias_dict)
 
-        # mean_rocs = calculate_mean_rocs(rocs_list_list)
+        mean_rocs = calculate_mean_rocs(rocs_dict_list)
 
         plot_mmds_average(
             mmds_complete,
             drop,
             result_path / "mmd",
-            mrs_iteration_list,
+            mrs_iteration_dict_list,
             number_of_samples,
         )
         plot_auc_average(
@@ -143,14 +150,14 @@ def analyse_mrs(
             drop,
             result_path / "auroc",
             number_of_samples,
-            mrs_iteration_list,
+            mrs_iteration_dict_list,
         )
 
-        # plot_rocs_mrs(mean_rocs, result_path / "rocs")
+        plot_rocs_mrs(mean_rocs, result_path / "rocs")
         plot_relative_bias(
-            relative_bias_list_list,
+            relative_bias_dict_list,
             result_path / "relative_bias",
-            mrs_iteration_list,
+            mrs_iteration_dict_list,
             number_of_samples,
             drop,
         )
@@ -165,4 +172,5 @@ if __name__ == "__main__":
         args.bias_type,
         args.drop,
         args.bias_fraction,
+        args.mrs_function,
     )

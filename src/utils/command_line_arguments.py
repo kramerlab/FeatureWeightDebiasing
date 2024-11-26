@@ -92,6 +92,7 @@ def parse_mrs_analysis_command_line_arguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_set_name", choices=dataset_list, required=True)
+    parser.add_argument("--mrs_function",  default="mrs_step")
     parser.add_argument("--n_cv_splits", default=2, type=int)
     parser.add_argument("--n_cv_repeats", default=5, type=int)
     parser.add_argument("--bias_type", choices=bias_choice, default="none")

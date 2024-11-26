@@ -16,7 +16,6 @@ from utils.metrics import (
     compute_classification_metrics_random_forest,
     compute_metrics,
 )
-from utils.visualization_fw_mrs import visualize_boxplot
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)

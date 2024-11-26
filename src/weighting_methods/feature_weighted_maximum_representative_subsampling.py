@@ -221,7 +221,7 @@ def feature_weighted_repeated_MRS(
                 if (
                     len(remaining) <= drop
                     or len(remaining) <= n_pu_splits
-                    or (auc_difference <= delta and early_stopping)
+                    or auc_difference <= delta
                     or switched_dict[temperature][hyperparameter]
                 ):
                     finished_dict[temperature][hyperparameter] = True

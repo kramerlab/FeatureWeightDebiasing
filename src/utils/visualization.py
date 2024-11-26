@@ -335,7 +335,7 @@ def plot_experiment_comparison_auc(
     plt.savefig(f"{file_name}.pdf")
 
 
-def plot_rocs_mrs(roc_list, file_name):
+def plot_rocs_mrs(roc_dict_list, file_name):
     """Plots rocs
 
     :param roc_list: Roc list
@@ -343,7 +343,7 @@ def plot_rocs_mrs(roc_list, file_name):
     """
     plt.rc("")
     plt.rc("axes", prop_cycle=default_cycle)
-    for fper, tper, std, deleted_elements in roc_list:
+    for fper, tper, std, deleted_elements in roc_dict_list:
         tpfrs_higher = np.minimum(tper + std, 1)
         tpfrs_lower = np.maximum(tper - std, 0)
         plt.plot(fper, tper, label=f"{deleted_elements} samples removed")
@@ -417,7 +417,6 @@ def plot_relative_bias(
             x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
         )
         plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
-
 
     plt.xlabel("Number of Remaining Samples")
     plt.ylabel("Relative Bias")

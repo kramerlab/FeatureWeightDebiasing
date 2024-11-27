@@ -86,9 +86,7 @@ def mrs_step(
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(
-            ifpr_list, itpr_list
-        )
+        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(ifpr_list, itpr_list)
         return (
             dropped_N.index[drop_ids],
             np.mean(auroc_list),
@@ -158,7 +156,7 @@ def mrs(
         switched_dict[hyperparameter] = False
         finished_dict[hyperparameter] = False
 
-    number_of_iterations = (len(N) - n_pu_splits) // drop
+    number_of_iterations = ((len(N) - n_pu_splits) // drop) - 1
     dropped_N = N.copy().reset_index(drop=True)
     roc_iteration = (len(N) // drop // 3.5) + 1
 
@@ -175,7 +173,12 @@ def mrs(
     for i in trange(number_of_iterations):
         for hyperparameter in hyperparameter_list:
             if i % roc_iteration == 0 and return_metrics:
-                drop_ids, auroc, mean_ifpr_list, mean_itpr_list, = mrs_function(
+                (
+                    drop_ids,
+                    auroc,
+                    mean_ifpr_list,
+                    mean_itpr_list,
+                ) = mrs_function(
                     N=dropped_N,
                     R=R,
                     columns=columns,
@@ -188,7 +191,7 @@ def mrs(
                     hyperparameter=hyperparameter,
                 )
                 roc_dict[hyperparameter].append(
-                    [mean_ifpr_list, mean_itpr_list, i * drop]
+                    [mean_ifpr_list.tolist(), mean_itpr_list.tolist(), i * drop]
                 )
             else:
                 drop_ids, auroc = mrs_function(
@@ -329,9 +332,7 @@ def random_drops(
     drop_ids = random.sample(range(0, len(dropped_N)), n_drop)
 
     if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(
-            ifpr_list, itpr_list
-        )
+        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(ifpr_list, itpr_list)
         return (
             dropped_N.index[drop_ids],
             np.mean(auroc_list),

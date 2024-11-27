@@ -14,7 +14,7 @@ conda_initialize
 micromamba activate feature_weighted_mrs
 
 DROP=1
-N_CV_REPEATS=50
+N_CV_REPEATS=100
 DATASET=gbs_allensbach
 
 for SAMPLE_WEIGHTING_METHOD in uniform fw-mrs-temperature fw-mrs-temperature-svm

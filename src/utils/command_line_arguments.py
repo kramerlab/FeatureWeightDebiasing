@@ -98,6 +98,7 @@ def parse_mrs_analysis_command_line_arguments():
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--drop", default=1, type=int)
     parser.add_argument("--bias_fraction", default=0.1, type=float)
+    parser.add_argument("--load_previous_results", default=False, action="store_true")
 
     return parser.parse_args()
 

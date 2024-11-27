@@ -15,7 +15,7 @@ conda_initialize
 micromamba activate feature_weighted_mrs
 
 N_CV_REPEATS=10
-N_CV_SPLITS=5
+N_CV_SPLITS=10
 
 CONFIG=downstream_task_experiment.config
 BIAS_FRACTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $CONFIG)

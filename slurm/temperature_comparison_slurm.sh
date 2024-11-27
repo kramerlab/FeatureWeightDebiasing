@@ -15,7 +15,7 @@ conda_initialize
 micromamba activate feature_weighted_mrs
 
 N_CV_REPEATS=10
-N_CV_SPLITS=5
+N_CV_SPLITS=10
 DROP=5
 CONFIG=temperature_comparison.config
 BIAS_FRACTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $CONFIG)

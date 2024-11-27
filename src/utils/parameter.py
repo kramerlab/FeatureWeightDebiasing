@@ -6,7 +6,7 @@ def set_parameter(method_name):
     if method_name in ("fw-mrs-temperature",):
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]
-        hyperparameter_list = [0.05, 0.025, 0.0]
+        hyperparameter_list = [0.025, 0.01, 0.0]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
@@ -20,7 +20,7 @@ def set_parameter(method_name):
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
     elif method_name == "mrs-forest":
-        hyperparameter_list = [0.05, 0.025, 0.0]
+        hyperparameter_list = [0.025, 0.01, 0.0]
         draw_with_feature_weights = False
         temperatures = None
         dropped_samples_val_dict = {

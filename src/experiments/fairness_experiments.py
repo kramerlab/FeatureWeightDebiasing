@@ -12,7 +12,7 @@ from sklearn.model_selection import (
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from utils.data_loader import load_weights, save_weights
+from utils.data_loader import load_saved_results, save_results
 from utils.metrics import compute_classification_metrics_random_forest_fairness
 from utils.statistics import create_result_path
 from fairlearn.metrics import (
@@ -85,8 +85,8 @@ def fairness_tasks_experiment(
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
 
-    sample_weight_list = load_weights(sample_weights_save_path)
-    feature_weight_list = load_weights(feature_weights_save_path)
+    sample_weight_list = load_saved_results(sample_weights_save_path)
+    feature_weight_list = load_saved_results(feature_weights_save_path)
 
     scaler = StandardScaler()
     scaler = scaler.fit(df[columns])
@@ -139,8 +139,8 @@ def fairness_tasks_experiment(
             feature_weight_list.append(feature_weights)
             sample_weight_list.append(sample_weights_n)
 
-            save_weights(sample_weights_save_path, sample_weight_list)
-            save_weights(feature_weights_save_path, feature_weight_list)
+            save_results(sample_weights_save_path, sample_weight_list)
+            save_results(feature_weights_save_path, feature_weight_list)
 
         sample_weights_r = np.ones(len(R)) / len(R)
         for key, value in sample_weights_n.items():

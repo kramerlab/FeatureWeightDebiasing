@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.preprocessing import StandardScaler
 
-from utils.data_loader import load_weights, save_weights
+from utils.data_loader import load_saved_results, save_results
 from utils.parameter import set_parameter
 from utils.statistics import create_result_path
 from utils.sampling import repeated_train_val_test_split_fixed_test_set, sample_N
@@ -58,8 +58,8 @@ def decomposition_experiment(
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
 
-    sample_weight_list = load_weights(sample_weights_save_path)
-    feature_weight_list = load_weights(feature_weights_save_path)
+    sample_weight_list = load_saved_results(sample_weights_save_path)
+    feature_weight_list = load_saved_results(feature_weights_save_path)
 
     scaler = StandardScaler()
 
@@ -78,7 +78,6 @@ def decomposition_experiment(
     elif method_name == "mrs-forest":
         predictions_val_dict = {0.0: []}
         probabilities_val_dict = {0.0: []}
-
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split_fixed_test_set(
@@ -131,8 +130,8 @@ def decomposition_experiment(
             feature_weight_list.append(feature_weights)
             sample_weight_list.append(sample_weights)
 
-            save_weights(sample_weights_save_path, sample_weight_list)
-            save_weights(feature_weights_save_path, feature_weight_list)
+            save_results(sample_weights_save_path, sample_weight_list)
+            save_results(feature_weights_save_path, feature_weight_list)
 
         predictions, probabilities = compute_decomposition_metrics_random_forest(
             N,

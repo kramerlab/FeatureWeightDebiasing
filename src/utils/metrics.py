@@ -588,14 +588,14 @@ def calculate_mean_rocs(rocs_dict_list):
     :param rocs: Rocs list
     :return: Mean rocs
     """
-    rocs_dict_list = np.array(rocs_dict_list, dtype=object)
     mean_rocs_dict = {hyperparameter: [] for hyperparameter in rocs_dict_list[0].keys()}
     for i, hyperparameter in enumerate(rocs_dict_list[0].keys()):
         rocs_list = []
         for dictionary in rocs_dict_list:
+            dictionary = {float(k): v for k, v in dictionary.items()}
             rocs_list.append(dictionary[float(hyperparameter)])
-        for i in range(len(rocs_list)):
-            rocs_at_iteration = rocs_list[i]
+        for i in range(len(rocs_list[0])):
+            rocs_at_iteration = [rocs[i] for rocs in rocs_list]
             fpr = [rocs[0] for rocs in rocs_at_iteration]
             tpr = [rocs[1] for rocs in rocs_at_iteration]
             mean_fpr, mean_tpr, std_tpr = calculate_mean_roc(fpr, tpr)

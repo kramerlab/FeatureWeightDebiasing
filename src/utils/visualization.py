@@ -192,6 +192,7 @@ def plot_auc_average(
     for i, hyperparameter in enumerate(auc_dicts[0].keys()):
         mmd_list = []
         for dictionary in auc_dicts:
+            dictionary = {float(k): v for k, v in dictionary.items()}
             mmd_list.append(dictionary[float(hyperparameter)][:min_length])
 
         mean = np.mean(mmd_list, axis=0)
@@ -219,7 +220,7 @@ def plot_auc_average(
     plt.xticks(x_ticks)
     plt.gca().invert_xaxis()
 
-    plt.savefig(f"{file_name}.pdf")
+    plt.savefig(f"{file_name}_wide_{wide}.pdf")
     plt.close()
 
 
@@ -252,6 +253,7 @@ def plot_mmds_average(
     for i, hyperparameter in enumerate(mmds_dicts[0].keys()):
         mmd_list = []
         for dictionary in mmds_dicts:
+            dictionary = {float(k): v for k, v in dictionary.items()}
             mmd_list.append(dictionary[float(hyperparameter)][:min_length])
 
         mean = np.mean(mmd_list, axis=0)
@@ -274,68 +276,7 @@ def plot_mmds_average(
     plt.close()
 
 
-def plot_experiment_comparison_auc(
-    auc_score_mrs,
-    std_aucs_mrs,
-    auc_score_experiment,
-    std_aucs_experiment,
-    experiment_label,
-    drop,
-    file_name,
-    number_of_samples,
-):
-    """Plots the mean auroc with variance
-
-    :param auc_score_mrs: Mean auroc values
-    :param std_aucs_mrs: Standard deviation of auroc values
-    :param auc_score_experiment: Mean auroc values for the mrs variant
-    :param std_aucs_experiment: Standard deviation of auroc values for the mrs variant
-    :param experiment_label: Name of the mrs variant
-    :param drop: Number of dropped samples per iteration
-    :param file_name: File name for the plot
-    :param number_of_samples: Number of sample sin the original data set
-    """
-    aucs_upper = np.minimum(auc_score_mrs + std_aucs_mrs, 1)
-    aucs_lower = np.maximum(auc_score_mrs - std_aucs_mrs, 0)
-
-    aucs_upper_experiment = np.minimum(auc_score_experiment + std_aucs_experiment, 1)
-    aucs_lower_experiment = np.maximum(auc_score_experiment - std_aucs_experiment, 0)
-
-    stop = number_of_samples - ((auc_score_mrs.size) * drop)
-    x_labels = list(range(number_of_samples, stop, -drop))
-
-    plt.fill_between(x_labels, aucs_lower, aucs_upper, color="blue", alpha=0.2)
-    plt.plot(x_labels, auc_score_mrs, color="blue", linestyle="-", label="MRS")
-
-    plt.fill_between(
-        x_labels,
-        aucs_lower_experiment,
-        aucs_upper_experiment,
-        color="orange",
-        alpha=0.2,
-    )
-    plt.plot(
-        x_labels,
-        auc_score_experiment,
-        linestyle=":",
-        color="orange",
-        label=experiment_label,
-    )
-
-    plt.plot(len(auc_score_mrs) * drop * [0.5], color="black", linestyle="--")
-
-    plt.ylabel("AUROC")
-    plt.xlabel("Number of Remaining Samples")
-    x_ticks = list(
-        range(number_of_samples, stop, -((number_of_samples - (stop + drop)) // 4))
-    ) + [stop + drop]
-    plt.xticks(x_ticks)
-    plt.legend()
-    plt.gca().invert_xaxis()
-    plt.savefig(f"{file_name}.pdf")
-
-
-def plot_rocs_mrs(roc_dict_list, file_name):
+def plot_rocs_mrs(mean_roc_dict, file_name):
     """Plots rocs
 
     :param roc_list: Roc list
@@ -343,40 +284,24 @@ def plot_rocs_mrs(roc_dict_list, file_name):
     """
     plt.rc("")
     plt.rc("axes", prop_cycle=default_cycle)
-    for fper, tper, std, deleted_elements in roc_dict_list:
-        tpfrs_higher = np.minimum(tper + std, 1)
-        tpfrs_lower = np.maximum(tper - std, 0)
-        plt.plot(fper, tper, label=f"{deleted_elements} samples removed")
-        plt.fill_between(fper, tpfrs_lower, tpfrs_higher, alpha=0.2)
-    plt.plot(
-        [0, 1], [0, 1], color="black", linestyle="--", label="Random", linewidth=0.8
-    )
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.legend()
-    plt.savefig(f"{file_name}.pdf")
-    plt.close()
-
-
-def plot_rocs_downstream(roc_list, file_name):
-    """Plots rocs
-
-    :param roc_list: Roc list
-    :param file_name: File name for the plot
-    """
-    plt.rc("")
-    plt.rc("axes", prop_cycle=default_cycle)
-    fpr = roc_list[0]
-    tpr = roc_list[1]
-    plt.plot(fpr, tpr)
-    plt.plot(
-        [0, 1], [0, 1], color="black", linestyle="--", label="Random", linewidth=0.8
-    )
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.legend()
-    plt.savefig(f"{file_name}.pdf")
-    plt.close()
+    for hyperparameter, mean_roc in mean_roc_dict.items():
+        for fper, tper, std, deleted_elements in mean_roc:
+            tpfrs_higher = np.minimum(tper + std, 1)
+            tpfrs_lower = np.maximum(tper - std, 0)
+            sns.lineplot(x=fper, y=tper, label=f"{deleted_elements} samples removed")
+            plt.fill_between(fper, tpfrs_lower, tpfrs_higher, alpha=0.2)
+        sns.lineplot(
+            x=[0, 1],
+            y=[0, 1],
+            color="black",
+            linestyle="--",
+            linewidth=0.8,
+        )
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.legend()
+        plt.savefig(f"{file_name}_{hyperparameter}.pdf")
+        plt.close()
 
 
 def plot_relative_bias(

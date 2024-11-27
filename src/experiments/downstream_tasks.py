@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.preprocessing import StandardScaler
 
-from utils.data_loader import load_weights, save_weights
+from utils.data_loader import load_saved_results, save_results
 from utils.parameter import set_parameter
 from utils.statistics import (
     create_result_path,
@@ -86,8 +86,8 @@ def downstream_tasks_experiment(
     roc_path.mkdir(exist_ok=True)
     validation_path.mkdir(exist_ok=True)
 
-    sample_weight_list = load_weights(sample_weights_save_path)
-    feature_weight_list = load_weights(feature_weights_save_path)
+    sample_weight_list = load_saved_results(sample_weights_save_path)
+    feature_weight_list = load_saved_results(feature_weights_save_path)
 
     scaler = StandardScaler()
 
@@ -100,6 +100,11 @@ def downstream_tasks_experiment(
         accuracy_val_dict,
         hyperparameter_list,
     ) = set_parameter(method_name)
+
+    dropped_samples_individual_val_dict = dropped_samples_val_dict.copy()
+    auroc_individual_val_dict = auroc_val_dict.copy()
+    auprc_individual_val_dict = auprc_val_dict.copy()
+    accuracy_individual_val_dict = accuracy_val_dict.copy()
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
@@ -154,8 +159,8 @@ def downstream_tasks_experiment(
             feature_weight_list.append(feature_weights)
             sample_weight_list.append(sample_weights)
 
-            save_weights(sample_weights_save_path, sample_weight_list)
-            save_weights(feature_weights_save_path, feature_weight_list)
+            save_results(sample_weights_save_path, sample_weight_list)
+            save_results(feature_weights_save_path, feature_weight_list)
 
         (
             rf_auroc,
@@ -216,6 +221,10 @@ def downstream_tasks_experiment(
                 auroc_val_dict,
                 auprc_val_dict,
                 accuracy_val_dict,
+                dropped_samples_individual_val_dict,
+                auroc_individual_val_dict,
+                auprc_individual_val_dict,
+                accuracy_individual_val_dict,
                 N,
                 R,
                 sample_weights,
@@ -248,6 +257,10 @@ def downstream_tasks_experiment(
             roc_curves_list,
             best_temperature_list,
             best_hyperparameter_list,
+            dropped_samples_individual_val_dict,
+            auroc_individual_val_dict,
+            auprc_individual_val_dict,
+            accuracy_individual_val_dict,
         ),
         (
             "rf_auroc",
@@ -259,6 +272,10 @@ def downstream_tasks_experiment(
             "roc_curves",
             "best_temperature",
             "best_hyperparameter",
+            "dropped_samples_individual_val_dict",
+            "auroc_individual_val_dict",
+            "auprc_individual_val_dict",
+            "accuracy_individual_val_dict",
         ),
     ):
         with open(
@@ -339,6 +356,10 @@ def compute_validation_results(
     auroc_val_dict,
     auprc_val_dict,
     accuracy_val_dict,
+    dropped_samples_individual_val_dict,
+    auroc_individual_val_dict,
+    auprc_individual_val_dict,
+    accuracy_individual_val_dict,
     N,
     R,
     sample_weights,
@@ -346,7 +367,6 @@ def compute_validation_results(
     method_name,
 ):
     if method_name == "mrs-forest":
-
         for temperature, temperature_sample_weights in sample_weights.items():
             for (
                 hyperparameter,
@@ -392,6 +412,55 @@ def compute_validation_results(
                 accuracy_val_dict[float(temperature)][float(hyperparameter)].append(
                     rf_accuracy_val
                 )
+
+        for temperature, temperature_sample_weights in sample_weights.items():
+            hyperparameter = 0.01
+            temperature_sample_weights = {
+                float(k): v for k, v in temperature_sample_weights.items()
+            }
+            temperature_feature_weights = feature_weights[temperature]
+            temperature_feature_weights = {
+                float(k): v for k, v in temperature_feature_weights.items()
+            }
+
+            (
+                rf_auroc_val,
+                rf_auprc_val,
+                rf_accuracy_val,
+                best_sample_weights_individual_val,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ) = compute_classification_metrics_random_forest(
+                N,
+                R,
+                columns,
+                parameter_sample_weights[hyperparameter],
+                parameter_feature_weights[hyperparameter],
+                target,
+                random_state=seed,
+                draw_with_feature_weights=draw_with_feature_weights,
+                n_estimators=500,
+                n_splits=5,
+                compute_feature_importance=False,
+            )
+            dropped_samples_individual_val = np.count_nonzero(
+                np.array(best_sample_weights_individual_val) == 0.0
+            )
+            dropped_samples_individual_val_dict[float(temperature)][
+                float(hyperparameter)
+            ].append(dropped_samples_individual_val)
+            auroc_individual_val_dict[float(temperature)][float(hyperparameter)].append(
+                rf_auroc_val
+            )
+            auprc_individual_val_dict[float(temperature)][float(hyperparameter)].append(
+                rf_auprc_val
+            )
+            accuracy_individual_val_dict[float(temperature)][
+                float(hyperparameter)
+            ].append(rf_accuracy_val)
     else:
         for temperature, temperature_sample_weights in sample_weights.items():
             temperature_feature_weights = feature_weights[temperature]
@@ -428,3 +497,49 @@ def compute_validation_results(
             auroc_val_dict[float(temperature)].append(rf_auroc_val)
             auprc_val_dict[float(temperature)].append(rf_auprc_val)
             accuracy_val_dict[float(temperature)].append(rf_accuracy_val)
+
+    for temperature, temperature_sample_weights in sample_weights.items():
+        hyperparameter = 1.0 if method_name == "fw-mrs-temperature-svm" else 0.01
+        temperature_feature_weights = feature_weights[temperature]
+        temperature_feature_weights = {
+            float(k): v for k, v in temperature_feature_weights.items()
+        }
+        temperature_sample_weights = {
+            float(k): v for k, v in temperature_sample_weights.items()
+        }
+
+        tmp_sample_weights = {temperature: temperature_sample_weights[hyperparameter]}
+        tmp_feature_weights = {temperature: temperature_feature_weights[hyperparameter]}
+        (
+            rf_auroc_val,
+            rf_auprc_val,
+            rf_accuracy_val,
+            best_sample_weights_val,
+            _,
+            _,
+            _,
+            _,
+            _,
+        ) = compute_classification_metrics_random_forest(
+            N,
+            R,
+            columns,
+            tmp_sample_weights,
+            tmp_feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            n_estimators=500,
+            n_splits=5,
+            compute_feature_importance=False,
+        )
+
+        dropped_samples_individual_val = np.count_nonzero(
+            np.array(best_sample_weights_val) == 0.0
+        )
+        dropped_samples_individual_val_dict[float(temperature)].append(
+            dropped_samples_val
+        )
+        auroc_individual_val_dict[float(temperature)].append(rf_auroc_val)
+        auprc_individual_val_dict[float(temperature)].append(rf_auprc_val)
+        accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)

@@ -49,7 +49,9 @@ def plot_budget_comparison_auroc(
             label=str(budget),
             linestyle=line_styles[i],
         )
-    plt.plot([max_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--")
+    plt.plot(
+        [max_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--"
+    )
     plt.ylabel("Feature Weighted AUROC")
     plt.xlabel("Number of Remaining Samples")
     step_size = len(x_labels) // n_ticks
@@ -61,7 +63,7 @@ def plot_budget_comparison_auroc(
     plt.close()
 
 
-def plot_budget_comparison_auroc_mean(
+def plot_temperature_comparison_auroc_mean(
     auroc_list_of_dictionaries,
     number_of_samples,
     drop,
@@ -92,7 +94,9 @@ def plot_budget_comparison_auroc_mean(
             x=x_labels, y=mean_aurocs, label=str(budget), linestyle=line_styles[i]
         )
         plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.2)
-    plt.plot([min_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--")
+    plt.plot(
+        [min_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--"
+    )
     plt.ylabel("Feature Weighted AUROC")
     plt.xlabel("Number of Remaining Samples")
     step_size = len(x_labels) // n_ticks

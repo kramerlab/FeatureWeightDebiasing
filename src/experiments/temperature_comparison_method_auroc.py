@@ -1,13 +1,13 @@
 import json
 
-from experiments.downstream_tasks import load_weights
-from utils.data_loader import save_weights
+from experiments.downstream_tasks import load_saved_results
+from utils.data_loader import save_results
 from utils.statistics import create_result_path
 from utils.sampling import sample_N, repeated_train_val_test_split
 from utils.metrics import compute_classification_metrics_random_forest
 from utils.visualization_fw_mrs import (
     plot_budget_comparison_auroc,
-    plot_budget_comparison_auroc_mean,
+    plot_temperature_comparison_auroc_mean,
 )
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -69,11 +69,11 @@ def temperature_comparison(
     feature_weights_save_path.mkdir(exist_ok=True)
     auroc_save_path.mkdir(exist_ok=True)
 
-    feature_weighted_aurocs_list = load_weights(
+    feature_weighted_aurocs_list = load_saved_results(
         auroc_save_path, file_name="method_aurocs"
     )
-    sample_weights_list = load_weights(sample_weights_save_path)
-    feature_weights_list = load_weights(feature_weights_save_path)
+    sample_weights_list = load_saved_results(sample_weights_save_path)
+    feature_weights_list = load_saved_results(feature_weights_save_path)
 
     number_of_samples_list = []
     scaler = StandardScaler()
@@ -166,12 +166,11 @@ def temperature_comparison(
             sample_weights_list.append(sample_weights)
             feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
 
-            save_weights(sample_weights_save_path, sample_weights_list)
-            save_weights(feature_weights_save_path, feature_weights_list)
-            save_weights(
+            save_results(sample_weights_save_path, sample_weights_list)
+            save_results(feature_weights_save_path, feature_weights_list)
+            save_results(
                 auroc_save_path, feature_weighted_aurocs_list, file_name="method_aurocs"
             )
-
 
         for temperature, values in sample_weights.items():
             key = next(iter(values.keys()))
@@ -187,7 +186,7 @@ def temperature_comparison(
             auroc_save_path / f"auroc_{i}",
         )
 
-        plot_budget_comparison_auroc_mean(
+        plot_temperature_comparison_auroc_mean(
             feature_weighted_aurocs_list,
             number_of_samples_list,
             drop,
@@ -200,7 +199,7 @@ def temperature_comparison(
     with open(result_path / "dropped_elements.json", "w") as result_file:
         result_file.write(json.dumps(dropped_samples_dict))
 
-    plot_budget_comparison_auroc_mean(
+    plot_temperature_comparison_auroc_mean(
         feature_weighted_aurocs_list,
         number_of_samples_list,
         drop,

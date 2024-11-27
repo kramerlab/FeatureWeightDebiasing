@@ -296,18 +296,18 @@ def load_fairness_adult():
     return df, columns, ("sex", "income")
 
 
-def save_weights(path, weights_list, file_name="weights"):
+def save_results(path, weights_list, file_name="weights"):
     with open(path / f"{file_name}.json", "w") as file:
         json.dump(weights_list, file, indent=4)
 
 
-def load_weights(path, file_name="weights"):
+def load_saved_results(path, file_name="weights"):
     weight_file = path / f"{file_name}.json"
     if weight_file.is_file():
         with open(weight_file, "r") as file:
-            weights = json.load(file)
-        if isinstance(weights, dict):
-            weights = {float(k): v for k, v in weights.items()}
+            saved_results = json.load(file)
+        if isinstance(saved_results, dict):
+            saved_results = {float(k): v for k, v in saved_results.items()}
     else:
-        weights = []
-    return weights
+        saved_results = []
+    return saved_results

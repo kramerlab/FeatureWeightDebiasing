@@ -17,6 +17,7 @@ from utils.metrics import (
     compute_relative_bias,
     interpolate_roc,
     train_pu_classifier_mrs,
+    wasserstein_distance,
     weighted_maximum_mean_discrepancy,
 )
 
@@ -141,6 +142,7 @@ def mrs(
     switched_dict = {}
     best_weights_dict = {}
     finished_dict = {}
+    wasserstein_dict = {}
 
     mrs_function = random_drops if mrs_function == "random" else mrs_step
 
@@ -155,6 +157,8 @@ def mrs(
         current_patience_dict[hyperparameter] = 0
         switched_dict[hyperparameter] = False
         finished_dict[hyperparameter] = False
+        wasserstein_dict[hyperparameter] = []
+
 
     number_of_iterations = ((len(N) - n_pu_splits) // drop) - 1
     dropped_N = N.copy().reset_index(drop=True)
@@ -211,6 +215,10 @@ def mrs(
                     dropped_N[target], R[target], sample_weights_dict[hyperparameter]
                 )
                 relative_bias_dict[hyperparameter].append(relative_bias)
+                wasserstein_distance_value = wasserstein_distance(
+                N[target], R[target], sample_weights_dict[hyperparameter]
+            )
+                wasserstein_dict[hyperparameter].append(wasserstein_distance_value)
 
             auc_difference = abs(auroc - 0.5)
             if auc_difference <= best_difference_dict[hyperparameter] or (
@@ -267,7 +275,7 @@ def mrs(
         ).tolist()
 
     if return_metrics:
-        return auc_dict, mmd_dict, relative_bias_dict, mrs_iteration_dict, roc_dict
+        return auc_dict, mmd_dict, relative_bias_dict, mrs_iteration_dict, roc_dict, wasserstein_dict
     else:
         return (best_weights_dict, feature_weights)
 

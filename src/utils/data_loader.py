@@ -64,7 +64,7 @@ def load_gbs_allensbach():
         "woechentlicheArbeitszeit",
         "Resilienz",
     ]
-    return allensbach, allensbach_columns, "Wahlteilnahme"
+    return allensbach, allensbach_columns, "Resilienz"
 
 
 def load_gbs_gesis():

@@ -508,8 +508,8 @@ def compute_validation_results(
             float(k): v for k, v in temperature_sample_weights.items()
         }
 
-        tmp_sample_weights = {temperature: temperature_sample_weights[hyperparameter]}
-        tmp_feature_weights = {temperature: temperature_feature_weights[hyperparameter]}
+        tmp_sample_weights = temperature_sample_weights[hyperparameter]
+        tmp_feature_weights = temperature_feature_weights[hyperparameter]
         (
             rf_auroc_val,
             rf_auprc_val,

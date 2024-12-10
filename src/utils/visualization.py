@@ -224,13 +224,14 @@ def plot_auc_average(
     plt.close()
 
 
-def plot_mmds_average(
+def plot_value_average(
     mmds_dicts,
     drop,
     file_name,
     mrs_iterations,
     number_of_samples,
     n_ticks=5,
+    ylabel="Maximum Mean Discrepancy",
 ):
     """Plots the mean mmds with variance
 
@@ -265,7 +266,7 @@ def plot_mmds_average(
         )
         plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
 
-    plt.ylabel("Maximum Mean Discrepancy")
+    plt.ylabel(ylabel)
     plt.xlabel("Number of Remaining Samples")
     step_size = len(x_labels) // n_ticks
     x_ticks = x_labels[::-step_size]
@@ -332,6 +333,7 @@ def plot_relative_bias(
     for i, hyperparameter in enumerate(relative_bias_dict[0].keys()):
         mmd_list = []
         for dictionary in relative_bias_dict:
+            dictionary = {float(k): v for k, v in dictionary.items()}
             mmd_list.append(dictionary[float(hyperparameter)][:min_length])
 
         mean = np.mean(mmd_list, axis=0)

@@ -60,7 +60,7 @@ class FullSample:
             yield list(range(len(X))), list(range(len(X)))
 
 
-def update_weights(weights, predictions, exponential, k=0.1):
+def update_weights(weights, predictions, exponential, k=0.1, weight=1.0):
     """Updates sample weights based on the prediction probabilities
 
     :param weights: Sample weights
@@ -74,7 +74,7 @@ def update_weights(weights, predictions, exponential, k=0.1):
     if exponential:
         p_difference = 0.5 - predictions
         weight_modificator = 1.5 - (1 / (1 + np.exp(p_difference / k)))
-        weights *= weight_modificator
+        weights *= weight_modificator * weight
     else:
         weight_modificator = 1.5 - predictions
         weights *= weight_modificator

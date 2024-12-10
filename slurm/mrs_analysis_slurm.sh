@@ -11,7 +11,7 @@
 
 
 NUMBER_OF_REPETETIONS=10
-N_CV_SPLITS=10
+N_CV_SPLITS=5
 DROP=1
 
 python srun src/mrs_analysis.py --data_set_name gbs_gesis --number_of_repetitions $NUMBER_OF_REPETETIONS --drop $DROP &

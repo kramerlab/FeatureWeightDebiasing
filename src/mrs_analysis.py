@@ -13,7 +13,7 @@ from utils.metrics import calculate_mean_rocs, scale_df
 from utils.visualization import (
     plot_auc_average,
     plot_relative_bias,
-    plot_mmds_average,
+    plot_value_average,
     plot_rocs_mrs,
 )
 
@@ -41,11 +41,7 @@ def analyse_mrs(
     np.random.seed(seed)
     random.seed(seed)
     random_generator = np.random.RandomState(seed)
-    aucs_complete = []
-    mmds_complete = []
-    mrs_iteration_dict_list = []
-    rocs_dict_list = []
-    relative_bias_dict_list = []
+
     result_path = create_result_path(
         "mrs",
         bias_type,
@@ -79,18 +75,25 @@ def analyse_mrs(
     relative_bias_save_path = result_path / "relative_bias"
     rocs_save_path = result_path / "rocs"
     mrs_iterations_save_path = result_path / "mrs_iterations"
+    wassersteins_save_path = result_path / "wassersteins"
 
     aurocs_save_path.mkdir(exist_ok=True)
     mmds_save_path.mkdir(exist_ok=True)
     relative_bias_save_path.mkdir(exist_ok=True)
     rocs_save_path.mkdir(exist_ok=True)
     mrs_iterations_save_path.mkdir(exist_ok=True)
+    wassersteins_save_path.mkdir(exist_ok=True)
 
-    aucs_complete = load_saved_results(aurocs_save_path)
-    mmds_complete = load_saved_results(mmds_save_path)
-    mrs_iteration_dict_list = load_saved_results(relative_bias_save_path)
-    rocs_dict_list = load_saved_results(rocs_save_path)
-    relative_bias_dict_list = load_saved_results(mrs_iterations_save_path)
+    aucs_complete = load_saved_results(aurocs_save_path, "aurocs")
+    wassersteins_complete = load_saved_results(wassersteins_save_path, "wassersteins")
+    mmds_complete = load_saved_results(mmds_save_path, "mmds")
+    mrs_iteration_dict_list = load_saved_results(
+        mrs_iterations_save_path, "mrs_iterations"
+    )
+    rocs_dict_list = load_saved_results(rocs_save_path, "rocs")
+    relative_bias_dict_list = load_saved_results(
+        relative_bias_save_path, "relative_biases"
+    )
 
     for i, (N, R, _) in enumerate(
         split_method(
@@ -122,12 +125,12 @@ def analyse_mrs(
                 relative_bias_dict,
                 mrs_iteration_dict,
                 roc_list_dict,
+                wasserstein_dict,
             ) = maximum_representative_subsampling.mrs(
                 N,
                 R,
                 columns,
                 drop=drop,
-                save_path=result_path,
                 return_metrics=True,
                 compute_bias=use_bias_mean,
                 target=target,
@@ -139,19 +142,25 @@ def analyse_mrs(
 
             aucs_complete.append(auc_dict)
             mmds_complete.append(mmd_dict)
+            wassersteins_complete.append(wasserstein_dict)
             mrs_iteration_dict_list.append(mrs_iteration_dict)
             rocs_dict_list.append(roc_list_dict)
             relative_bias_dict_list.append(relative_bias_dict)
 
-            save_results(aurocs_save_path, aucs_complete)
-            save_results(mmds_save_path, mmds_complete)
-            save_results(relative_bias_save_path, mrs_iteration_dict_list)
-            save_results(rocs_save_path, rocs_dict_list)
-            save_results(mrs_iterations_save_path, relative_bias_dict_list)
+            save_results(aurocs_save_path, aucs_complete, "aurocs")
+            save_results(mmds_save_path, mmds_complete, "mmds")
+            save_results(
+                relative_bias_save_path, relative_bias_dict_list, "relative_biases"
+            )
+            save_results(rocs_save_path, rocs_dict_list, "rocs")
+            save_results(
+                mrs_iterations_save_path, mrs_iteration_dict_list, "mrs_iterations"
+            )
+            save_results(wassersteins_save_path, wassersteins_complete, "wassersteins")
 
         mean_rocs = calculate_mean_rocs(rocs_dict_list)
 
-        plot_mmds_average(
+        plot_value_average(
             mmds_complete,
             drop,
             result_path / "mmd",
@@ -172,6 +181,15 @@ def analyse_mrs(
             number_of_samples,
             mrs_iteration_dict_list,
             wide=False,
+        )
+
+        plot_value_average(
+            wassersteins_complete,
+            drop,
+            result_path / "auroc",
+            mrs_iteration_dict_list,
+            number_of_samples,
+            ylabel="Wasserstein Distance",
         )
 
         plot_rocs_mrs(mean_rocs, result_path / "rocs")

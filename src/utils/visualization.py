@@ -203,7 +203,7 @@ def plot_auc_average(
         sns.lineplot(
             x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
         )
-        plt.fill_between(x_labels, aucs_lower, aucs_upper, alpha=0.2)
+        plt.fill_between(x_labels, aucs_lower, aucs_upper, alpha=0.3)
 
     random_line = len(x_labels) * [0.5]
     plt.plot(
@@ -264,7 +264,7 @@ def plot_value_average(
         sns.lineplot(
             x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
         )
-        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
+        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.3)
 
     plt.ylabel(ylabel)
     plt.xlabel("Number of Remaining Samples")
@@ -286,17 +286,17 @@ def plot_rocs_mrs(mean_roc_dict, file_name):
     plt.rc("")
     plt.rc("axes", prop_cycle=default_cycle)
     for hyperparameter, mean_roc in mean_roc_dict.items():
-        for fper, tper, std, deleted_elements in mean_roc:
+        for i, (fper, tper, std, deleted_elements) in enumerate(mean_roc):
             tpfrs_higher = np.minimum(tper + std, 1)
             tpfrs_lower = np.maximum(tper - std, 0)
-            sns.lineplot(x=fper, y=tper, label=f"{deleted_elements} samples removed")
-            plt.fill_between(fper, tpfrs_lower, tpfrs_higher, alpha=0.2)
+            sns.lineplot(x=fper, y=tper, label=f"{deleted_elements} samples removed", linestyle=line_styles[i])
+            plt.fill_between(fper, tpfrs_lower, tpfrs_higher, alpha=0.3)
         sns.lineplot(
             x=[0, 1],
             y=[0, 1],
             color="black",
             linestyle="--",
-            linewidth=0.8,
+            linewidth=1,
         )
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
@@ -343,7 +343,7 @@ def plot_relative_bias(
         sns.lineplot(
             x=x_labels, y=mean, label=str(hyperparameter), linestyle=line_styles[i]
         )
-        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.2)
+        plt.fill_between(x_labels, mmds_lower, mmds_upper, alpha=0.3)
 
     plt.xlabel("Number of Remaining Samples")
     plt.ylabel("Relative Bias")

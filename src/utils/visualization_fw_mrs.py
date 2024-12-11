@@ -93,7 +93,7 @@ def plot_temperature_comparison_auroc_mean(
         sns.lineplot(
             x=x_labels, y=mean_aurocs, label=str(budget), linestyle=line_styles[i]
         )
-        plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.2)
+        plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.3)
     plt.plot(
         [min_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--"
     )

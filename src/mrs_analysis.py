@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from pathlib import Path
+import json
 
 from experiments.downstream_tasks import repeated_train_val_test_split
 from utils.parameter import set_parameter
@@ -186,7 +186,7 @@ def analyse_mrs(
         plot_value_average(
             wassersteins_complete,
             drop,
-            result_path / "auroc",
+            result_path / "wasserstein",
             mrs_iteration_dict_list,
             number_of_samples,
             ylabel="Wasserstein Distance",
@@ -202,6 +202,10 @@ def analyse_mrs(
                 number_of_samples,
                 drop,
             )
+
+        meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples}
+        with open(result_path / 'metadata.json', 'w') as file:
+            json.dump(meta_data_dict, file)
 
 
 def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):

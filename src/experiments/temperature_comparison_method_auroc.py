@@ -81,9 +81,12 @@ def temperature_comparison(
     if data_set_name in ("gbs_gesis", "gbs_allensbach"):
         N = df[df["label"] == 1]
         R = df[df["label"] == 0]
+        split_method = gbs_split
+    else:
+        split_method = repeated_train_val_test_split
 
     for i, (N, R, _) in enumerate(
-        repeated_train_val_test_split(
+        split_method(
             n_cv_splits,
             n_cv_repeats,
             df,
@@ -220,3 +223,10 @@ def save_mean_dropped_elements(result_path, dropped_samples_list):
 
     with open(result_path / "mean_dropped_samples", "w", encoding="utf-8") as file:
         json.dump(mean_dropped_samples_dict, file, indent=4)
+
+def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
+    for _ in range(n_cv_splits):
+        for _ in range(n_cv_repeats):
+            N = df[df["label"] == 1]
+            R = df[df["label"] == 0]
+            yield N, R, _

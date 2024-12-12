@@ -101,11 +101,16 @@ def downstream_tasks_experiment(
         hyperparameter_list,
     ) = set_parameter(method_name)
 
-    dropped_samples_individual_val_dict = dropped_samples_val_dict.copy()
-    auroc_individual_val_dict = auroc_val_dict.copy()
-    auprc_individual_val_dict = auprc_val_dict.copy()
-    accuracy_individual_val_dict = accuracy_val_dict.copy()
-
+    if dropped_samples_val_dict is not None:
+        dropped_samples_individual_val_dict = dropped_samples_val_dict.copy()
+        auroc_individual_val_dict = auroc_val_dict.copy()
+        auprc_individual_val_dict = auprc_val_dict.copy()
+        accuracy_individual_val_dict = accuracy_val_dict.copy()
+    else: 
+        dropped_samples_individual_val_dict = None
+        auroc_individual_val_dict = None
+        auprc_individual_val_dict = None
+        accuracy_individual_val_dict = None
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split(
             n_cv_splits,
@@ -197,7 +202,7 @@ def downstream_tasks_experiment(
                 N,
                 R,
                 scaler,
-                columns,
+                columns.values,
                 target,
                 best_sample_weights,
                 gamma,

@@ -41,6 +41,7 @@ def analyse_mrs(
     np.random.seed(seed)
     random.seed(seed)
     random_generator = np.random.RandomState(seed)
+    wasserstein_target = "Resilienz" if data_set_name == "gbs_allensbach" else None
 
     result_path = create_result_path(
         "mrs",
@@ -65,7 +66,7 @@ def analyse_mrs(
 
     if data_set_name in ("gbs_gesis", "gbs_allensbach"):
         split_method = gbs_split
-        use_bias_mean = False
+        use_bias_mean = True
     else:
         use_bias_mean = True
         split_method = repeated_train_val_test_split
@@ -138,6 +139,7 @@ def analyse_mrs(
                 hyperparameter_list=hyperparameter_list,
                 early_stopping=False,
                 mrs_function=mrs_function,
+                wasserstein_target=wasserstein_target,
             )
 
             aucs_complete.append(auc_dict)

@@ -35,13 +35,14 @@ def soft_mrs_weighting(
     columns,
     random_generator=None,
     exponential=False,
-    patience=10,
+    patience=50,
     method_name="",
     return_metrics=False,
     compute_bias=False,
     target=None,
     n_iterations=None,
     early_stopping=True,
+    wasserstein_target=None,
     *args,
     **kwargs
 ):
@@ -75,6 +76,7 @@ def soft_mrs_weighting(
         )
         else False
     )
+    wasserstein_target = target if wasserstein_target is None else wasserstein_target
 
     # Optimize until MMD stagnates
     while True:
@@ -95,12 +97,12 @@ def soft_mrs_weighting(
             auroc_list.append(auroc)
 
             wasserstein_distance_value = wasserstein_distance(
-                N[target], R[target], weights_N
+                N[wasserstein_target], R[wasserstein_target], weights_N
             )
 
             wasserstein_list.append(wasserstein_distance_value)
             if compute_bias and target is not None:
-                relative_bias = compute_relative_bias(N[target], R[target], weights_N)
+                relative_bias = compute_relative_bias(N[wasserstein_target], R[wasserstein_target], weights_N)
                 relative_bias_list.append(relative_bias.tolist())
 
         if mmd < best_mmd:

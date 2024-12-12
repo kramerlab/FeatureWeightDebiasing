@@ -6,17 +6,12 @@ from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
 from utils.parameter import set_parameter
-from utils.sampling import repeated_train_val_test_split
 from utils.statistics import logistic_regression
-from utils.visualization import plot_statistical_analysis
 from utils.metrics import (
     calculate_rbf_gamma,
-    compute_classification_metrics_random_forest,
     compute_metrics,
 )
-import pandas as pd
 
-bins = 8
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
 
@@ -28,9 +23,9 @@ def perform_statistical_analysis_mrs(
     method_name,
     n_cv_repeats: int,
     n_cv_splits: int,
-    target: str,
     random_generator=None,
     drop=1,
+    target=None,
     data_set_name=None,
     **args,
 ):
@@ -49,22 +44,22 @@ def perform_statistical_analysis_mrs(
     iterations_path = result_path / "iteration"
     iterations_path.mkdir(exist_ok=True, parents=True)
 
-    gbs = df[df["label"] == 1].copy()
-    allensbach = df[df["label"] == 0].copy()
+    scaler = StandardScaler()
+    df[columns] = scaler.fit_transform(df[columns])
+
+    N = df[df["label"] == 1].copy()
+    R = df[df["label"] == 0].copy()
+    gamma = calculate_rbf_gamma(N[columns])
     sample_weights_list = []
-    feature_weights_list = []
-    rf_auroc_list = []
-    rf_auprc_list = []
     dropped_samples_list = []
     wasserstein_list = []
     relative_biases_list = []
     mmd_list = []
     pvalue_list = []
-    abs_feature_importance_list = []
     roc_curves_list = []
 
     (
-        draw_with_feature_weights,
+        _,
         temperatures,
         _,
         _,
@@ -73,27 +68,10 @@ def perform_statistical_analysis_mrs(
         hyperparameter_list,
     ) = set_parameter(method_name)
 
-    scaler = StandardScaler()
-
-    for i, (N, R, T) in enumerate(
-        repeated_train_val_test_split(
-            n_cv_splits,
-            n_cv_repeats,
-            gbs,
-            gbs[target],
-            sampling_random_generator,
-        )
-    ):
-
-        N = pd.concat([N, R])
-        N[columns] = scaler.fit_transform(N[columns])
-        allensbach_copy = allensbach.copy()
-        allensbach_copy[columns] = scaler.transform(allensbach[columns])
-        T[columns] = scaler.transform(T[columns])
-        gamma = calculate_rbf_gamma(N[columns])
-        sample_weights, feature_weights = sample_weighting_method(
+    for i in range(n_cv_repeats):
+        sample_weights, _ = sample_weighting_method(
             N=N,
-            R=allensbach_copy,
+            R=R,
             columns=columns,
             drop=drop,
             early_stopping=True,
@@ -102,80 +80,44 @@ def perform_statistical_analysis_mrs(
             hyperparameter_list=hyperparameter_list,
             target=target,
         )
-        if method_name in ("mrs-forest", "psa"):
+        if method_name == "mrs-forest":
             sample_weights = {0.0: sample_weights}
-            feature_weights = {0.0: feature_weights}
-
-        if feature_weights is None:
-            feature_weights = (np.ones(len(columns)) / len(columns)).tolist()
-
-        (
-            rf_auroc,
-            rf_auprc,
-            accuracy,
-            sample_weights,
-            abs_feature_importance,
-            roc_curve_values,
-            _,
-            _,
-            _,
-        ) = compute_classification_metrics_random_forest(
-            N,
-            T,
-            columns,
-            sample_weights,
-            feature_weights,
-            target,
-            random_state=seed,
-            draw_with_feature_weights=draw_with_feature_weights,
-            n_estimators=500,
-            n_splits=5,
-        )
-
-        sample_weights_list.append(sample_weights)
-        feature_weights_list.append(feature_weights)
-
-        rf_auroc_list.append(rf_auroc)
-        rf_auprc_list.append(rf_auprc)
-        abs_feature_importance_list.append(abs_feature_importance.tolist())
-        roc_curves_list.append(roc_curve_values)
 
         dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
 
-        if method_name not in ("fw-mrs-temperature", "fw-mrs-temperature-svm"):
-            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+        weighted_mmd, relative_bias, wasserstein_distances, best_sample_weights = (
+            compute_metrics(
                 N,
-                allensbach_copy,
+                R,
                 scaler,
                 columns,
                 target,
                 sample_weights,
                 gamma,
+                return_sample_weights=True,
             )
-        else:
-            weighted_mmd = np.ones(len(N.columns))
-            relative_bias = np.ones(len(N.columns))
-            wasserstein_distances = np.ones(len(N.columns))
+        )
+
+        sample_weights_list.append(best_sample_weights)
         wasserstein_list.append(wasserstein_distances)
         relative_biases_list.append(relative_bias)
         mmd_list.append(weighted_mmd)
 
-        if data_set_name == "gbs_allensbach":
-            pvalue = logistic_regression(N[columns + ["Wahlteilnahme"]], sample_weights)
-            pvalue_list.append(pvalue)
+        pvalue = logistic_regression(
+            N[columns + [target]], best_sample_weights
+        )
+        pvalue_list.append(pvalue)
 
-        result_dict_mrs_iteration = {}
-        for index, column in enumerate(columns):
-            result_dict_mrs_iteration[f"{column}_relative_bias"] = {
-                "wasserstein": wasserstein_distances[index],
-                "relative_bias": relative_bias[index],
-            }
+    result_dict_mrs_iteration = {}
+    for index, column in enumerate(columns):
+        result_dict_mrs_iteration[f"{column}_relative_bias"] = {
+            "wasserstein": wasserstein_distances[index],
+            "relative_bias": relative_bias[index],
+        }
 
-        with open(
-            iterations_path / f"results_{method_name}_{i}.json", "w"
-        ) as result_file:
-            result_file.write(json.dumps(result_dict_mrs_iteration))
+    with open(iterations_path / f"results_{method_name}_{i}.json", "w") as result_file:
+        result_file.write(json.dumps(result_dict_mrs_iteration))
 
     wasserstein_std_list = np.std(wasserstein_list, axis=0)
     relative_bias_std_list = np.std(relative_biases_list, axis=0)
@@ -210,52 +152,20 @@ def perform_statistical_analysis_mrs(
         (
             "similarity_metrics.json",
             "p_value_results.json",
-            "rf_auroc.json",
-            "rf_auprc.json",
             "dropped_samples.json",
-            "abs_feature_importance.json",
             "roc_curves.json",
+            "sample_weights.json",
         ),
         (
             result_dict_similarity,
             p_values_dict,
-            rf_auroc_list,
-            rf_auprc_list,
             dropped_samples_list,
-            abs_feature_importance_list,
             roc_curves_list,
+            sample_weights_list,
         ),
     ):
         with open(result_path / file_name, "w") as result_file:
             result_file.write(json.dumps(data))
-
-    N.loc[:, columns] = scaler.inverse_transform(N[columns])
-    allensbach_copy.loc[:, columns] = scaler.inverse_transform(allensbach_copy[columns])
-
-    # Plot exemplary last iteration
-    plot_statistical_analysis(
-        bins,
-        N[columns],
-        allensbach_copy[columns],
-        result_path,
-        sample_weights_list[-1],
-        method_name,
-    )
-
-    mean_results_dict = {}
-    abs_feature_importance_list = np.array(abs_feature_importance_list)
-
-    mean_results_dict["Mean AUROC"] = np.mean(rf_auroc_list)
-    mean_results_dict["Std AUROC"] = np.std(rf_auroc_list)
-
-    mean_results_dict["Mean AUPRC"] = np.mean(rf_auprc_list)
-    mean_results_dict["Std AUPRC"] = np.std(rf_auprc_list)
-
-    for i, feature_name in enumerate(columns):
-        feature_importances = abs_feature_importance_list[:, i]
-        mean_results_dict[feature_name] = np.mean(feature_importances)
-    with open(result_path / "mean_feature_importances.json", "w") as result_file:
-        result_file.write(json.dumps(mean_results_dict))
 
 
 def compute_confidence_interval(data, confidence=0.95):

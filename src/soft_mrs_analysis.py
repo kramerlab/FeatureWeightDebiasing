@@ -37,6 +37,7 @@ def analyse_soft_mrs(
     mmds_complete = []
     relative_bias_complete = []
     sample_weights_list_list = []
+    wasserstein_target = "Resilienz" if data_set_name == "gbs_allensbach" else None
 
     result_path = create_result_path(
         "soft_mrs",
@@ -128,6 +129,7 @@ def analyse_soft_mrs(
                 early_stopping=False,
                 exponential=exponential,
                 n_iterations=500,
+                wasserstein_target=wasserstein_target,
             )
 
             mmds_complete.append(mmd_list)

@@ -178,6 +178,7 @@ def compute_metrics(
     target,
     sample_weights_list,
     gamma,
+    return_sample_weights = False,
 ):
     """Computes the metrics for an experiment
 
@@ -193,7 +194,7 @@ def compute_metrics(
     final_wasserstein_distances = []
     N_dropped = scaled_N[columns].values
     R_dropped = scaled_R[columns].values
-    columns_and_target = np.append(columns.values, target)
+    columns_and_target = np.append(columns, target)
     if isinstance(sample_weights_list, dict):
         best_mmd = np.inf
         tmp_wasserstein_distances = []
@@ -225,6 +226,7 @@ def compute_metrics(
                 )
 
                 if weighted_mmd < best_mmd:
+                    best_sample_weights = sample_weights
                     best_mmd = weighted_mmd
                     final_sample_biases = sample_biases.copy()
                     final_wasserstein_distances = tmp_wasserstein_distances.copy()
@@ -254,12 +256,21 @@ def compute_metrics(
             unscaled_R[columns_and_target],
             sample_weights_list,
         )
+        best_sample_weights = sample_weights_list
 
-    return (
-        weighted_mmd,
-        final_sample_biases,
-        final_wasserstein_distances,
-    )
+    if return_sample_weights:
+        return (
+            weighted_mmd,
+            final_sample_biases,
+            final_wasserstein_distances,
+            best_sample_weights,
+        )
+    else:
+        return (
+            weighted_mmd,
+            final_sample_biases,
+            final_wasserstein_distances,
+        )
 
 
 def compute_classification_metrics_random_forest(

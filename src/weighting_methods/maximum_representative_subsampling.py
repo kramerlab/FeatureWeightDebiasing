@@ -112,6 +112,7 @@ def mrs(
     drop=1,
     random_generator=None,
     hyperparameter_list=[0.0],
+    wasserstein_target=None,
     *args,
     **attributes
 ):
@@ -145,6 +146,7 @@ def mrs(
     wasserstein_dict = {}
 
     mrs_function = random_drops if mrs_function == "random" else mrs_step
+    wasserstein_target = target if wasserstein_target is None else wasserstein_target
 
     for hyperparameter in hyperparameter_list:
         auc_dict[hyperparameter] = []
@@ -158,7 +160,6 @@ def mrs(
         switched_dict[hyperparameter] = False
         finished_dict[hyperparameter] = False
         wasserstein_dict[hyperparameter] = []
-
 
     number_of_iterations = ((len(N) - n_pu_splits) // drop) - 1
     dropped_N = N.copy().reset_index(drop=True)
@@ -212,12 +213,16 @@ def mrs(
 
             if compute_bias and target is not None:
                 relative_bias = compute_relative_bias(
-                    dropped_N[target], R[target], sample_weights_dict[hyperparameter]
+                    dropped_N[wasserstein_target],
+                    R[wasserstein_target],
+                    sample_weights_dict[hyperparameter],
                 )
                 relative_bias_dict[hyperparameter].append(relative_bias)
                 wasserstein_distance_value = wasserstein_distance(
-                N[target], R[target], sample_weights_dict[hyperparameter]
-            )
+                    N[wasserstein_target],
+                    R[wasserstein_target],
+                    sample_weights_dict[hyperparameter],
+                )
                 wasserstein_dict[hyperparameter].append(wasserstein_distance_value)
 
             auc_difference = abs(auroc - 0.5)
@@ -275,7 +280,14 @@ def mrs(
         ).tolist()
 
     if return_metrics:
-        return auc_dict, mmd_dict, relative_bias_dict, mrs_iteration_dict, roc_dict, wasserstein_dict
+        return (
+            auc_dict,
+            mmd_dict,
+            relative_bias_dict,
+            mrs_iteration_dict,
+            roc_dict,
+            wasserstein_dict,
+        )
     else:
         return (best_weights_dict, feature_weights)
 

@@ -72,6 +72,7 @@ def mrs_step(
         abs_feature_importance_list.append(abs_feature_importance)
 
     abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
+    abs_mean_feature_importance = abs_mean_feature_importance / np.sum(abs_mean_feature_importance)
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     return dropped_N.index[drop_ids], abs_mean_feature_importance, np.mean(auroc_list)
@@ -268,7 +269,12 @@ def fw_MRS_SVM(
             break
 
     if return_metrics:
-        return auroc_dict, best_sample_weights_dict, feature_weights_dict
+        return (
+            auroc_dict,
+            best_sample_weights_dict,
+            feature_weights_dict,
+            abs_feature_importance_dict,
+        )
     else:
         return (
             best_sample_weights_dict,

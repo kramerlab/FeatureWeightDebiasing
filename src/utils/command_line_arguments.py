@@ -150,3 +150,5 @@ def get_experiment_function(experiment_name=""):
         return fairness_tasks_experiment
     elif experiment_name == "decomposition":
         return decomposition_experiment
+    elif experiment_name == "lipidomics":
+        return 

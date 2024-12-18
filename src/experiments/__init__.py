@@ -3,3 +3,4 @@ from .temperature_comparison_method_auroc import temperature_comparison
 from .statistical_analysis_mrs import perform_statistical_analysis_mrs
 from .fairness_experiments import fairness_tasks_experiment
 from .bias_variance_decomposition_experiments import decomposition_experiment
+from .lipidomics_experiment import lipidomics_quantification_experiment

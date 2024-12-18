@@ -6,6 +6,7 @@ from experiments import (
     downstream_tasks_experiment,
     fairness_tasks_experiment,
     decomposition_experiment,
+    lipidomics_quantification_experiment
 )
 
 
@@ -52,6 +53,7 @@ dataset_list = [
     "breast_cancer",
     "hr_analytics",
     "loan_prediction",
+    "lipidomics",
 ]
 
 
@@ -151,4 +153,4 @@ def get_experiment_function(experiment_name=""):
     elif experiment_name == "decomposition":
         return decomposition_experiment
     elif experiment_name == "lipidomics":
-        return 
+        return lipidomics_quantification_experiment

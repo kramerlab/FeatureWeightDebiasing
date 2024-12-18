@@ -40,6 +40,8 @@ def load_dataset(dataset_name):
         return load_loan_prediction()
     elif dataset_name == "fairness_adult":
         return load_fairness_adult()
+    elif dataset_name == "lipidomics":
+        return load_lipid_quantification()
     else:
         print("No valid data set name given!")
         exit()
@@ -294,6 +296,40 @@ def load_fairness_adult():
     df = pd.concat([X, sex, pd.DataFrame({"income": y_true})], axis=1)
 
     return df, columns, ("sex", "income")
+
+
+def load_lipid_quantification():
+    unprocessed_data_file_name = "data/MyoVasc cohort 1 - different quan strat_3 final sets.xlsx"
+    processed_data_file_name = "data/preprocessed_data_for_classification.csv"
+    stage_mapping = {"S0": 0, "S1":1, "S2":2, "S3": 3}
+    if not pathlib.Path(processed_data_file_name).exists():
+        cal_data = pd.read_excel(unprocessed_data_file_name, sheet_name="cal", index_col=0, header=None).T
+        set1_data = pd.read_excel(unprocessed_data_file_name, sheet_name="set1", index_col=0, header=None).T
+        set2_data = pd.read_excel(unprocessed_data_file_name, sheet_name="set2", index_col=0, header=None).T
+
+        cal_data["Method"] = "cal"
+        cal_data["ID"] = list(range(len(cal_data)))
+        set1_data["Method"] = "set1"
+        set1_data["ID"] = list(range(len(set1_data)))
+        set2_data["Method"] = "set2"
+        set2_data["ID"] = list(range(len(set2_data)))
+        data = pd.concat([cal_data, set1_data, set2_data])
+        lipid_names = cal_data.columns.drop(["Stages", "Method", "ID"])
+        data[lipid_names] = data[lipid_names].astype("float64")
+        data["Stages"] = data["Stages"].replace(stage_mapping)
+        data[lipid_names] = data[lipid_names].replace({0: np.nan})
+        data.to_csv(processed_data_file_name, index=False)
+    else:
+        df = pd.read_csv(
+            f"{file_path}/../../data/preprocessed_data_for_classification.csv",
+        )
+    lipid_names = df.drop(columns=["Method", "Stages", "ID"]).columns
+
+    binary_data = df[df["Stages"].isin([0, 3])].copy()
+    binary_data = binary_data[binary_data["Method"].isin(["cal", "set2"])].copy()
+    binary_data["Stages"] = binary_data["Stages"].replace({0:0, 3: 1})
+
+    return binary_data, lipid_names, "Stages"
 
 
 def save_results(path, weights_list, file_name="weights"):

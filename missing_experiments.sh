@@ -1,7 +1,7 @@
 N_CV_REPEATS=10
 N_CV_SPLITS=5
 
-DROP=1
+DROP=5
 for BIAS_FRACTION in 0.8 0.9
 do
     for BIAS_TYPE in mean_difference 

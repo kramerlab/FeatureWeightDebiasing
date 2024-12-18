@@ -799,3 +799,99 @@ def train_svm_pu_classifier(
     )
 
     return clf
+
+
+def compute_classification_metrics_random_forest_lipidomics(
+    N_train,
+    N_test,
+    R_test,
+    columns,
+    sample_weights_list,
+    feature_weights,
+    label,
+    random_state=None,
+    n_splits=5,
+    splitter="feature_weighted_best",
+    n_estimators=500,
+    draw_with_feature_weights=False,
+    max_features="sqrt",
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+
+    if isinstance(sample_weights_list, dict):
+        best_clf = None
+        best_score = -1
+        for temperature in sample_weights_list.keys():
+            for hyperparameter, sample_weights in sample_weights_list[
+                temperature
+            ].items():
+                feature_weight = feature_weights[temperature][hyperparameter]
+                not_zero_indices = np.array(sample_weights) > 0.0
+                N_training = N_train.loc[not_zero_indices, :]
+                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+
+                clf, score = train_random_forest_classifier(
+                    N_training[columns].values,
+                    N_training[label].values,
+                    train_sample_weights,
+                    np.array(feature_weight),
+                    random_state=random_state,
+                    n_splits=n_splits,
+                    draw_with_feature_weights=draw_with_feature_weights,
+                    splitter=splitter,
+                    n_estimators=n_estimators,
+                    max_features=max_features,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_clf = clf
+                    best_weights = sample_weights
+                    best_temperature = temperature
+                    best_hyperparameter = hyperparameter
+    else:
+        best_temperature = 0
+        not_zero_indices = np.array(sample_weights_list) > 0.0
+        N_training = N_train.loc[not_zero_indices, :]
+        train_sample_weights = np.array(sample_weights_list)[not_zero_indices]
+
+        best_clf, _ = train_random_forest_classifier(
+            N_training[columns].values,
+            N_training[label].values,
+            train_sample_weights,
+            np.array(feature_weights),
+            random_state=random_state,
+            n_splits=n_splits,
+            draw_with_feature_weights=draw_with_feature_weights,
+            splitter=splitter,
+            n_estimators=n_estimators,
+            max_features=max_features,
+        )
+        best_hyperparameter = None
+        best_weights = train_sample_weights
+
+    y_probabilitites_cal = best_clf.predict_proba(N_test[columns].values)[:, 1]
+    y_probabilitites_set2 = best_clf.predict_proba(R_test[columns].values)[:, 1]
+
+    auroc_score_cal = roc_auc_score(N_test[label], y_probabilitites_cal)
+    auprc_cal = average_precision_score(N_test[label], y_probabilitites_cal)
+
+    auroc_score_set2 = roc_auc_score(R_test[label], y_probabilitites_set2)
+    auprc_set2 = average_precision_score(R_test[label], y_probabilitites_set2)
+
+    return (
+        auroc_score_cal,
+        auprc_cal,
+        auroc_score_set2,
+        auprc_set2,
+        best_weights,
+        best_temperature,
+        best_hyperparameter,
+    )

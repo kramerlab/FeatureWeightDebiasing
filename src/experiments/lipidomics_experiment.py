@@ -8,31 +8,29 @@ from utils.parameter import set_parameter
 from utils.statistics import (
     create_result_path,
     write_result_dict,
-    write_result_dict_test_set,
+    write_result_dict_test_set_lipidomics,
 )
-from utils.sampling import repeated_train_val_test_split, sample_N
 from utils.metrics import (
     calculate_rbf_gamma,
-    compute_classification_metrics_random_forest,
+    compute_classification_metrics_random_forest_lipidomics,
     compute_metrics,
 )
+from sklearn.impute import KNNImputer
+from sklearn.model_selection import StratifiedKFold
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
 
 
-def downstream_tasks_experiment(
+def lipidomics_quantification_experiment(
     df,
     columns,
     sample_weighting_method,
     target: str,
     n_cv_repeats: int,
     n_cv_splits: int,
-    bias_type: str = None,
-    data_set_name: str = "",
     random_generator=None,
     load_previous_results=True,
-    bias_fraction=0.1,
     drop=1,
     method_name=None,
     **args,
@@ -50,17 +48,16 @@ def downstream_tasks_experiment(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    rf_auroc_list = []
-    rf_auprc_list = []
-    rf_accuracy_list = []
+    rf_auroc_cal_list = []
+    rf_auprc_cal_list = []
+
+    rf_auroc_set2_list = []
+    rf_auprc_set2_list = []
 
     weighted_mmds_list = []
     biases_list = []
     wasserstein_distance_list = []
 
-    abs_feature_importance_list = []
-    feature_importance_list = []
-    roc_curves_list = []
     best_temperature_list = []
     best_hyperparameter_list = []
 
@@ -68,10 +65,11 @@ def downstream_tasks_experiment(
 
     result_path = create_result_path(
         method_name,
-        bias_type,
-        data_set_name,
-        experiment_name="downstream_task",
-        bias_fraction=bias_fraction,
+        "",
+        "",
+        experiment_name="lipidomics_task",
+        bias_fraction="",
+        prefix="../../lipid_results",
     )
     sample_weights_save_path = result_path / "sample_weights"
     feature_weights_save_path = result_path / "feature_weights"
@@ -89,52 +87,45 @@ def downstream_tasks_experiment(
     sample_weight_list = load_saved_results(sample_weights_save_path)
     feature_weight_list = load_saved_results(feature_weights_save_path)
 
-    scaler = StandardScaler()
+    cal_scaler = StandardScaler()
+    cal_imputer = KNNImputer(n_neighbors=10, weights="uniform")
+    set2_scaler = StandardScaler()
+    set2_imputer = KNNImputer(n_neighbors=10, weights="uniform")
 
     (
         draw_with_feature_weights,
         temperatures,
-        dropped_samples_val_dict,
-        auroc_val_dict,
-        auprc_val_dict,
-        accuracy_val_dict,
+        _,
+        _,
+        _,
+        _,
         hyperparameter_list,
     ) = set_parameter(method_name)
 
-    if dropped_samples_val_dict is not None:
-        dropped_samples_individual_val_dict = dropped_samples_val_dict.copy()
-        auroc_individual_val_dict = auroc_val_dict.copy()
-        auprc_individual_val_dict = auprc_val_dict.copy()
-        accuracy_individual_val_dict = accuracy_val_dict.copy()
-    else: 
-        dropped_samples_individual_val_dict = None
-        auroc_individual_val_dict = None
-        auprc_individual_val_dict = None
-        accuracy_individual_val_dict = None
-    for i, (N, R, T) in enumerate(
-        repeated_train_val_test_split(
+    for i, (N_train, N_test, R_train, R_test) in enumerate(
+        repeated_train_val_test_split_for_lipidomics(
             n_cv_splits,
             n_cv_repeats,
             df,
-            df[target],
+            target,
             sampling_random_generator,
         )
     ):
-        N[columns] = scaler.fit_transform(N[columns])
-        R[columns] = scaler.transform(R[columns])
-        T[columns] = scaler.transform(T[columns])
-        N = sample_N(
-            train=N,
-            bias_type=bias_type,
-            bias_fraction=bias_fraction,
-            columns=columns,
-            bias_variable=target,
-            random_generator=sampling_random_generator,
-        )
-        N["label"] = 1
-        R["label"] = 0
+        N_train[columns] = set2_scaler.fit_transform(N_train[columns])
+        N_train[columns] = set2_imputer.fit_transform(N_train[columns])
+        N_train["label"] = 1
+        N_test[columns] = set2_scaler.transform(N_test[columns])
+        N_test[columns] = set2_scaler.transform(N_test[columns])
 
-        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
+        R_train[columns] = cal_scaler.fit_transform(R_train[columns])
+        R_train[columns] = cal_imputer.fit_transform(R_train[columns])
+        R_train["label"] = 0
+        R_test[columns] = cal_scaler.transform(R_test[columns])
+        R_test[columns] = cal_scaler.transform(R_test[columns])
+
+        gamma = calculate_rbf_gamma(
+            np.append(N_train[columns], R_train[columns], axis=0)
+        )
 
         if len(sample_weight_list) > i and load_previous_results:
             sample_weights = sample_weight_list[i]
@@ -142,8 +133,8 @@ def downstream_tasks_experiment(
 
         else:
             sample_weights, feature_weights = sample_weighting_method(
-                N=N,
-                R=R,
+                N=N_train,
+                R=R_train,
                 columns=columns,
                 save_path=result_path,
                 bias_variable=target,
@@ -168,25 +159,24 @@ def downstream_tasks_experiment(
             save_results(feature_weights_save_path, feature_weight_list)
 
         (
-            rf_auroc,
-            rf_auprc,
-            rf_accuracy,
+            rf_auroc_cal,
+            rf_auprc_cal,
+            rf_auroc_set2,
+            rf_auprc_set2,
             best_sample_weights,
-            abs_feature_importance,
-            roc_curve_values,
             best_temperature,
             best_hyperparameter,
-            _,
-        ) = compute_classification_metrics_random_forest(
-            N,
-            T,
+        ) = compute_classification_metrics_random_forest_lipidomics(
+            N_train,
+            N_test,
+            R_test,
             columns,
             sample_weights,
             feature_weights,
             target,
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
-            n_estimators=500,
+            n_estimators=100,
             n_splits=5,
         )
         dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
@@ -199,9 +189,9 @@ def downstream_tasks_experiment(
             "fw-mrs-temperature-svm",
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
-                N,
-                R,
-                scaler,
+                N_train,
+                R_train,
+                cal_scaler,
                 columns.values,
                 target,
                 best_sample_weights,
@@ -209,78 +199,36 @@ def downstream_tasks_experiment(
             )
 
         else:
-            weighted_mmd = np.ones(len(N.columns))
-            relative_bias = np.ones(len(N.columns))
-            wasserstein_distances = np.ones(len(N.columns))
-
-        if method_name in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-svm",
-            "mrs-forest",
-        ):
-            compute_validation_results(
-                columns,
-                target,
-                draw_with_feature_weights,
-                dropped_samples_val_dict,
-                auroc_val_dict,
-                auprc_val_dict,
-                accuracy_val_dict,
-                dropped_samples_individual_val_dict,
-                auroc_individual_val_dict,
-                auprc_individual_val_dict,
-                accuracy_individual_val_dict,
-                N,
-                R,
-                sample_weights,
-                feature_weights,
-                method_name,
-            )
+            weighted_mmd = np.ones(len(N_train.columns))
+            relative_bias = np.ones(len(N_train.columns))
+            wasserstein_distances = np.ones(len(N_train.columns))
 
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
-        rf_auroc_list.append(rf_auroc)
-        rf_auprc_list.append(rf_auprc)
-        rf_accuracy_list.append(rf_accuracy)
+        rf_auroc_cal_list.append(rf_auroc_cal)
+        rf_auprc_cal_list.append(rf_auprc_cal)
+        rf_auroc_set2_list.append(rf_auroc_set2)
+        rf_auprc_set2_list.append(rf_auprc_set2)
 
-        # plot_sample_weights(sample_weights, sample_weights_save_path, i)
-        # plot_feature_weights(feature_weights, feature_weights_save_path, i)
-
-        abs_feature_importance_list.append(abs_feature_importance.tolist())
-        roc_curves_list.append(roc_curve_values)
-
-        # plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")
     for result_list, file_name in zip(
         (
-            rf_auroc_list,
-            rf_auprc_list,
-            rf_accuracy_list,
+            rf_auroc_cal_list,
+            rf_auprc_cal_list,
+            rf_auroc_set2_list,
+            rf_auprc_set2_list,
             dropped_samples_list,
-            abs_feature_importance_list,
-            feature_importance_list,
-            roc_curves_list,
             best_temperature_list,
             best_hyperparameter_list,
-            dropped_samples_individual_val_dict,
-            auroc_individual_val_dict,
-            auprc_individual_val_dict,
-            accuracy_individual_val_dict,
         ),
         (
-            "rf_auroc",
-            "rf_auprc",
-            "rf_accuracy",
+            "rf_auroc_cal",
+            "rf_auprc_cal",
+            "rf_auroc_set2",
+            "rf_auprc_set2",
             "dropped_samples",
-            "abs_feature_importance",
-            "feature_importance",
-            "roc_curves",
             "best_temperature",
             "best_hyperparameter",
-            "dropped_samples_individual_val_dict",
-            "auroc_individual_val_dict",
-            "auprc_individual_val_dict",
-            "accuracy_individual_val_dict",
         ),
     ):
         with open(
@@ -289,7 +237,7 @@ def downstream_tasks_experiment(
             result_file.write(json.dumps(result_list))
 
     result_dict = write_result_dict(
-        N.drop(["label"], axis="columns").columns,
+        N_train.drop(["label", "Method", "ID"], axis="columns").columns,
         weighted_mmds_list,
         biases_list,
         wasserstein_distance_list,
@@ -299,252 +247,38 @@ def downstream_tasks_experiment(
         result_file.write(json.dumps(result_dict))
 
     result_dict = {}
-    result_dict = write_result_dict_test_set(
-        rf_auroc_list,
-        rf_auprc_list,
-        rf_accuracy_list,
+    result_dict = write_result_dict_test_set_lipidomics(
+        rf_auroc_cal_list,
+        rf_auprc_cal_list,
+        rf_auroc_set2_list,
+        rf_auprc_set2_list,
         dropped_samples_list,
-        len(N),
+        len(N_train),
     )
 
     with open(result_path / "classification_results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
 
-    if method_name in (
-        "fw-mrs-temperature",
-        "fw-mrs-temperature-svm",
-        "mrs-forest",
-    ):
-        for result_list, file_name in zip(
-            (
-                auroc_val_dict,
-                auprc_val_dict,
-                dropped_samples_val_dict,
-            ),
-            (
-                "auroc_val_dict",
-                "auprc_val_dict",
-                "dropped_samples_val_dict",
-            ),
-        ):
-            with open(validation_path / f"{file_name}.json", "w") as result_file:
-                result_file.write(json.dumps(result_list))
 
-        dropped_samples_val_results_dict = {}
-        if method_name == "mrs-forest":
-            for temperature, temperature_values in dropped_samples_val_dict.items():
-                for hyperparameter, values in temperature_values.items():
-                    dropped_samples_val_results_dict[
-                        f"{temperature}_{hyperparameter}_mean"
-                    ] = np.mean(values)
-                    dropped_samples_val_results_dict[
-                        f"{temperature}_{hyperparameter}_std"
-                    ] = np.std(values)
-        else:
-            for temperature, temperature_values in dropped_samples_val_dict.items():
-                dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(
-                    temperature_values
-                )
-                dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(
-                    temperature_values
-                )
-
-        with open(validation_path / "dropped_elements.json", "w") as result_file:
-            result_file.write(json.dumps(dropped_samples_val_results_dict))
-
-
-def compute_validation_results(
-    columns,
-    target,
-    draw_with_feature_weights,
-    dropped_samples_val_dict,
-    auroc_val_dict,
-    auprc_val_dict,
-    accuracy_val_dict,
-    dropped_samples_individual_val_dict,
-    auroc_individual_val_dict,
-    auprc_individual_val_dict,
-    accuracy_individual_val_dict,
-    N,
-    R,
-    sample_weights,
-    feature_weights,
-    method_name,
+def repeated_train_val_test_split_for_lipidomics(
+    n_cv_splits, n_cv_repeats, df, target, random_generator
 ):
-    if method_name == "mrs-forest":
-        for temperature, temperature_sample_weights in sample_weights.items():
-            for (
-                hyperparameter,
-                parameter_sample_weights,
-            ) in temperature_sample_weights.items():
-                parameter_feature_weights = feature_weights[temperature][hyperparameter]
+    # Is used to draw radom states
+    max_int = 2**32 - 1
 
-                (
-                    rf_auroc_val,
-                    rf_auprc_val,
-                    rf_accuracy_val,
-                    best_sample_weights_val,
-                    _,
-                    _,
-                    _,
-                    _,
-                    _,
-                ) = compute_classification_metrics_random_forest(
-                    N,
-                    R,
-                    columns,
-                    parameter_sample_weights,
-                    parameter_feature_weights,
-                    target,
-                    random_state=seed,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    n_estimators=500,
-                    n_splits=5,
-                    compute_feature_importance=False,
-                )
-                dropped_samples_val = np.count_nonzero(
-                    np.array(best_sample_weights_val) == 0.0
-                )
-                dropped_samples_val_dict[float(temperature)][
-                    float(hyperparameter)
-                ].append(dropped_samples_val)
-                auroc_val_dict[float(temperature)][float(hyperparameter)].append(
-                    rf_auroc_val
-                )
-                auprc_val_dict[float(temperature)][float(hyperparameter)].append(
-                    rf_auprc_val
-                )
-                accuracy_val_dict[float(temperature)][float(hyperparameter)].append(
-                    rf_accuracy_val
-                )
-
-        for temperature, temperature_sample_weights in sample_weights.items():
-            hyperparameter = 0.01
-            temperature_sample_weights = {
-                float(k): v for k, v in temperature_sample_weights.items()
-            }
-            temperature_feature_weights = feature_weights[temperature]
-            temperature_feature_weights = {
-                float(k): v for k, v in temperature_feature_weights.items()
-            }
-
-            (
-                rf_auroc_val,
-                rf_auprc_val,
-                rf_accuracy_val,
-                best_sample_weights_individual_val,
-                _,
-                _,
-                _,
-                _,
-                _,
-            ) = compute_classification_metrics_random_forest(
-                N,
-                R,
-                columns,
-                parameter_sample_weights[hyperparameter],
-                parameter_feature_weights[hyperparameter],
-                target,
-                random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                n_estimators=500,
-                n_splits=5,
-                compute_feature_importance=False,
-            )
-            dropped_samples_individual_val = np.count_nonzero(
-                np.array(best_sample_weights_individual_val) == 0.0
-            )
-            dropped_samples_individual_val_dict[float(temperature)][
-                float(hyperparameter)
-            ].append(dropped_samples_individual_val)
-            auroc_individual_val_dict[float(temperature)][float(hyperparameter)].append(
-                rf_auroc_val
-            )
-            auprc_individual_val_dict[float(temperature)][float(hyperparameter)].append(
-                rf_auprc_val
-            )
-            accuracy_individual_val_dict[float(temperature)][
-                float(hyperparameter)
-            ].append(rf_accuracy_val)
-    else:
-        for temperature, temperature_sample_weights in sample_weights.items():
-            temperature_feature_weights = feature_weights[temperature]
-            tmp_sample_weights = {temperature: temperature_sample_weights}
-            tmp_feature_weights = {temperature: temperature_feature_weights}
-            (
-                rf_auroc_val,
-                rf_auprc_val,
-                rf_accuracy_val,
-                best_sample_weights_val,
-                _,
-                _,
-                _,
-                _,
-                _,
-            ) = compute_classification_metrics_random_forest(
-                N,
-                R,
-                columns,
-                tmp_sample_weights,
-                tmp_feature_weights,
-                target,
-                random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
-                n_estimators=500,
-                n_splits=5,
-                compute_feature_importance=False,
-            )
-
-            dropped_samples_val = np.count_nonzero(
-                np.array(best_sample_weights_val) == 0.0
-            )
-            dropped_samples_val_dict[float(temperature)].append(dropped_samples_val)
-            auroc_val_dict[float(temperature)].append(rf_auroc_val)
-            auprc_val_dict[float(temperature)].append(rf_auprc_val)
-            accuracy_val_dict[float(temperature)].append(rf_accuracy_val)
-
-    for temperature, temperature_sample_weights in sample_weights.items():
-        hyperparameter = 1.0 if method_name == "fw-mrs-temperature-svm" else 0.01
-        temperature_feature_weights = feature_weights[temperature]
-        temperature_feature_weights = {
-            float(k): v for k, v in temperature_feature_weights.items()
-        }
-        temperature_sample_weights = {
-            float(k): v for k, v in temperature_sample_weights.items()
-        }
-
-        tmp_sample_weights = temperature_sample_weights[hyperparameter]
-        tmp_feature_weights = temperature_feature_weights[hyperparameter]
-        (
-            rf_auroc_val,
-            rf_auprc_val,
-            rf_accuracy_val,
-            best_sample_weights_val,
-            _,
-            _,
-            _,
-            _,
-            _,
-        ) = compute_classification_metrics_random_forest(
-            N,
-            R,
-            columns,
-            tmp_sample_weights,
-            tmp_feature_weights,
-            target,
-            random_state=seed,
-            draw_with_feature_weights=draw_with_feature_weights,
-            n_estimators=500,
-            n_splits=5,
-            compute_feature_importance=False,
+    cal_data = df[df["Method"] == "cal"]
+    set2_data = df[df["Method"] == "set2"]
+    for _ in range(n_cv_repeats):
+        skf = StratifiedKFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
         )
+        for train_val_index, test_index in skf.split(cal_data, cal_data[target]):
+            train_samples_cal = cal_data.iloc[train_val_index].copy()
+            test_samples_cal = cal_data.iloc[test_index].copy()
 
-        dropped_samples_individual_val = np.count_nonzero(
-            np.array(best_sample_weights_val) == 0.0
-        )
-        dropped_samples_individual_val_dict[float(temperature)].append(
-            dropped_samples_val
-        )
-        auroc_individual_val_dict[float(temperature)].append(rf_auroc_val)
-        auprc_individual_val_dict[float(temperature)].append(rf_auprc_val)
-        accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)
+            train_samples_set2 = set2_data.iloc[train_val_index].copy()
+            test_samples_set2 = set2_data.iloc[test_index].copy()
+
+            yield train_samples_set2, test_samples_set2, train_samples_cal, test_samples_cal

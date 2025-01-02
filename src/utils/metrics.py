@@ -353,13 +353,13 @@ def compute_classification_metrics_random_forest(
         y_predictions = best_clf.predict(T[columns].values)
         fpr, tpr, _ = roc_curve(T[label], y_probabilitites)
 
-    if compute_feature_importance:
+    if compute_feature_importance and best_clf is not None:
         abs_feature_importance = calculate_feature_importance(
             T[columns].values,
             best_clf.best_estimator_,
         )
     else:
-        abs_feature_importance = None
+        abs_feature_importance = np.ones_like(columns)
 
     auroc_score = roc_auc_score(T[label], y_probabilitites)
     auprc = average_precision_score(T[label], y_probabilitites)

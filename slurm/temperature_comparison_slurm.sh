@@ -4,11 +4,11 @@
 #SBATCH -p longtime 
 #SBATCH -J "feature_weighting_temperature_comparison" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 9-00 # <time in minutes>
+#SBATCH -t 9-00 
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
 #SBATCH --mem=16G 
-#SBATCH --array=1-24
+#SBATCH --array=1-8
 
 source ~/.bashrc
 conda_initialize

@@ -1,15 +1,12 @@
 import json
+import numpy as np
 
 from experiments.downstream_tasks import load_saved_results
 from utils.data_loader import save_results
 from utils.statistics import create_result_path
 from utils.sampling import sample_N, repeated_train_val_test_split
 from utils.metrics import compute_classification_metrics_random_forest
-from utils.visualization_fw_mrs import (
-    plot_budget_comparison_auroc,
-    plot_temperature_comparison_auroc_mean,
-)
-import numpy as np
+from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean
 from sklearn.preprocessing import StandardScaler
 
 seed = 5
@@ -89,8 +86,6 @@ def temperature_comparison(
     scaler = StandardScaler()
 
     if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-        N = df[df["label"] == 1]
-        R = df[df["label"] == 0]
         split_method = gbs_split
     else:
         split_method = repeated_train_val_test_split
@@ -232,7 +227,6 @@ def temperature_comparison(
             result_path / "fixed_mean_auroc",
         )
 
-
     for temperature, values in dropped_samples_dict.items():
         dropped_samples_dict[temperature] = np.mean(dropped_samples_dict[temperature])
 
@@ -247,34 +241,18 @@ def temperature_comparison(
     )
 
     plot_temperature_comparison_auroc_mean(
-            fixed_feature_weighted_aurocs_list,
-            number_of_samples_list,
-            drop,
-            result_path / "fixed_mean_auroc",
-        )
+        fixed_feature_weighted_aurocs_list,
+        number_of_samples_list,
+        drop,
+        result_path / "fixed_mean_auroc",
+    )
     meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples_list}
-    with open(result_path / 'metadata.json', 'w') as file:
+    with open(result_path / "metadata.json", "w") as file:
         json.dump(meta_data_dict, file)
 
 
-# save_mean_dropped_elements(result_path, dropped_samples_list_dict)
-
-
-def save_mean_dropped_elements(result_path, dropped_samples_list):
-    mean_dropped_samples_dict = {}
-    for key, value in dropped_samples_list.items():
-        dropped_elements = []
-        dropped_elements.append(value)
-        mean_dropped_samples_dict[f"{key} mean"] = np.mean(dropped_elements)
-        mean_dropped_samples_dict[f"{key} std"] = np.std(dropped_elements)
-
-    with open(result_path / "mean_dropped_samples", "w", encoding="utf-8") as file:
-        json.dump(mean_dropped_samples_dict, file, indent=4)
-
-
 def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
-    for _ in range(n_cv_splits):
-        for _ in range(n_cv_repeats):
-            N = df[df["label"] == 1]
-            R = df[df["label"] == 0]
-            yield N, R, _
+    N = df[df["label"] == 1]
+    R = df[df["label"] == 0]
+    for _ in range(n_cv_splits * n_cv_repeats):
+        yield N, R, _

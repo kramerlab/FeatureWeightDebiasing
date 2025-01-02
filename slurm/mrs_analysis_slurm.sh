@@ -4,7 +4,7 @@
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 5-00 # <time in minutes>
+#SBATCH -t 5-00 
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
 #SBATCH --mem=8G 

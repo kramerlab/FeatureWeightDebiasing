@@ -560,7 +560,7 @@ def train_random_forest_classifier(
         n_splits = target_sum
     elif (len(y) - target_sum) < n_splits:
         n_splits = len(y) - target_sum
-    if n_splits == 1:
+    if n_splits in (1, 0):
         n_splits = 2
     skf = StratifiedKFold(
         n_splits=int(n_splits), shuffle=True, random_state=random_state

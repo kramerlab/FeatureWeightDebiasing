@@ -1,6 +1,7 @@
 import json
 import numpy as np
 
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from utils.data_loader import load_saved_results, save_results
@@ -91,6 +92,10 @@ def downstream_tasks_experiment(
 
     scaler = StandardScaler()
 
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+        split_method = gbs_allensbach_split
+    else:
+        split_method = repeated_train_val_test_split
     (
         draw_with_feature_weights,
         temperatures,
@@ -106,13 +111,13 @@ def downstream_tasks_experiment(
         auroc_individual_val_dict = auroc_val_dict.copy()
         auprc_individual_val_dict = auprc_val_dict.copy()
         accuracy_individual_val_dict = accuracy_val_dict.copy()
-    else: 
+    else:
         dropped_samples_individual_val_dict = None
         auroc_individual_val_dict = None
         auprc_individual_val_dict = None
         accuracy_individual_val_dict = None
     for i, (N, R, T) in enumerate(
-        repeated_train_val_test_split(
+        split_method(
             n_cv_splits,
             n_cv_repeats,
             df,
@@ -202,7 +207,7 @@ def downstream_tasks_experiment(
                 N,
                 R,
                 scaler,
-                columns.values,
+                columns,
                 target,
                 best_sample_weights,
                 gamma,
@@ -217,7 +222,7 @@ def downstream_tasks_experiment(
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
             "mrs-forest",
-        ):
+        ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             compute_validation_results(
                 columns,
                 target,
@@ -288,8 +293,12 @@ def downstream_tasks_experiment(
         ) as result_file:
             result_file.write(json.dumps(result_list))
 
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+        result_columns = columns
+    else:
+        result_columns = N.drop(["label"], axis="columns").columns
     result_dict = write_result_dict(
-        N.drop(["label"], axis="columns").columns,
+        result_columns,
         weighted_mmds_list,
         biases_list,
         wasserstein_distance_list,
@@ -548,3 +557,22 @@ def compute_validation_results(
         auroc_individual_val_dict[float(temperature)].append(rf_auroc_val)
         auprc_individual_val_dict[float(temperature)].append(rf_auprc_val)
         accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)
+
+
+def gbs_allensbach_split(
+    n_cv_splits, n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+    N = df[df["label"] == 1]
+    R = df[df["label"] == 0]
+    for _ in range(n_cv_repeats):
+        skf = StratifiedKFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(N, N["Wahlteilnahme"]):
+            N_train = N.iloc[train_val_index]
+            N_test = N.iloc[test_index]
+            yield N_train, R, N_test

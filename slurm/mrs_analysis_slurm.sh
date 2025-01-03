@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
 #SBATCH --mem=16G
-#SBATCH --array=1-105
+#SBATCH --array=1-12
 
 
 N_CV_REPEATS=10
@@ -25,5 +25,5 @@ MRS_FUNCTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $
 DATASET=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}' $CONFIG)
 DROP=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $6}' $CONFIG)
 
-srun python src/mrs_analysis.py --data_set_name $DATASET --bias_type $BIAS_TYPE --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
+srun python ../src/mrs_analysis.py --data_set_name $DATASET --bias_type $BIAS_TYPE --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
             --drop $DROP --bias_fraction $BIAS_FRACTION --mrs_function $MRS_FUNCTION --load_previous_results

@@ -4,11 +4,11 @@
 #SBATCH -p parallel 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 3-00 
+#SBATCH -t 5-00 
 #SBATCH --cpus-per-task=5
 #SBATCH --nodes=1
 #SBATCH --mem=16G
-#SBATCH --array=1-316
+#SBATCH --array=1-105
 
 source ~/.bashrc
 conda_initialize

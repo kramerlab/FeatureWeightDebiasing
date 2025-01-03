@@ -19,7 +19,6 @@ def analyse_soft_mrs(
     n_cv_repeats,
     data_set_name,
     bias_type,
-    drop,
     bias_fraction,
     soft_mrs_function,
     load_previous_results,
@@ -109,7 +108,7 @@ def analyse_soft_mrs(
             N["label"] = 1
             R["label"] = 0
 
-        if len(mmds_complete) <= i and load_previous_results:
+        if not (len(mmds_complete) > i and load_previous_results):
             (
                 mmd_list,
                 relative_bias_list,
@@ -120,7 +119,6 @@ def analyse_soft_mrs(
                 N,
                 R,
                 columns,
-                drop=drop,
                 return_metrics=True,
                 compute_bias=use_bias_mean,
                 target=target,
@@ -150,11 +148,10 @@ def analyse_soft_mrs(
 
 
 def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
-    for _ in range(n_cv_splits):
-        for _ in range(n_cv_repeats):
-            N = df[df["label"] == 1]
-            R = df[df["label"] == 0]
-            yield N, R, _
+    N = df[df["label"] == 1]
+    R = df[df["label"] == 0]
+    for _ in range(n_cv_splits * n_cv_repeats):
+        yield N, R, _
 
 
 if __name__ == "__main__":
@@ -164,7 +161,6 @@ if __name__ == "__main__":
         args.n_cv_repeats,
         args.data_set_name,
         args.bias_type,
-        args.drop,
         args.bias_fraction,
         args.mrs_function,
         args.load_previous_results,

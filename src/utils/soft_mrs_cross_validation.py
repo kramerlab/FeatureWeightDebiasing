@@ -74,9 +74,10 @@ def update_weights(weights, predictions, exponential, k=0.1, weight=1.0):
     if exponential:
         p_difference = 0.5 - predictions
         weight_modificator = 1.5 - (1 / (1 + np.exp(p_difference / k)))
-        weights *= weight_modificator * weight
+        # x_power = 1 / predictions
+        # weight_modificator = 1.5 - (1 / (1 + (x_power - 1) ** 0.5))
     else:
         weight_modificator = 1.5 - predictions
-        weights *= weight_modificator
+    weights *= weight_modificator
     weights = weights / weights.sum()
     return weights

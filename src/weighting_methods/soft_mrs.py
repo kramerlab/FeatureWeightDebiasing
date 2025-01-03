@@ -162,6 +162,7 @@ def train_weighted_random_forest(
         cv=FullSample(1),
         n_jobs=5,
         scoring=scorer,
+
     )
     grid_cv = grid_cv.fit(x, label, sample_weight=weights)
     best_predictions = grid_cv.predict_proba(x)

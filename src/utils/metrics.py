@@ -197,9 +197,9 @@ def compute_metrics(
     columns_and_target = np.append(columns, target)
     if isinstance(sample_weights_list, dict):
         best_mmd = np.inf
-        tmp_wasserstein_distances = []
         for temperature in sample_weights_list.keys():
             for _, sample_weights in sample_weights_list[temperature].items():
+                tmp_wasserstein_distances = []
                 weighted_mmd = weighted_maximum_mean_discrepancy(
                     N_dropped,
                     R_dropped,
@@ -230,8 +230,8 @@ def compute_metrics(
                     best_mmd = weighted_mmd
                     final_sample_biases = sample_biases.copy()
                     final_wasserstein_distances = tmp_wasserstein_distances.copy()
-
     else:
+        final_wasserstein_distances = []
         weighted_mmd = weighted_maximum_mean_discrepancy(
             N_dropped,
             R_dropped,

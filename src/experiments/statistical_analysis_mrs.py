@@ -116,9 +116,6 @@ def perform_statistical_analysis_mrs(
             "relative_bias": relative_bias[index],
         }
 
-    with open(iterations_path / f"results_{method_name}_{i}.json", "w") as result_file:
-        result_file.write(json.dumps(result_dict_mrs_iteration))
-
     wasserstein_std_list = np.std(wasserstein_list, axis=0)
     relative_bias_std_list = np.std(relative_biases_list, axis=0)
     mmd_std_list = np.std(np.array(mmd_list)[:, np.newaxis], axis=0)

@@ -111,17 +111,17 @@ def lipidomics_quantification_experiment(
             sampling_random_generator,
         )
     ):
-        N_train[columns] = set2_scaler.fit_transform(N_train[columns])
-        N_train[columns] = set2_imputer.fit_transform(N_train[columns])
+        N_train[columns] = cal_scaler.fit_transform(N_train[columns])
+        N_train[columns] = cal_imputer.fit_transform(N_train[columns])
         N_train["label"] = 1
-        N_test[columns] = set2_scaler.transform(N_test[columns])
-        N_test[columns] = set2_scaler.transform(N_test[columns])
+        N_test[columns] = cal_scaler.transform(N_test[columns])
+        N_test[columns] = cal_imputer.transform(N_test[columns])
 
-        R_train[columns] = cal_scaler.fit_transform(R_train[columns])
-        R_train[columns] = cal_imputer.fit_transform(R_train[columns])
+        R_train[columns] = set2_scaler.fit_transform(R_train[columns])
+        R_train[columns] = set2_imputer.fit_transform(R_train[columns])
         R_train["label"] = 0
-        R_test[columns] = cal_scaler.transform(R_test[columns])
-        R_test[columns] = cal_scaler.transform(R_test[columns])
+        R_test[columns] = set2_scaler.transform(R_test[columns])
+        R_test[columns] = set2_imputer.transform(R_test[columns])
 
         gamma = calculate_rbf_gamma(
             np.append(N_train[columns], R_train[columns], axis=0)
@@ -176,7 +176,7 @@ def lipidomics_quantification_experiment(
             target,
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
-            n_estimators=100,
+            n_estimators=200,
             n_splits=5,
         )
         dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
@@ -281,4 +281,4 @@ def repeated_train_val_test_split_for_lipidomics(
             train_samples_set2 = set2_data.iloc[train_val_index].copy()
             test_samples_set2 = set2_data.iloc[test_index].copy()
 
-            yield train_samples_set2, test_samples_set2, train_samples_cal, test_samples_cal
+            yield train_samples_cal, test_samples_cal, train_samples_set2, test_samples_set2

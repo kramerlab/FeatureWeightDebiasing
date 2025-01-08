@@ -138,56 +138,57 @@ def temperature_comparison(
                 method_name=method_name,
                 return_metrics=True,
             )
-            if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
-                optimised_random_forest_feature_weighted_aurocs = {}
-                fixed_feature_weighted_aurocs = {}
-                for temperature, temperature_sample_weights in sample_weights.items():
-                    temperature_feature_weights = {"tmp": feature_weights[temperature]}
-                    temperature_sample_weights = {"tmp": temperature_sample_weights}
+            optimised_random_forest_feature_weighted_aurocs = {}
+            fixed_feature_weighted_aurocs = {}
+            for temperature, temperature_sample_weights in sample_weights.items():
+                temperature_feature_weights = {"tmp": feature_weights[temperature]}
+                temperature_sample_weights = {"tmp": temperature_sample_weights}
 
-                    (
-                        _,
-                        _,
-                        _,
-                        _,
-                        _,
-                        _,
-                        _,
-                        best_hyperparameter,
-                        _,
-                    ) = compute_classification_metrics_random_forest(
-                        N,
-                        R,
-                        columns,
-                        temperature_sample_weights,
-                        temperature_feature_weights,
-                        target,
-                        random_state=seed,
-                        draw_with_feature_weights=True,
-                        splitter="feature_weighted_best",
-                        n_estimators=500,
-                        n_splits=5,
-                        compute_feature_importance=False,
-                    )
+                (
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    best_hyperparameter,
+                    _,
+                ) = compute_classification_metrics_random_forest(
+                    N,
+                    R,
+                    columns,
+                    temperature_sample_weights,
+                    temperature_feature_weights,
+                    target,
+                    random_state=seed,
+                    draw_with_feature_weights=True,
+                    splitter="feature_weighted_best",
+                    n_estimators=500,
+                    n_splits=5,
+                    compute_feature_importance=False,
+                )
 
-                    optimised_random_forest_feature_weighted_aurocs[temperature] = (
-                        random_forest_feature_weighted_aurocs[temperature][
-                            best_hyperparameter
-                        ]
-                    )
-                    fixed_feature_weighted_aurocs[temperature] = (
-                        random_forest_feature_weighted_aurocs[temperature][
-                            fixed_hyperparameter
-                        ]
-                    )
+                optimised_random_forest_feature_weighted_aurocs[temperature] = (
+                    random_forest_feature_weighted_aurocs[temperature][
+                        best_hyperparameter
+                    ]
+                )
+                fixed_feature_weighted_aurocs[temperature] = (
+                    random_forest_feature_weighted_aurocs[temperature][
+                        fixed_hyperparameter
+                    ]
+                )
+                feature_weighted_aurocs_list.append(
+                    optimised_random_forest_feature_weighted_aurocs
+                )
+                fixed_feature_weighted_aurocs_list.append(
+                    fixed_feature_weighted_aurocs
+                )
 
             feature_weights_list.append(feature_weights)
             feature_importances_list.append(feature_importances)
             sample_weights_list.append(sample_weights)
-            feature_weighted_aurocs_list.append(
-                optimised_random_forest_feature_weighted_aurocs
-            )
-            fixed_feature_weighted_aurocs_list.append(fixed_feature_weighted_aurocs)
 
             save_results(sample_weights_save_path, sample_weights_list)
             save_results(feature_weights_save_path, feature_weights_list)

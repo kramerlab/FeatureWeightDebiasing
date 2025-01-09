@@ -25,4 +25,4 @@ BIAS_TYPE=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}'
 
 srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
 --bias_type $BIAS_TYPE --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \
---experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION
+--experiment_name temperature_comparison --drop $DROP --bias_fraction $BIAS_FRACTION --load_previous_results

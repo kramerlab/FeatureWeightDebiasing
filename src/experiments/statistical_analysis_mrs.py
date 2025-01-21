@@ -5,6 +5,7 @@ import scipy.stats
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
+from utils.data_loader import load_saved_results
 from utils.parameter import set_parameter
 from utils.statistics import logistic_regression
 from utils.metrics import (
@@ -27,6 +28,7 @@ def perform_statistical_analysis_mrs(
     drop=1,
     target=None,
     data_set_name=None,
+    load_previous_results=True,
     **args,
 ):
     """Analyze GBS corrected with Allensbach with two methods.
@@ -46,6 +48,10 @@ def perform_statistical_analysis_mrs(
 
     scaler = StandardScaler()
     df[columns] = scaler.fit_transform(df[columns])
+
+    result_path.mkdir(exist_ok=True)
+
+    sample_weight_list = load_saved_results(result_path, "sample_weights")
 
     N = df[df["label"] == 1].copy()
     R = df[df["label"] == 0].copy()
@@ -69,22 +75,23 @@ def perform_statistical_analysis_mrs(
     ) = set_parameter(method_name)
 
     for i in range(n_cv_repeats):
-        sample_weights, _ = sample_weighting_method(
-            N=N,
-            R=R,
-            columns=columns,
-            drop=drop,
-            early_stopping=True,
-            random_generator=random_generator,
-            budgets=temperatures,
-            hyperparameter_list=hyperparameter_list,
-            target=target,
-        )
-        if method_name == "mrs-forest":
-            sample_weights = {0.0: sample_weights}
+        if len(sample_weight_list) > i and load_previous_results:
+            sample_weights = sample_weight_list[i]
 
-        dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
-        dropped_samples_list.append(dropped_samples)
+        else:
+            sample_weights, _ = sample_weighting_method(
+                N=N,
+                R=R,
+                columns=columns,
+                drop=drop,
+                early_stopping=True,
+                random_generator=random_generator,
+                budgets=temperatures,
+                hyperparameter_list=hyperparameter_list,
+                target=target,
+            )
+            if method_name == "mrs-forest":
+                sample_weights = {0.0: sample_weights}
 
         weighted_mmd, relative_bias, wasserstein_distances, best_sample_weights = (
             compute_metrics(
@@ -99,6 +106,9 @@ def perform_statistical_analysis_mrs(
             )
         )
 
+        dropped_samples = np.count_nonzero(np.array(sample_weights) == 0.0)
+        dropped_samples_list.append(dropped_samples)
+        
         sample_weights_list.append(best_sample_weights)
         wasserstein_list.append(wasserstein_distances)
         relative_biases_list.append(relative_bias)

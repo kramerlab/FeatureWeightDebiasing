@@ -117,7 +117,7 @@ def soft_mrs_weighting(
 
         predictions_N = predictions[: len(N), 1]
         weights_N = update_weights(
-            weights_N, predictions_N, exponential=exponential, k=0.2
+            weights_N, predictions_N, exponential=exponential
         )
         iteration += 1
         if iteration == n_iterations:

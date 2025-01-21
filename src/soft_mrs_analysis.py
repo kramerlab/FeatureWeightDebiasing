@@ -126,7 +126,7 @@ def analyse_soft_mrs(
                 hyperparameter_list=hyperparameter_list,
                 early_stopping=False,
                 exponential=exponential,
-                n_iterations=500,
+                n_iterations=2000,
                 wasserstein_target=wasserstein_target,
             )
 

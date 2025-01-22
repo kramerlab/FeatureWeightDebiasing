@@ -14,6 +14,8 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest_lipidomics,
     compute_metrics,
+    train_random_forest_classifier,
+    train_svc,
 )
 from sklearn.impute import KNNImputer
 from sklearn.model_selection import StratifiedKFold
@@ -48,11 +50,25 @@ def lipidomics_quantification_experiment(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    rf_auroc_cal_list = []
-    rf_auprc_cal_list = []
+    both_rf_auroc_cal_list = []
+    both_rf_auprc_cal_list = []
+    both_rf_auroc_set2_list = []
+    both_rf_auprc_set2_list = []
 
-    rf_auroc_set2_list = []
-    rf_auprc_set2_list = []
+    both_svc_auroc_cal_list = []
+    both_svc_auprc_cal_list = []
+    both_svc_auroc_set2_list = []
+    both_svc_auprc_set2_list = []
+
+    only_n_rf_auroc_cal_list = []
+    only_n_rf_auprc_cal_list = []
+    only_n_rf_auroc_set2_list = []
+    only_n_rf_auprc_set2_list = []
+
+    only_r_rf_auroc_cal_list = []
+    only_r_rf_auprc_cal_list = []
+    only_r_rf_auroc_set2_list = []
+    only_r_rf_auprc_set2_list = []
 
     weighted_mmds_list = []
     biases_list = []
@@ -146,6 +162,7 @@ def lipidomics_quantification_experiment(
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
                 compute_bias=False,
+                stratify_R=True,
             )
 
             if method_name in ("mrs-forest", "psa"):
@@ -159,15 +176,16 @@ def lipidomics_quantification_experiment(
             save_results(feature_weights_save_path, feature_weight_list)
 
         (
-            rf_auroc_cal,
-            rf_auprc_cal,
-            rf_auroc_set2,
-            rf_auprc_set2,
-            best_sample_weights,
-            best_temperature,
-            best_hyperparameter,
+            only_n_rf_auroc_cal,
+            only_n_rf_auprc_cal,
+            only_n_rf_auroc_set2,
+            only_n_rf_auprc_set2,
+            _,
+            _,
+            _,
         ) = compute_classification_metrics_random_forest_lipidomics(
             N_train,
+            None,
             N_test,
             R_test,
             columns,
@@ -179,10 +197,82 @@ def lipidomics_quantification_experiment(
             n_estimators=200,
             n_splits=5,
         )
-        dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
+
+        (
+            only_r_rf_auroc_cal,
+            only_r_rf_auprc_cal,
+            only_r_rf_auroc_set2,
+            only_r_rf_auprc_set2,
+            _,
+            _,
+            _,
+        ) = compute_classification_metrics_random_forest_lipidomics(
+            None,
+            R_train,
+            N_test,
+            R_test,
+            columns,
+            [],
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            n_estimators=200,
+            n_splits=5,
+        )
+
+        (
+            both_rf_auroc_cal,
+            both_rf_auprc_cal,
+            both_rf_auroc_set2,
+            both_rf_auprc_set2,
+            both_best_sample_weights,
+            both_best_temperature,
+            both_best_hyperparameter,
+        ) = compute_classification_metrics_random_forest_lipidomics(
+            N_train,
+            R_train,
+            N_test,
+            R_test,
+            columns,
+            sample_weights,
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            n_estimators=200,
+            n_splits=5,
+            classifier_function=train_random_forest_classifier,
+        )
+
+        (
+            both_svc_auroc_cal,
+            both_svc_auprc_cal,
+            both_svc_auroc_set2,
+            both_svc_auprc_set2,
+            _,
+            _,
+            _,
+        ) = compute_classification_metrics_random_forest_lipidomics(
+            N_train,
+            R_train,
+            N_test,
+            R_test,
+            columns,
+            sample_weights,
+            feature_weights,
+            target,
+            random_state=seed,
+            draw_with_feature_weights=draw_with_feature_weights,
+            n_estimators=200,
+            n_splits=5,
+            classifier_function=train_svc,
+        )
+
+        dropped_samples = np.count_nonzero(np.array(both_best_sample_weights) == 0.0)
         dropped_samples_list.append(dropped_samples)
-        best_temperature_list.append(best_temperature)
-        best_hyperparameter_list.append(best_hyperparameter)
+        best_temperature_list.append(both_best_temperature)
+        best_hyperparameter_list.append(both_best_hyperparameter)
 
         if method_name not in (
             "fw-mrs-temperature",
@@ -194,7 +284,7 @@ def lipidomics_quantification_experiment(
                 cal_scaler,
                 columns.values,
                 target,
-                best_sample_weights,
+                both_best_sample_weights,
                 gamma,
             )
 
@@ -206,26 +296,42 @@ def lipidomics_quantification_experiment(
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias)
         wasserstein_distance_list.append(wasserstein_distances)
-        rf_auroc_cal_list.append(rf_auroc_cal)
-        rf_auprc_cal_list.append(rf_auprc_cal)
-        rf_auroc_set2_list.append(rf_auroc_set2)
-        rf_auprc_set2_list.append(rf_auprc_set2)
+
+        both_rf_auroc_cal_list.append(both_rf_auroc_cal)
+        both_rf_auprc_cal_list.append(both_rf_auprc_cal)
+        both_rf_auroc_set2_list.append(both_rf_auroc_set2)
+        both_rf_auprc_set2_list.append(both_rf_auprc_set2)
+
+        both_svc_auroc_cal_list.append(both_svc_auroc_cal)
+        both_svc_auprc_cal_list.append(both_svc_auprc_cal)
+        both_svc_auroc_set2_list.append(both_svc_auroc_set2)
+        both_svc_auprc_set2_list.append(both_svc_auprc_set2)
+
+        only_n_rf_auroc_cal_list.append(only_n_rf_auroc_cal)
+        only_n_rf_auprc_cal_list.append(only_n_rf_auprc_cal)
+        only_n_rf_auroc_set2_list.append(only_n_rf_auroc_set2)
+        only_n_rf_auprc_set2_list.append(only_n_rf_auprc_set2)
+
+        only_r_rf_auroc_cal_list.append(only_r_rf_auroc_cal)
+        only_r_rf_auprc_cal_list.append(only_r_rf_auprc_cal)
+        only_r_rf_auroc_set2_list.append(only_r_rf_auroc_set2)
+        only_r_rf_auprc_set2_list.append(only_r_rf_auprc_set2)
 
     for result_list, file_name in zip(
         (
-            rf_auroc_cal_list,
-            rf_auprc_cal_list,
-            rf_auroc_set2_list,
-            rf_auprc_set2_list,
+            both_rf_auroc_cal_list,
+            both_rf_auprc_cal_list,
+            both_rf_auroc_set2_list,
+            both_rf_auprc_set2_list,
             dropped_samples_list,
             best_temperature_list,
             best_hyperparameter_list,
         ),
         (
-            "rf_auroc_cal",
-            "rf_auprc_cal",
-            "rf_auroc_set2",
-            "rf_auprc_set2",
+            "both_rf_auroc_cal",
+            "both_rf_auprc_cal",
+            "both_rf_auroc_set2",
+            "both_rf_auprc_set2",
             "dropped_samples",
             "best_temperature",
             "best_hyperparameter",
@@ -246,18 +352,49 @@ def lipidomics_quantification_experiment(
     with open(result_path / "similarity_results.json", "w") as result_file:
         result_file.write(json.dumps(result_dict))
 
-    result_dict = {}
-    result_dict = write_result_dict_test_set_lipidomics(
-        rf_auroc_cal_list,
-        rf_auprc_cal_list,
-        rf_auroc_set2_list,
-        rf_auprc_set2_list,
+    both_result_dict = write_result_dict_test_set_lipidomics(
+        both_rf_auroc_cal_list,
+        both_rf_auprc_cal_list,
+        both_rf_auroc_set2_list,
+        both_rf_auprc_set2_list,
         dropped_samples_list,
         len(N_train),
     )
+    with open(result_path / "both_classification_results.json", "w") as result_file:
+        result_file.write(json.dumps(both_result_dict))
 
-    with open(result_path / "classification_results.json", "w") as result_file:
-        result_file.write(json.dumps(result_dict))
+    both_svc_result_dict = write_result_dict_test_set_lipidomics(
+        both_rf_auroc_cal_list,
+        both_rf_auprc_cal_list,
+        both_rf_auroc_set2_list,
+        both_rf_auprc_set2_list,
+        dropped_samples_list,
+        len(N_train),
+    )
+    with open(result_path / "both_svc_classification_results.json", "w") as result_file:
+        result_file.write(json.dumps(both_svc_result_dict))
+
+    only_n_result_dict = write_result_dict_test_set_lipidomics(
+        only_n_rf_auroc_cal_list,
+        only_n_rf_auprc_cal_list,
+        only_n_rf_auroc_set2_list,
+        only_n_rf_auprc_set2_list,
+        dropped_samples_list,
+        len(N_train),
+    )
+    with open(result_path / "only_n_classification_results.json", "w") as result_file:
+        result_file.write(json.dumps(only_n_result_dict))
+
+    only_r_result_dict = write_result_dict_test_set_lipidomics(
+        only_r_rf_auroc_cal_list,
+        only_r_rf_auprc_cal_list,
+        only_r_rf_auroc_set2_list,
+        only_r_rf_auprc_set2_list,
+        dropped_samples_list,
+        len(N_train),
+    )
+    with open(result_path / "only_r_classification_results.json", "w") as result_file:
+        result_file.write(json.dumps(only_r_result_dict))
 
 
 def repeated_train_val_test_split_for_lipidomics(

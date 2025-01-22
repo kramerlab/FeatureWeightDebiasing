@@ -15,7 +15,7 @@ from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
 )
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC, LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
 param_grid = {
@@ -178,7 +178,7 @@ def compute_metrics(
     target,
     sample_weights_list,
     gamma,
-    return_sample_weights = False,
+    return_sample_weights=False,
 ):
     """Computes the metrics for an experiment
 
@@ -803,6 +803,7 @@ def train_svm_pu_classifier(
 
 def compute_classification_metrics_random_forest_lipidomics(
     N_train,
+    R_train,
     N_test,
     R_test,
     columns,
@@ -815,6 +816,7 @@ def compute_classification_metrics_random_forest_lipidomics(
     n_estimators=500,
     draw_with_feature_weights=False,
     max_features="sqrt",
+    classifier_function=train_random_forest_classifier,
 ):
     """Computes classification metrics for downstream tasks
 
@@ -826,7 +828,16 @@ def compute_classification_metrics_random_forest_lipidomics(
     :return: Downstream classification metrics
     """
 
-    if isinstance(sample_weights_list, dict):
+    if isinstance(sample_weights_list, dict) or isinstance(feature_weights, dict):
+        if isinstance(sample_weights_list, list):
+            sample_weights_list = {
+                temperature: {
+                    hyperparameter: []
+                    for hyperparameter in feature_weights[temperature].keys()
+                }
+                for temperature in feature_weights.keys()
+            }
+            pass
         best_clf = None
         best_score = -1
         for temperature in sample_weights_list.keys():
@@ -835,13 +846,18 @@ def compute_classification_metrics_random_forest_lipidomics(
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
                 not_zero_indices = np.array(sample_weights) > 0.0
-                N_training = N_train.loc[not_zero_indices, :]
+                N_training = (
+                    N_train.loc[not_zero_indices, :] if N_train is not None else N_train
+                )
                 train_sample_weights = np.array(sample_weights)[not_zero_indices]
+                r_weights = np.ones(len(R_train)) if R_train is not None else []
+                X_sample_weights = np.concatenate([train_sample_weights, r_weights])
+                X_train = pd.concat([N_training, R_train])
 
-                clf, score = train_random_forest_classifier(
-                    N_training[columns].values,
-                    N_training[label].values,
-                    train_sample_weights,
+                clf, score = classifier_function(
+                    X_train[columns].values,
+                    X_train[label].values,
+                    X_sample_weights,
                     np.array(feature_weight),
                     random_state=random_state,
                     n_splits=n_splits,
@@ -859,13 +875,19 @@ def compute_classification_metrics_random_forest_lipidomics(
     else:
         best_temperature = 0
         not_zero_indices = np.array(sample_weights_list) > 0.0
-        N_training = N_train.loc[not_zero_indices, :]
+        N_training = (
+            N_train.loc[not_zero_indices, :] if N_train is not None else N_train
+        )
         train_sample_weights = np.array(sample_weights_list)[not_zero_indices]
+        r_weights = np.ones(len(R_train)) if R_train is not None else []
+        X_sample_weights = np.concatenate([train_sample_weights, r_weights])
 
-        best_clf, _ = train_random_forest_classifier(
-            N_training[columns].values,
-            N_training[label].values,
-            train_sample_weights,
+        X_train = pd.concat([N_training, R_train])
+
+        best_clf, _ = classifier_function(
+            X_train[columns].values,
+            X_train[label].values,
+            X_sample_weights,
             np.array(feature_weights),
             random_state=random_state,
             n_splits=n_splits,
@@ -876,13 +898,15 @@ def compute_classification_metrics_random_forest_lipidomics(
         )
         best_hyperparameter = None
         best_weights = train_sample_weights
-
-    y_probabilitites_cal = best_clf.predict_proba(N_test[columns].values)[:, 1]
-    y_probabilitites_set2 = best_clf.predict_proba(R_test[columns].values)[:, 1]
+    if classifier_function.__name__ == "train_random_forest_classifier":
+        y_probabilitites_cal = best_clf.predict_proba(N_test[columns].values)[:, 1]
+        y_probabilitites_set2 = best_clf.predict_proba(R_test[columns].values)[:, 1]
+    else:
+        y_probabilitites_cal = best_clf.decision_function(N_test[columns].values)
+        y_probabilitites_set2 = best_clf.decision_function(R_test[columns].values)
 
     auroc_score_cal = roc_auc_score(N_test[label], y_probabilitites_cal)
     auprc_cal = average_precision_score(N_test[label], y_probabilitites_cal)
-
     auroc_score_set2 = roc_auc_score(R_test[label], y_probabilitites_set2)
     auprc_set2 = average_precision_score(R_test[label], y_probabilitites_set2)
 
@@ -895,3 +919,52 @@ def compute_classification_metrics_random_forest_lipidomics(
         best_temperature,
         best_hyperparameter,
     )
+
+
+def train_svc(
+    X,
+    y,
+    sample_weights,
+    feature_weights=None,
+    n_splits=5,
+    draw_with_feature_weights=False,
+    random_state=None,
+    **kwargs,
+):
+    """Train a classifier to measure the auroc
+
+    :param X_train: Training features
+    :param y_train: Training targets
+    :param weights: Sample weights, defaults to None
+    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param n_splits: Number of cross-validation iterations, defaults to 5
+    :return: Trained classifier
+    """
+
+    if draw_with_feature_weights:
+        X = X * feature_weights
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    param_grid = {
+        "kernel": ["linear", "rbf"],
+        "C": [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e2],
+    }
+    clf = SVC(
+        random_state=random_state,
+    )
+    grid_cv = GridSearchCV(
+        clf,
+        param_grid,
+        cv=skf,
+        n_jobs=-1,
+        scoring="roc_auc",
+        refit=True,
+    )
+
+    grid_cv.fit(
+        X,
+        y,
+        sample_weight=sample_weights,
+    )
+
+    return grid_cv.best_estimator_, grid_cv.best_score_

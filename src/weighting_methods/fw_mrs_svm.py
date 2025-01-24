@@ -26,6 +26,7 @@ def mrs_step(
     feature_weight=None,
     sample_weights=None,
     hyperparameter=0.0,
+    stratify_R=False,
     *args,
     **attributes,
 ):
@@ -44,8 +45,19 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
+    y = N[target]
+    target_sum = np.sum(y)
+    if target_sum < n_splits:
+        n_splits = target_sum
+    elif (len(y) - target_sum) < n_splits:
+        n_splits = len(y) - target_sum
+    if n_splits in (1, 0):
+        n_splits = 2
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    if stratify_R:
+        kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    else:
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
         skf.split(dropped_N, dropped_N[target]), kf.split(R)
     ):
@@ -72,7 +84,9 @@ def mrs_step(
         abs_feature_importance_list.append(abs_feature_importance)
 
     abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
-    abs_mean_feature_importance = abs_mean_feature_importance / np.sum(abs_mean_feature_importance)
+    abs_mean_feature_importance = abs_mean_feature_importance / np.sum(
+        abs_mean_feature_importance
+    )
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     return dropped_N.index[drop_ids], abs_mean_feature_importance, np.mean(auroc_list)
@@ -146,6 +160,7 @@ def fw_MRS_SVM(
     temperature=0.0,
     hyperparameter_list=[0.0],
     return_metrics=False,
+    stratify_R=False,
     *args,
     **attributes,
 ):
@@ -228,6 +243,7 @@ def fw_MRS_SVM(
                     splitter=splitter,
                     sample_weights=sample_weights_dict[temperature][hyperparameter],
                     hyperparameter=hyperparameter,
+                    stratify_R=stratify_R,
                 )
 
                 feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)

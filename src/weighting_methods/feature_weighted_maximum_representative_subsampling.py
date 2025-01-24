@@ -48,6 +48,16 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
+
+    y = N[target]
+    target_sum = np.sum(y)
+    if target_sum < n_splits:
+        n_splits = target_sum
+    elif (len(y) - target_sum) < n_splits:
+        n_splits = len(y) - target_sum
+    if n_splits in (1, 0):
+        n_splits = 2
+
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if stratify_R:
         kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)

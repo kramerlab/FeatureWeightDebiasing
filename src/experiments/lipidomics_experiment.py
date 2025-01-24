@@ -364,10 +364,10 @@ def lipidomics_quantification_experiment(
         result_file.write(json.dumps(both_result_dict))
 
     both_svc_result_dict = write_result_dict_test_set_lipidomics(
-        both_rf_auroc_cal_list,
-        both_rf_auprc_cal_list,
-        both_rf_auroc_set2_list,
-        both_rf_auprc_set2_list,
+        both_svc_auroc_cal_list,
+        both_svc_auprc_cal_list,
+        both_svc_auroc_set2_list,
+        both_svc_auprc_set2_list,
         dropped_samples_list,
         len(N_train),
     )

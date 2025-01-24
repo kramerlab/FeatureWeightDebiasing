@@ -409,7 +409,7 @@ def repeated_train_val_test_split_for_lipidomics(
         skf = StratifiedKFold(
             n_splits=n_cv_splits,
             shuffle=True,
-            random_state=random_generator.randint(max_int),
+            random_state=random_generator.randint(max_int, dtype=np.int64),
         )
         for train_val_index, test_index in skf.split(cal_data, cal_data[target]):
             train_samples_cal = cal_data.iloc[train_val_index].copy()

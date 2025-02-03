@@ -63,7 +63,7 @@ def mrs_step(
         kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     else:
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-        
+
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
         skf.split(dropped_N, dropped_N[target]), kf.split(R, R[target])
     ):
@@ -206,7 +206,7 @@ def feature_weighted_repeated_MRS(
                     target=target,
                     columns=columns,
                     n_drop=drop,
-                    random_state=random_generator.randint(max_int, dtype=np.int64),
+                    random_state=int(random_generator.randint(max_int, dtype=np.int64)),
                     n_splits=n_pu_splits,
                     feature_weight=np.array(
                         feature_weights_dict[temperature][hyperparameter]
@@ -321,7 +321,7 @@ def initialize_dictionaries(
                 len(columns)
             ).tolist()
 
-    random_state = random_generator.randint(max_int, dtype=np.int64),
+    random_state = int(int(random_generator.randint(max_int, dtype=np.int64)))
     for hyperparameter in hyperparameter_list:
         _, abs_feature_importance, _ = mrs_step(
             N=dropped_N,

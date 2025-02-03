@@ -206,7 +206,7 @@ def feature_weighted_repeated_MRS(
                     target=target,
                     columns=columns,
                     n_drop=drop,
-                    random_state=random_generator.randint(max_int),
+                    random_state=random_generator.randint(max_int, dtype=np.int64),
                     n_splits=n_pu_splits,
                     feature_weight=np.array(
                         feature_weights_dict[temperature][hyperparameter]
@@ -321,7 +321,7 @@ def initialize_dictionaries(
                 len(columns)
             ).tolist()
 
-    random_state = random_generator.randint(max_int)
+    random_state = random_generator.randint(max_int, dtype=np.int64),
     for hyperparameter in hyperparameter_list:
         _, abs_feature_importance, _ = mrs_step(
             N=dropped_N,

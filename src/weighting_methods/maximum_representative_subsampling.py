@@ -190,7 +190,7 @@ def mrs(
                     target=target,
                     n_drop=drop,
                     n_splits=n_pu_splits,
-                    random_state=random_generator.randint(max_int),
+                    random_state=random_generator.randint(max_int, dtype=np.int64),
                     calculate_roc=True,
                     sample_weights=sample_weights_dict[hyperparameter],
                     hyperparameter=hyperparameter,
@@ -206,7 +206,7 @@ def mrs(
                     target=target,
                     n_drop=drop,
                     n_splits=n_pu_splits,
-                    random_state=random_generator.randint(max_int),
+                    random_state=random_generator.randint(max_int, dtype=np.int64),
                     sample_weights=sample_weights_dict[hyperparameter],
                     hyperparameter=hyperparameter,
                 )

@@ -364,10 +364,10 @@ def lipidomics_quantification_experiment(
         result_file.write(json.dumps(both_result_dict))
 
     both_svc_result_dict = write_result_dict_test_set_lipidomics(
-        both_rf_auroc_cal_list,
-        both_rf_auprc_cal_list,
-        both_rf_auroc_set2_list,
-        both_rf_auprc_set2_list,
+        both_svc_auroc_cal_list,
+        both_svc_auprc_cal_list,
+        both_svc_auroc_set2_list,
+        both_svc_auprc_set2_list,
         dropped_samples_list,
         len(N_train),
     )
@@ -409,7 +409,7 @@ def repeated_train_val_test_split_for_lipidomics(
         skf = StratifiedKFold(
             n_splits=n_cv_splits,
             shuffle=True,
-            random_state=random_generator.randint(max_int),
+            random_state=random_generator.randint(max_int, dtype=np.int64),
         )
         for train_val_index, test_index in skf.split(cal_data, cal_data[target]):
             train_samples_cal = cal_data.iloc[train_val_index].copy()

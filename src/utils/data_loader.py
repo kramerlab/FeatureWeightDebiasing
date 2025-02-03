@@ -313,12 +313,12 @@ def load_lipid_quantification():
         set1_data["ID"] = list(range(len(set1_data)))
         set2_data["Method"] = "set2"
         set2_data["ID"] = list(range(len(set2_data)))
-        data = pd.concat([cal_data, set1_data, set2_data])
+        df = pd.concat([cal_data, set1_data, set2_data])
         lipid_names = cal_data.columns.drop(["Stages", "Method", "ID"])
-        data[lipid_names] = data[lipid_names].astype("float64")
-        data["Stages"] = data["Stages"].replace(stage_mapping)
-        data[lipid_names] = data[lipid_names].replace({0: np.nan})
-        data.to_csv(processed_data_file_name, index=False)
+        df[lipid_names] = df[lipid_names].astype("float64")
+        df["Stages"] = df["Stages"].replace(stage_mapping)
+        df[lipid_names] = df[lipid_names].replace({0.0: np.nan})
+        df.to_csv(processed_data_file_name, index=False)
     else:
         df = pd.read_csv(
             f"{file_path}/../../data/preprocessed_data_for_classification.csv",

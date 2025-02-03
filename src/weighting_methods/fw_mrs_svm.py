@@ -234,7 +234,7 @@ def fw_MRS_SVM(
                     target=target,
                     columns=columns,
                     n_drop=drop,
-                    random_state=random_generator.randint(max_int),
+                    random_state=random_generator.randint(max_int, dtype=np.int64),
                     class_weight=class_weight,
                     n_splits=n_pu_splits,
                     feature_weight=np.array(

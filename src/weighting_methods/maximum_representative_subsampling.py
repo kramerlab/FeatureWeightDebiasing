@@ -148,7 +148,6 @@ def mrs(
     mrs_iteration_dict = {}
     sample_weights_dict = {}
     best_difference_dict = {}
-    current_patience_dict = {}
     switched_dict = {}
     best_weights_dict = {}
     finished_dict = {}
@@ -165,7 +164,6 @@ def mrs(
         mrs_iteration_dict[hyperparameter] = 0
         sample_weights_dict[hyperparameter] = np.ones(len(N))
         best_difference_dict[hyperparameter] = np.inf
-        current_patience_dict[hyperparameter] = 0
         switched_dict[hyperparameter] = False
         finished_dict[hyperparameter] = False
         wasserstein_dict[hyperparameter] = []
@@ -186,6 +184,8 @@ def mrs(
 
     for i in trange(number_of_iterations):
         for hyperparameter in hyperparameter_list:
+            if finished_dict[hyperparameter] and not return_metrics:
+                continue
             if i % roc_iteration == 0 and return_metrics:
                 (
                     drop_ids,
@@ -253,14 +253,11 @@ def mrs(
                 )
                 mrs_iteration_dict[hyperparameter] = i * drop
                 best_difference_dict[hyperparameter] = auc_difference
-                current_patience_dict[hyperparameter] = 0
                 switched_dict[hyperparameter] = (
                     True
                     if auroc <= 0.5 and not switched_dict[hyperparameter]
                     else False
                 )
-            else:
-                current_patience_dict[hyperparameter] += 1
 
             if return_metrics:
                 auc_dict[hyperparameter].append(auroc)

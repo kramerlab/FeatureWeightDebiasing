@@ -179,7 +179,7 @@ def fw_MRS_SVM(
         for temperature in budgets:
             for hyperparameter in hyperparameter_list:
                 if finished_dict[temperature][hyperparameter] and not return_metrics:
-                    break
+                    continue
                 splitter = "best" if temperature is None else "feature_weighted_best"
                 drop_ids, _, auroc = mrs_step(
                     N=dropped_N,

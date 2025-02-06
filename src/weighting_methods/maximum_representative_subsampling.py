@@ -57,7 +57,7 @@ def mrs_step(
 
     y = dropped_N[target]
     target_sum = np.sum(y)
-    if target_sum <= n_splits:
+    if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
         if calculate_roc:
             return None, None, None, None
         else:

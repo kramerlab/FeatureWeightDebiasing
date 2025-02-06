@@ -45,14 +45,11 @@ def mrs_step(
     abs_feature_importance_list = []
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
-    y = N[target]
+    y = dropped_N[target]
     target_sum = np.sum(y)
     if target_sum < n_splits:
-        n_splits = target_sum
-    elif (len(y) - target_sum) < n_splits:
-        n_splits = len(y) - target_sum
-    if n_splits in (1, 0):
-        n_splits = 2
+        return None, None, None
+
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if stratify_R:
         kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -99,50 +96,6 @@ def calculate_feature_importance(test_N, clf, background=None):
     abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
 
     return abs_feature_importance
-
-
-def mrs_without_cv(
-    N,
-    R,
-    target,
-    columns,
-    n_drop: int = 1,
-    class_weight="balanced",
-    random_state=None,
-    feature_weights=None,
-    *args,
-    **attributes,
-):
-    """Performs one iteration of maximum representative sampling without cross-validation
-
-    :param N: Non-representative data set
-    :param R: Representative data set
-    :param columns: Name of columns used for training
-    :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param class_weight: Type of class weights, defaults to "balanced"
-    :param random_state: Random state to make the experiment reproducible, defaults to None
-    :return: The index of the element to drop
-    """
-    data = pd.concat([N, R])
-    clf = train_svm_pu_classifier(
-        data[columns],
-        data.label,
-        class_weight=class_weight,
-        random_state=random_state,
-        feature_weight=feature_weights,
-    )
-    predictions_N = clf.predict_proba(N[columns])[:, 1]
-    feature_importance, _ = calculate_feature_importance(
-        test_N=N[columns].values,
-        clf=clf,
-    )
-    predictions = clf.predict_proba(data[columns])[:, 1]
-    auroc = roc_auc_score(data.label, predictions)
-
-    drop_ids = np.argpartition(predictions_N, -n_drop)[-n_drop:]
-    drop_index = N.index[drop_ids]
-
-    return drop_index, feature_importance, auroc
 
 
 def fw_MRS_SVM(
@@ -245,6 +198,10 @@ def fw_MRS_SVM(
                     hyperparameter=hyperparameter,
                     stratify_R=stratify_R,
                 )
+
+                if drop_ids is None:
+                    finished_dict[temperature][hyperparameter] = True
+                    continue
 
                 feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)
                 auc_difference = abs(auroc - 0.5)

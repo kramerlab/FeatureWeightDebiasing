@@ -250,13 +250,8 @@ def downstream_tasks_experiment(
         rf_auprc_list.append(rf_auprc)
         rf_accuracy_list.append(rf_accuracy)
 
-        # plot_sample_weights(sample_weights, sample_weights_save_path, i)
-        # plot_feature_weights(feature_weights, feature_weights_save_path, i)
-
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
-
-        # plot_rocs_downstream(roc_curve_values, roc_path / f"roc_iteration_{i}")
     for result_list, file_name in zip(
         (
             rf_auroc_list,

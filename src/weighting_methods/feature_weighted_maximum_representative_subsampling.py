@@ -49,14 +49,10 @@ def mrs_step(
     dropped_N = N[sample_weights != 0.0]
     all_predictions = np.zeros(len(dropped_N))
 
-    y = N[target]
+    y = dropped_N[target]
     target_sum = np.sum(y)
     if target_sum < n_splits:
-        n_splits = target_sum
-    elif (len(y) - target_sum) < n_splits:
-        n_splits = len(y) - target_sum
-    if n_splits in (1, 0):
-        n_splits = 2
+        return None, None, None
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if stratify_R:
@@ -216,8 +212,13 @@ def feature_weighted_repeated_MRS(
                     hyperparameter=hyperparameter,
                     stratify_R=stratify_R,
                 )
+
+                if drop_ids is None:
+                    finished_dict[temperature][hyperparameter] = True
+                    continue
                 feature_weighted_aurocs_dict[temperature][hyperparameter].append(auroc)
                 auc_difference = abs(auroc - 0.5)
+
 
                 if return_metrics:
                     auroc_dict[temperature][hyperparameter].append(auroc)

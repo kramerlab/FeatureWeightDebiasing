@@ -644,7 +644,6 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
 
 
 def calculate_feature_importance(test_N, clf, background=None):
-
     explainer = shap.TreeExplainer(clf, data=background)
     explainer = explainer(test_N, check_additivity=False)
     shap_values = explainer.values[:, :, 1]

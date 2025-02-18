@@ -90,16 +90,17 @@ def mrs_step(
             )
             abs_feature_importance_list.append(abs_feature_importance)
 
+    mean_auroc = np.mean(auroc_list)
     if compute_feature_importance:
         abs_mean_feature_importance = np.mean(abs_feature_importance_list, axis=0)
-        abs_mean_feature_importance = abs_mean_feature_importance / np.sum(
+        abs_mean_feature_importance = (abs_mean_feature_importance / np.sum(
             abs_mean_feature_importance
-        )
+        )) * mean_auroc
     else:
         abs_mean_feature_importance = None
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
-    return dropped_N.index[drop_ids], abs_mean_feature_importance, np.mean(auroc_list)
+    return dropped_N.index[drop_ids], abs_mean_feature_importance, mean_auroc
 
 
 def compute_feature_weights_with_budget(budget, feature_importance):

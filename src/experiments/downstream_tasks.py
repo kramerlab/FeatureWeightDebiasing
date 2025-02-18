@@ -67,6 +67,7 @@ def downstream_tasks_experiment(
     best_hyperparameter_list = []
 
     dropped_samples_list = []
+    R_feature_importance_list = []
 
     result_path = create_result_path(
         method_name,
@@ -252,6 +253,33 @@ def downstream_tasks_experiment(
 
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
+
+        if method_name == "uniform" and bias_type == "none":
+            R_sample_weights = np.ones(len(R))
+            (
+                _,
+                _,
+                _,
+                _,
+                R_feature_importance,
+                _,
+                _,
+                _,
+                _,
+            ) = compute_classification_metrics_random_forest(
+                R,
+                T,
+                columns,
+                R_sample_weights,
+                feature_weights,
+                target,
+                random_state=seed,
+                draw_with_feature_weights=draw_with_feature_weights,
+                n_estimators=500,
+                n_splits=5,
+            )
+            R_feature_importance_list.append(R_feature_importance.tolist())
+
     for result_list, file_name in zip(
         (
             rf_auroc_list,
@@ -263,6 +291,7 @@ def downstream_tasks_experiment(
             roc_curves_list,
             best_temperature_list,
             best_hyperparameter_list,
+            R_feature_importance_list,
         ),
         (
             "rf_auroc",
@@ -274,6 +303,7 @@ def downstream_tasks_experiment(
             "roc_curves",
             "best_temperature",
             "best_hyperparameter",
+            "R_feature_importance_list",
         ),
     ):
         with open(

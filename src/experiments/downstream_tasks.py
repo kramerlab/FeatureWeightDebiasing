@@ -204,6 +204,8 @@ def downstream_tasks_experiment(
         if method_name not in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
+            "fw-mrs-temperature_soft_threshold",
+            "fw-mrs-temperature-svm_soft_threshold",
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
@@ -223,6 +225,8 @@ def downstream_tasks_experiment(
         if method_name in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
+            "fw-mrs-temperature_soft_treshold",
+            "fw-mrs-temperature-svm_soft_threshold",
             "mrs-forest",
         ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             compute_validation_results(

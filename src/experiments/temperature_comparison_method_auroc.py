@@ -42,14 +42,15 @@ def temperature_comparison(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
-    if method_name in ("fw-mrs-temperature",):
-        temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature_soft_threshold"):
+        # temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
+        temperatures = [0.0,  0.05, 0.01, 0.005]
         hyperparameter_list = [0.025, 0.01, 0.0]
         fixed_hyperparameter = 0.01
-    if method_name == "fw-mrs-temperature-svm":
+    if method_name in ("fw-mrs-temperature-svm", "fw-mrs-temperature-svm_soft_threshold"):
         temperatures = [0.0, 0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
-        fixed_hyperparameter = 1e-1
+        fixed_hyperparameter = 1e0
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
 
     result_path = create_result_path(

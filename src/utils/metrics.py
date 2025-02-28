@@ -306,36 +306,36 @@ def compute_classification_metrics_random_forest(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                not_zero_indices = np.array(sample_weights) > 0.0
-                N_train = N.loc[not_zero_indices, :]
-                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+                for iteration, train_sample_weights in sample_weights.items():
 
-                clf, score = train_random_forest_classifier(
-                    N_train[columns].values,
-                    N_train[label].values,
-                    train_sample_weights,
-                    np.array(feature_weight),
-                    random_state=random_state,
-                    n_splits=n_splits,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    splitter=splitter,
-                    n_estimators=n_estimators,
-                    max_features=max_features,
-                )
-                if score > best_score:
-                    best_score = score
-                    best_clf = clf
-                    best_weights = sample_weights
-                    best_temperature = temperature
-                    best_hyperparameter = hyperparameter
+                    clf, score = train_random_forest_classifier(
+                        N[columns].values,
+                        N[label].values,
+                        train_sample_weights,
+                        np.array(feature_weight),
+                        random_state=random_state,
+                        n_splits=n_splits,
+                        draw_with_feature_weights=draw_with_feature_weights,
+                        splitter=splitter,
+                        n_estimators=n_estimators,
+                        max_features=max_features,
+                    )
+                    if score > best_score:
+                        best_iteration = iteration
+                        best_score = score
+                        best_clf = clf
+                        best_weights = train_sample_weights
+                        best_temperature = temperature
+                        best_hyperparameter = hyperparameter
+                    if best_score == 1:
+                        break
     else:
         best_temperature = 0
-        N_train = N.copy()
         train_sample_weights = sample_weights_list.copy()
 
         best_clf, _ = train_random_forest_classifier(
-            N_train[columns].values,
-            N_train[label].values,
+            N[columns].values,
+            N[label].values,
             train_sample_weights,
             np.array(feature_weights),
             random_state=random_state,
@@ -410,13 +410,11 @@ def compute_decomposition_metrics_random_forest(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                not_zero_indices = np.array(sample_weights) > 0
-                N_train = N.loc[not_zero_indices, :]
-                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+                train_sample_weights = np.array(sample_weights)
 
                 clf, score = train_random_forest_classifier(
-                    N_train[columns].values,
-                    N_train[label].values,
+                    N[columns].values,
+                    N[label].values,
                     np.array(train_sample_weights),
                     np.array(feature_weight),
                     random_state=random_state,
@@ -431,12 +429,11 @@ def compute_decomposition_metrics_random_forest(
                     best_score = score
                     best_clf = clf
     else:
-        N_train = N.copy()
         train_sample_weights = sample_weights_list.copy()
 
         best_clf, _ = train_random_forest_classifier(
-            N_train[columns].values,
-            N_train[label].values,
+            N[columns].values,
+            N[label].values,
             np.array(train_sample_weights),
             np.array(feature_weights),
             random_state=random_state,
@@ -639,15 +636,15 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     """
     if temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
-    feature_weights = np.exp(-np.array(feature_importance) / temperature)
+    feature_weights = np.exp(np.array(feature_importance) / temperature)
     return feature_weights / np.sum(feature_weights)
 
 
 def calculate_feature_importance(test_N, clf, background=None):
     explainer = shap.TreeExplainer(clf, data=background)
     explainer = explainer(test_N, check_additivity=False)
-    shap_values = explainer.values[:, :, 1]
-    abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
+    shap_values = np.abs(explainer.values[:, :, 1])
+    abs_feature_importance = np.mean(shap_values, axis=0)
 
     return abs_feature_importance
 
@@ -844,11 +841,10 @@ def compute_classification_metrics_random_forest_lipidomics(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                not_zero_indices = np.array(sample_weights) > 0.0
                 N_training = (
-                    N_train.loc[not_zero_indices, :] if N_train is not None else N_train
+                    N_train if N_train is not None else N_train
                 )
-                train_sample_weights = np.array(sample_weights)[not_zero_indices]
+                train_sample_weights = np.array(sample_weights)
                 r_weights = np.ones(len(R_train)) if R_train is not None else []
                 X_sample_weights = np.concatenate([train_sample_weights, r_weights])
                 X_train = pd.concat([N_training, R_train])
@@ -873,11 +869,10 @@ def compute_classification_metrics_random_forest_lipidomics(
                     best_hyperparameter = hyperparameter
     else:
         best_temperature = 0
-        not_zero_indices = np.array(sample_weights_list) > 0.0
         N_training = (
-            N_train.loc[not_zero_indices, :] if N_train is not None else N_train
+            N_train if N_train is not None else N_train
         )
-        train_sample_weights = np.array(sample_weights_list)[not_zero_indices]
+        train_sample_weights = np.array(sample_weights_list)
         r_weights = np.ones(len(R_train)) if R_train is not None else []
         X_sample_weights = np.concatenate([train_sample_weights, r_weights])
 

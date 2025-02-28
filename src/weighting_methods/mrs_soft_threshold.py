@@ -107,7 +107,7 @@ def mrs_step(
         return dropped_N.index[drop_ids], np.mean(auroc_list)
 
 
-def mrs(
+def mrs_with_soft_threshold(
     N,
     R,
     columns,

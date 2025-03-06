@@ -3,7 +3,7 @@ def set_parameter(method_name):
     auroc_val_dict = None
     auprc_val_dict = None
     accuracy_val_dict = None
-    if method_name in ("fw-mrs-temperature",):
+    if method_name in ("fw-mrs-temperature", "fw-mrs-temperature_soft_threshold"):
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [0.025, 0.01, 0.0]
@@ -11,7 +11,10 @@ def set_parameter(method_name):
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
-    elif method_name == "fw-mrs-temperature-svm":
+    elif method_name in (
+        "fw-mrs-temperature-svm",
+        "fw-mrs-temperature-svm_soft_threshold",
+    ):
         draw_with_feature_weights = True
         temperatures = [0.1, 0.05, 0.01, 0.005]
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
@@ -19,7 +22,7 @@ def set_parameter(method_name):
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
-    elif method_name == "mrs-forest":
+    elif method_name in ("mrs-forest", "mrs-forest_soft_threshold"):
         hyperparameter_list = [0.025, 0.01, 0.0]
         draw_with_feature_weights = False
         temperatures = None

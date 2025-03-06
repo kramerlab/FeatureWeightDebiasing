@@ -242,7 +242,7 @@ def mrs(
 
             auc_difference = abs(auroc - 0.5)
             if not switched_dict[hyperparameter]:
-                best_weights_dict[hyperparameter][i] = (
+                best_weights_dict[hyperparameter][0] = (
                     sample_weights_dict[hyperparameter]
                     .copy()
                     .astype(np.float64)

@@ -12,6 +12,7 @@ from utils.metrics import (
     compute_feature_weights_with_temperature,
     train_pu_classifier,
 )
+from weighting_methods.fw_mrs import initialize_dictionaries
 
 # Used to draw radom states
 max_int = 2**32 - 1
@@ -250,89 +251,6 @@ def feature_weighted_repeated_MRS_soft_threshold(
             best_sample_weights_dict,
             feature_weights_dict,
         )
-
-
-def initialize_dictionaries(
-    N,
-    R,
-    columns,
-    target,
-    drop,
-    budgets,
-    random_generator,
-    n_pu_splits,
-    hyperparameter_list,
-    dropped_N,
-    best_difference_dict,
-    best_sample_weights_dict,
-    dropped_samples_dict,
-    auc_difference_dict,
-    abs_feature_importance_dict,
-    sample_weights_dict,
-    feature_weights_dict,
-    feature_weighted_aurocs_dict,
-    finished_dict,
-    switched_dict={},
-    auc_dict={},
-    mmd_dict={},
-    mrs_step=mrs_step,
-    stratify_R=False,
-):
-    for temperature in budgets:
-        best_difference_dict[temperature] = {}
-        auc_difference_dict[temperature] = {}
-        dropped_samples_dict[temperature] = {}
-        feature_weighted_aurocs_dict[temperature] = {}
-        sample_weights_dict[temperature] = {}
-        abs_feature_importance_dict[temperature] = {}
-        feature_weights_dict[temperature] = {}
-        best_sample_weights_dict[temperature] = {}
-        finished_dict[temperature] = {}
-        switched_dict[temperature] = {}
-        auc_dict[temperature] = {}
-        mmd_dict[temperature] = {}
-        for hyperparameter in hyperparameter_list:
-            finished_dict[temperature][hyperparameter] = False
-            switched_dict[temperature][hyperparameter] = False
-            best_difference_dict[temperature][hyperparameter] = np.inf
-            auc_difference_dict[temperature][hyperparameter] = 1
-            dropped_samples_dict[temperature][hyperparameter] = 0
-            auc_dict[temperature][hyperparameter] = []
-            mmd_dict[temperature][hyperparameter] = []
-            feature_weighted_aurocs_dict[temperature][hyperparameter] = []
-            sample_weights_dict[temperature][hyperparameter] = np.ones(len(N))
-            abs_feature_importance_dict[temperature][hyperparameter] = np.ones(
-                len(columns)
-            ).tolist()
-            best_sample_weights_dict[temperature][hyperparameter] = {}
-
-    random_state = int(int(random_generator.randint(max_int, dtype=np.int64)))
-    for hyperparameter in hyperparameter_list:
-        _, abs_feature_importance, _ = mrs_step(
-            N=dropped_N,
-            R=R,
-            target=target,
-            columns=columns,
-            n_drop=drop,
-            random_state=random_state,
-            n_splits=n_pu_splits,
-            feature_weight=np.ones(len(columns)),
-            splitter="best",
-            sample_weights=np.ones(len(N)),
-            compute_feature_importance=True,
-            hyperparameter=hyperparameter,
-            stratify_R=stratify_R,
-        )
-
-        for temperature in budgets:
-            feature_weights_dict[temperature][hyperparameter] = (
-                compute_feature_weights_with_temperature(
-                    temperature, -np.array(abs_feature_importance)
-                ).tolist()
-            )
-            abs_feature_importance_dict[temperature][
-                hyperparameter
-            ] = abs_feature_importance.tolist()
 
 
 def compute_target_importances(

@@ -164,7 +164,7 @@ def downstream_tasks_experiment(
                 compute_bias=False,
             )
 
-            if method_name in ("mrs-forest", "psa"):
+            if method_name in ("mrs-forest", "psa", "mrs-forest_soft_threshold"):
                 sample_weights = {0.0: sample_weights}
                 feature_weights = {0.0: feature_weights}
 
@@ -228,6 +228,7 @@ def downstream_tasks_experiment(
             "fw-mrs-temperature_soft_treshold",
             "fw-mrs-temperature-svm_soft_threshold",
             "mrs-forest",
+            "mrs-forest_soft_threshold"
         ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             compute_validation_results(
                 columns,
@@ -345,6 +346,7 @@ def downstream_tasks_experiment(
         "fw-mrs-temperature",
         "fw-mrs-temperature-svm",
         "mrs-forest",
+        "mrs-forest_soft_threshold"
     ):
         for result_list, file_name in zip(
             (
@@ -370,7 +372,7 @@ def downstream_tasks_experiment(
                 result_file.write(json.dumps(result_list))
 
         dropped_samples_val_results_dict = {}
-        if method_name == "mrs-forest":
+        if method_name in ("mrs-forest", "mrs-forest_soft_threshold"):
             for temperature, temperature_values in dropped_samples_val_dict.items():
                 for hyperparameter, values in temperature_values.items():
                     dropped_samples_val_results_dict[
@@ -410,14 +412,15 @@ def compute_validation_results(
     feature_weights,
     method_name,
 ):
-    if method_name == "mrs-forest":
+    if method_name in ("mrs-forest", "mrs-forest_soft_threshold"):
         for temperature, temperature_sample_weights in sample_weights.items():
             for (
                 hyperparameter,
                 parameter_sample_weights,
             ) in temperature_sample_weights.items():
                 parameter_feature_weights = feature_weights[temperature][hyperparameter]
-
+                parameter_feature_weights = {temperature: {hyperparameter: parameter_feature_weights}}
+                parameter_sample_weights = {temperature: {hyperparameter: parameter_sample_weights}}
                 (
                     rf_auroc_val,
                     rf_auprc_val,
@@ -470,6 +473,9 @@ def compute_validation_results(
 
             tmp_sample_weights = temperature_sample_weights[float(hyperparameter)]
             tmp_feature_weights = temperature_feature_weights[float(hyperparameter)]
+
+            tmp_sample_weights = {temperature: {hyperparameter: tmp_sample_weights}}
+            tmp_feature_weights = {temperature: {hyperparameter: tmp_feature_weights}}
             (
                 rf_auroc_val,
                 rf_auprc_val,
@@ -557,7 +563,9 @@ def compute_validation_results(
             }
 
             tmp_sample_weights = temperature_sample_weights[hyperparameter]
+            tmp_sample_weights = {temperature: {hyperparameter: tmp_sample_weights}}
             tmp_feature_weights = temperature_feature_weights[hyperparameter]
+            tmp_feature_weights = {temperature: {hyperparameter: tmp_feature_weights}}
             (
                 rf_auroc_val,
                 rf_auprc_val,

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import shap
 from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
@@ -83,11 +84,10 @@ def mrs_step(
         auroc_list.append(roc_auc_score(test_data.label, predictions))
 
         if compute_feature_importance:
-            abs_feature_importance = calculate_feature_importance(
-                test_N=N_test[columns].values,
-                clf=clf,
-                background=train_data[columns],
-            )
+            explainer = shap.TreeExplainer(clf, data=train_data[columns])
+            explainer = explainer(N_test[columns].values, check_additivity=False)
+            shap_values = explainer.values[:, :, 1]
+            abs_feature_importance = -np.mean(shap_values, axis=0)
             feature_importance_list.append(abs_feature_importance)
 
     mean_auroc = np.mean(auroc_list)
@@ -231,7 +231,7 @@ def feature_weighted_repeated_MRS(
                     best_difference_dict[temperature][hyperparameter] = auc_difference
                     dropped_samples_dict[temperature][hyperparameter] = i * drop
                     sample_weights = sample_weights_dict[temperature][hyperparameter]
-                    best_sample_weights_dict[temperature][hyperparameter][i] = (
+                    best_sample_weights_dict[temperature][hyperparameter][0] = (
                         (sample_weights / np.sum(sample_weights)).tolist().copy()
                     )
                     if not switched_dict[temperature][hyperparameter] and auroc <= 0.5:
@@ -345,7 +345,7 @@ def initialize_dictionaries(
         for temperature in budgets:
             feature_weights_dict[temperature][hyperparameter] = (
                 compute_feature_weights_with_temperature(
-                    temperature, np.array(abs_feature_importance)
+                    temperature, -np.array(abs_feature_importance)
                 ).tolist()
             )
             abs_feature_importance_dict[temperature][

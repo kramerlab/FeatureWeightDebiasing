@@ -9,5 +9,6 @@ from .fw_mrs import (
 )
 from .kernel_mean_matching import kernel_mean_matching
 from .maximum_representative_subsampling import mrs
+from .mrs_soft_threshold import mrs_with_soft_threshold
 from .fw_mrs_svm import fw_MRS_SVM
 from .fw_mrs_svm_soft_threshold import fw_MRS_SVM_soft_threshold

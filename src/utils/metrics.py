@@ -320,6 +320,7 @@ def compute_classification_metrics_random_forest(
                         n_estimators=n_estimators,
                         max_features=max_features,
                     )
+                    
                     if score > best_score:
                         best_iteration = iteration
                         best_score = score
@@ -570,6 +571,7 @@ def train_random_forest_classifier(
         n_estimators=n_estimators,
         max_features=max_features,
     )
+
     grid_cv = GridSearchCV(
         clf,
         param_grid,
@@ -867,6 +869,8 @@ def compute_classification_metrics_random_forest_lipidomics(
                     best_weights = sample_weights
                     best_temperature = temperature
                     best_hyperparameter = hyperparameter
+                if best_score == 1:
+                        break
     else:
         best_temperature = 0
         N_training = (

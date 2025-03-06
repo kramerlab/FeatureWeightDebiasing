@@ -6,7 +6,7 @@ from experiments import (
     downstream_tasks_experiment,
     fairness_tasks_experiment,
     decomposition_experiment,
-    lipidomics_quantification_experiment
+    lipidomics_quantification_experiment,
 )
 
 
@@ -19,7 +19,8 @@ from weighting_methods import (
     mrs,
     fw_MRS_SVM,
     feature_weighted_repeated_MRS_soft_threshold,
-    fw_MRS_SVM_soft_threshold
+    fw_MRS_SVM_soft_threshold,
+    mrs_with_soft_threshold,
 )
 
 
@@ -27,6 +28,7 @@ from weighting_methods import (
 sample_weighting_method_list = [
     "uniform",
     "mrs-forest",
+    "mrs-forest_soft_threshold",
     "soft-mrs-linear",
     "soft-mrs-exponential",
     "fw-mrs-temperature",
@@ -98,7 +100,7 @@ def parse_mrs_analysis_command_line_arguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_set_name", choices=dataset_list, required=True)
-    parser.add_argument("--mrs_function",  default="mrs_step")
+    parser.add_argument("--mrs_function", default="mrs_step")
     parser.add_argument("--n_cv_splits", default=2, type=int)
     parser.add_argument("--n_cv_repeats", default=5, type=int)
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
@@ -136,6 +138,8 @@ def get_sample_weighting_function(method_name):
         return feature_weighted_repeated_MRS_soft_threshold
     elif method_name == "mrs-forest":
         return mrs
+    elif method_name == "mrs-forest_soft_threshold":
+        return mrs_with_soft_threshold
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "fw-mrs-temperature-svm":

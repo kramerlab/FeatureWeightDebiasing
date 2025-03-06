@@ -84,8 +84,8 @@ def mrs_step(
 
         if compute_feature_importance:
             explainer = Explainer(clf, train_data[columns])
-            shap_values = np.abs(explainer.shap_values(N_test[columns]))
-            feature_importance_list.append(np.mean(shap_values, axis=0))
+            shap_values = explainer.shap_values(N_test[columns])
+            feature_importance_list.append(-np.mean(shap_values, axis=0))
 
     mean_auroc = np.mean(auroc_list)
     if compute_feature_importance:
@@ -230,7 +230,7 @@ def fw_MRS_SVM(
                     best_difference_dict[temperature][hyperparameter] = auc_difference
                     dropped_samples_dict[temperature][hyperparameter] = i * drop
                     sample_weights = sample_weights_dict[temperature][hyperparameter]
-                    best_sample_weights_dict[temperature][hyperparameter][i] = (
+                    best_sample_weights_dict[temperature][hyperparameter][0] = (
                         (sample_weights / np.sum(sample_weights)).tolist().copy()
                     )
                     if not switched_dict[temperature][hyperparameter] and auroc <= 0.5:

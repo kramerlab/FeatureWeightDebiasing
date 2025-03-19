@@ -91,7 +91,7 @@ def plot_temperature_comparison_auroc_mean(
         ratio_upper = mean_aurocs + std_aurocs
         ratio_lower = (mean_aurocs - std_aurocs).clip(min=0)
         sns.lineplot(
-            x=x_labels, y=mean_aurocs, label=str(budget), linestyle=line_styles[i]
+            x=x_labels, y=mean_aurocs, label=str(budget)
         )
         plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.3)
     plt.plot(

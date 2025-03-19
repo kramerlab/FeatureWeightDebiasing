@@ -6,14 +6,11 @@ from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
 from sklearn.model_selection import KFold, StratifiedKFold
-from utils.metrics import (
-    compute_feature_weights_with_temperature,
-    train_svm_pu_classifier,
-)
-from weighting_methods.fw_mrs_soft_threshold import (
-    initialize_dictionaries,
-)
+from utils.metrics import train_svm_pu_classifier,
+
 from shap import Explainer
+
+from weighting_methods.fw_mrs import initialize_dictionaries
 
 # Used to draw radom states
 max_int = 2**32 - 1
@@ -55,7 +52,7 @@ def mrs_step(
     if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
         return None, None, None
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    skf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     if stratify_R:
         kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     else:
@@ -82,10 +79,10 @@ def mrs_step(
         all_predictions[test_indices_N] = distances[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, distances))
 
-        if compute_feature_importance:
-            explainer = Explainer(clf, train_data[columns])
-            shap_values = explainer.shap_values(N_test[columns])
-            feature_importance_list.append(-np.mean(shap_values, axis=0))
+    if compute_feature_importance:
+        explainer = Explainer(clf, train_data[columns])
+        shap_values = np.abs(explainer.shap_values(test_data[columns]))
+        feature_importance_list.append(np.mean(shap_values, axis=0))
 
     mean_auroc = np.mean(auroc_list)
     if compute_feature_importance:
@@ -117,7 +114,7 @@ def fw_MRS_SVM(
     drop=1,
     budgets=[1.0],
     random_generator=None,
-    class_weight=None,
+    class_weight="balanced",
     n_pu_splits=5,
     temperature=0.0,
     hyperparameter_list=[0.0],
@@ -208,6 +205,22 @@ def fw_MRS_SVM(
                     hyperparameter=hyperparameter,
                     stratify_R=stratify_R,
                 )
+
+                """ _, _, auroc = mrs_step(
+                    N=dropped_N,
+                    R=R,
+                    target=target,
+                    columns=columns,
+                    n_drop=drop,
+                    random_state=int(random_generator.randint(max_int, dtype=np.int64)),
+                    class_weight=class_weight,
+                    n_splits=n_pu_splits,
+                    feature_weight=np.ones(len(columns)),
+                    splitter=splitter,
+                    sample_weights=sample_weights_dict[temperature][hyperparameter],
+                    hyperparameter=hyperparameter,
+                    stratify_R=stratify_R,
+                ) """
 
                 if drop_ids is None:
                     finished_dict[temperature][hyperparameter] = True

@@ -16,8 +16,8 @@ do
 done
 
 
-for SAMPLE_WEIGHTING_METHOD in uniform
-do
-    python src/weighting_experiment.py --dataset gbs_allensbach  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
+# for SAMPLE_WEIGHTING_METHOD in uniform
+# do
+#    python src/weighting_experiment.py --dataset gbs_allensbach  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
     --bias_type none --experiment_name downstream_task --drop $DROP --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS --load_previous_results
 done

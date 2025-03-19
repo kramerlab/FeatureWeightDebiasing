@@ -15,6 +15,7 @@ from utils.sampling import repeated_train_val_test_split, sample_N
 from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,
+    compute_classification_metrics_random_forest_perfect,
     compute_metrics,
 )
 import copy
@@ -67,7 +68,9 @@ def downstream_tasks_experiment(
     best_hyperparameter_list = []
 
     dropped_samples_list = []
-    R_feature_importance_list = []
+    R_auroc_list = []
+    R_auprc_list = []
+    validation_score_list = []
 
     result_path = create_result_path(
         method_name,
@@ -106,7 +109,7 @@ def downstream_tasks_experiment(
         auprc_val_dict,
         accuracy_val_dict,
         hyperparameter_list,
-    ) = set_parameter(method_name)
+    ) = set_parameter(method_name, data_set_name, bias_type)
 
     if dropped_samples_val_dict is not None:
         dropped_samples_individual_val_dict = copy.deepcopy(dropped_samples_val_dict)
@@ -164,7 +167,7 @@ def downstream_tasks_experiment(
                 compute_bias=False,
             )
 
-            if method_name in ("mrs-forest", "psa", "mrs-forest_soft_threshold"):
+            if method_name in ("mrs-forest", "psa"):
                 sample_weights = {0.0: sample_weights}
                 feature_weights = {0.0: feature_weights}
 
@@ -184,8 +187,10 @@ def downstream_tasks_experiment(
             best_temperature,
             best_hyperparameter,
             _,
+            validation_score,
         ) = compute_classification_metrics_random_forest(
             N,
+            R,
             T,
             columns,
             sample_weights,
@@ -200,12 +205,11 @@ def downstream_tasks_experiment(
         dropped_samples_list.append(dropped_samples)
         best_temperature_list.append(best_temperature)
         best_hyperparameter_list.append(best_hyperparameter)
+        validation_score_list.append(validation_score)
 
         if method_name not in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
-            "fw-mrs-temperature_soft_threshold",
-            "fw-mrs-temperature-svm_soft_threshold",
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
@@ -225,10 +229,7 @@ def downstream_tasks_experiment(
         if method_name in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
-            "fw-mrs-temperature_soft_treshold",
-            "fw-mrs-temperature-svm_soft_threshold",
             "mrs-forest",
-            "mrs-forest_soft_threshold"
         ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             compute_validation_results(
                 columns,
@@ -250,7 +251,7 @@ def downstream_tasks_experiment(
             )
 
         weighted_mmds_list.append(weighted_mmd)
-        biases_list.append(relative_bias)
+        biases_list.append(relative_bias.astype(float))
         wasserstein_distance_list.append(wasserstein_distances)
         rf_auroc_list.append(rf_auroc)
         rf_auprc_list.append(rf_auprc)
@@ -259,31 +260,18 @@ def downstream_tasks_experiment(
         abs_feature_importance_list.append(abs_feature_importance.tolist())
         roc_curves_list.append(roc_curve_values)
 
-        if method_name == "uniform" and bias_type == "none":
-            R_sample_weights = np.ones(len(R))
-            (
-                _,
-                _,
-                _,
-                _,
-                R_feature_importance,
-                _,
-                _,
-                _,
-                _,
-            ) = compute_classification_metrics_random_forest(
+        if method_name == "uniform" and bias_type == "less_positive_class":
+            (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(
                 R,
                 T,
                 columns,
-                R_sample_weights,
-                feature_weights,
                 target,
                 random_state=seed,
-                draw_with_feature_weights=draw_with_feature_weights,
                 n_estimators=500,
                 n_splits=5,
             )
-            R_feature_importance_list.append(R_feature_importance.tolist())
+            R_auroc_list.append(R_auroc)
+            R_auprc_list.append(R_auprc)
 
     for result_list, file_name in zip(
         (
@@ -296,7 +284,9 @@ def downstream_tasks_experiment(
             roc_curves_list,
             best_temperature_list,
             best_hyperparameter_list,
-            R_feature_importance_list,
+            R_auroc_list,
+            R_auprc_list,
+            validation_score_list,
         ),
         (
             "rf_auroc",
@@ -308,7 +298,9 @@ def downstream_tasks_experiment(
             "roc_curves",
             "best_temperature",
             "best_hyperparameter",
-            "R_feature_importance_list",
+            "R_auroc_list",
+            "R_auprc_list",
+            "validation_score",
         ),
     ):
         with open(
@@ -346,7 +338,6 @@ def downstream_tasks_experiment(
         "fw-mrs-temperature",
         "fw-mrs-temperature-svm",
         "mrs-forest",
-        "mrs-forest_soft_threshold"
     ):
         for result_list, file_name in zip(
             (
@@ -372,7 +363,7 @@ def downstream_tasks_experiment(
                 result_file.write(json.dumps(result_list))
 
         dropped_samples_val_results_dict = {}
-        if method_name in ("mrs-forest", "mrs-forest_soft_threshold"):
+        if method_name in ("mrs-forest"):
             for temperature, temperature_values in dropped_samples_val_dict.items():
                 for hyperparameter, values in temperature_values.items():
                     dropped_samples_val_results_dict[
@@ -412,15 +403,19 @@ def compute_validation_results(
     feature_weights,
     method_name,
 ):
-    if method_name in ("mrs-forest", "mrs-forest_soft_threshold"):
+    if method_name in ("mrs-forest"):
         for temperature, temperature_sample_weights in sample_weights.items():
             for (
                 hyperparameter,
                 parameter_sample_weights,
             ) in temperature_sample_weights.items():
                 parameter_feature_weights = feature_weights[temperature][hyperparameter]
-                parameter_feature_weights = {temperature: {hyperparameter: parameter_feature_weights}}
-                parameter_sample_weights = {temperature: {hyperparameter: parameter_sample_weights}}
+                parameter_feature_weights = {
+                    temperature: {hyperparameter: parameter_feature_weights}
+                }
+                parameter_sample_weights = {
+                    temperature: {hyperparameter: parameter_sample_weights}
+                }
                 (
                     rf_auroc_val,
                     rf_auprc_val,
@@ -433,6 +428,7 @@ def compute_validation_results(
                     _,
                 ) = compute_classification_metrics_random_forest(
                     N,
+                    R,
                     R,
                     columns,
                     parameter_sample_weights,
@@ -489,6 +485,7 @@ def compute_validation_results(
             ) = compute_classification_metrics_random_forest(
                 N,
                 R,
+                R,
                 columns,
                 tmp_sample_weights,
                 tmp_feature_weights,
@@ -530,8 +527,10 @@ def compute_validation_results(
                 _,
                 _,
                 _,
+                _,
             ) = compute_classification_metrics_random_forest(
                 N,
+                R,
                 R,
                 columns,
                 tmp_sample_weights,
@@ -576,8 +575,10 @@ def compute_validation_results(
                 _,
                 _,
                 _,
+                _,
             ) = compute_classification_metrics_random_forest(
                 N,
+                R,
                 R,
                 columns,
                 tmp_sample_weights,

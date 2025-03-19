@@ -18,9 +18,6 @@ from weighting_methods import (
     uniform_sample_weighting,
     mrs,
     fw_MRS_SVM,
-    feature_weighted_repeated_MRS_soft_threshold,
-    fw_MRS_SVM_soft_threshold,
-    mrs_with_soft_threshold,
 )
 
 
@@ -28,13 +25,10 @@ from weighting_methods import (
 sample_weighting_method_list = [
     "uniform",
     "mrs-forest",
-    "mrs-forest_soft_threshold",
     "soft-mrs-linear",
     "soft-mrs-exponential",
     "fw-mrs-temperature",
     "fw-mrs-temperature-svm",
-    "fw-mrs-temperature_soft_threshold",
-    "fw-mrs-temperature-svm_soft_threshold",
     "kmm",
     "psa",
 ]
@@ -60,6 +54,9 @@ dataset_list = [
     "hr_analytics",
     "loan_prediction",
     "lipidomics",
+    "german_credit",
+    "bank_marketing",
+    "diabetes"
 ]
 
 
@@ -134,18 +131,12 @@ def get_sample_weighting_function(method_name):
         return soft_mrs_weighting
     elif method_name == "fw-mrs-temperature":
         return feature_weighted_repeated_MRS
-    elif method_name == "fw-mrs-temperature_soft_threshold":
-        return feature_weighted_repeated_MRS_soft_threshold
     elif method_name == "mrs-forest":
         return mrs
-    elif method_name == "mrs-forest_soft_threshold":
-        return mrs_with_soft_threshold
     elif method_name == "kmm":
         return kernel_mean_matching
     elif method_name == "fw-mrs-temperature-svm":
         return fw_MRS_SVM
-    elif method_name == "fw-mrs-temperature-svm_soft_threshold":
-        return fw_MRS_SVM_soft_threshold
 
 
 def get_experiment_function(experiment_name=""):

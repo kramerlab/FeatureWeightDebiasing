@@ -13,6 +13,9 @@ from folktables import (
     ACSEmployment,
 )
 
+from ucimlrepo import fetch_ucirepo
+
+
 file_path = pathlib.Path(__file__).parent
 seed = 5
 upper_sample_limit = 6000
@@ -42,9 +45,96 @@ def load_dataset(dataset_name):
         return load_fairness_adult()
     elif dataset_name == "lipidomics":
         return load_lipid_quantification()
+    elif dataset_name == "german_credit":
+        return load_german_credit()
+    elif dataset_name == "bank_marketing":
+        return load_bank_marketing()
+    elif dataset_name == "diabetes":
+        return load_diabetes()
     else:
         print("No valid data set name given!")
         exit()
+
+
+def load_diabetes():
+    cdc_diabetes_health_indicators = fetch_ucirepo(id=891) 
+  
+    # data (as pandas dataframes) 
+    X = cdc_diabetes_health_indicators.data.features 
+    y = cdc_diabetes_health_indicators.data.targets 
+
+    # X = X.replace(feature_replacer)
+    columns = X.columns
+    target = y.columns[0]
+    X[target] = y
+    # X[target] = X[target].map({"yes": True, "no": False})
+
+    if len(X) > upper_sample_limit:
+        X = X.sample(upper_sample_limit, random_state=seed).copy()
+
+    return X, columns, target
+
+
+def load_bank_marketing():
+    # fetch dataset
+    bank_marketing = fetch_ucirepo(id=222)
+    categorical_variables = [
+        "job",
+        "marital",
+        "education",
+        "contact",
+        "day_of_week",
+        "month",
+        "poutcome",
+    ]
+    feature_replacer = {"no": False, "yes": True}
+
+    # data (as pandas dataframes)
+    X = bank_marketing.data.features
+    y = bank_marketing.data.targets
+    X = pd.get_dummies(X, columns=categorical_variables, drop_first=True)
+    X = X.replace(feature_replacer)
+    columns = X.columns
+    target = y.columns[0]
+    X[target] = y
+    X[target] = X[target].map({"yes": True, "no": False})
+
+    if len(X) > upper_sample_limit:
+        X = X.sample(upper_sample_limit, random_state=seed).copy()
+
+    return X, columns, target
+
+
+def load_german_credit():
+    # fetch dataset
+    statlog_german_credit_data = fetch_ucirepo(id=144)
+
+    feature_replacer = {"A191": False, "A192": True, "A201": True, "A202": False}
+    categorical_variables = [
+        "Attribute1",
+        "Attribute3",
+        "Attribute4",
+        "Attribute6",
+        "Attribute7",
+        "Attribute9",
+        "Attribute10",
+        "Attribute12",
+        "Attribute14",
+        "Attribute15",
+        "Attribute17",
+    ]
+    X = statlog_german_credit_data.data.features
+    X = pd.get_dummies(X, columns=categorical_variables, drop_first=True)
+    X = X.replace(feature_replacer)
+    columns = X.columns
+    y = statlog_german_credit_data.data.targets
+    target = y.columns[0]
+    X[target] = y
+    X[target] = X[target].map({1: 0, 2: 1})
+
+    if len(X) > upper_sample_limit:
+        X = X.sample(upper_sample_limit, random_state=seed).copy()
+    return X, columns, target
 
 
 def load_gbs_allensbach():
@@ -299,13 +389,21 @@ def load_fairness_adult():
 
 
 def load_lipid_quantification():
-    unprocessed_data_file_name = "data/MyoVasc cohort 1 - different quan strat_3 final sets.xlsx"
+    unprocessed_data_file_name = (
+        "data/MyoVasc cohort 1 - different quan strat_3 final sets.xlsx"
+    )
     processed_data_file_name = "data/preprocessed_data_for_classification.csv"
-    stage_mapping = {"S0": 0, "S1":1, "S2":2, "S3": 3}
+    stage_mapping = {"S0": 0, "S1": 1, "S2": 2, "S3": 3}
     if not pathlib.Path(processed_data_file_name).exists():
-        cal_data = pd.read_excel(unprocessed_data_file_name, sheet_name="cal", index_col=0, header=None).T
-        set1_data = pd.read_excel(unprocessed_data_file_name, sheet_name="set1", index_col=0, header=None).T
-        set2_data = pd.read_excel(unprocessed_data_file_name, sheet_name="set2", index_col=0, header=None).T
+        cal_data = pd.read_excel(
+            unprocessed_data_file_name, sheet_name="cal", index_col=0, header=None
+        ).T
+        set1_data = pd.read_excel(
+            unprocessed_data_file_name, sheet_name="set1", index_col=0, header=None
+        ).T
+        set2_data = pd.read_excel(
+            unprocessed_data_file_name, sheet_name="set2", index_col=0, header=None
+        ).T
 
         cal_data["Method"] = "cal"
         cal_data["ID"] = list(range(len(cal_data)))
@@ -327,7 +425,7 @@ def load_lipid_quantification():
 
     binary_data = df[df["Stages"].isin([0, 3])].copy()
     binary_data = binary_data[binary_data["Method"].isin(["cal", "set2"])].copy()
-    binary_data["Stages"] = binary_data["Stages"].replace({0:0, 3: 1})
+    binary_data["Stages"] = binary_data["Stages"].replace({0: 0, 3: 1})
 
     return binary_data, lipid_names, "Stages"
 

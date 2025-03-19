@@ -4,6 +4,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 
 seed = 5
 
+
 def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_generator):
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]
@@ -14,7 +15,6 @@ def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_gen
         elif bias_type == "less_negative_class":
             positive_fraction = 1
             negative_fraction = bias_fraction
-
         N = sample_class_biased_N(
             positive_samples,
             negative_samples,
@@ -99,7 +99,7 @@ def sample_with_test_set(
         columns,
         train,
         bias_variable,
-        random_generator=random_generator
+        random_generator=random_generator,
     )
 
     N["label"] = 1

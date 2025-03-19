@@ -14,3 +14,4 @@ joblib
 threadpoolctl
 fairlearn
 src/feature_weighted_tree/scikit-learn
+ucimlrepo

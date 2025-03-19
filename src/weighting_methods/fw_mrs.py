@@ -87,7 +87,7 @@ def mrs_step(
             explainer = shap.TreeExplainer(clf, data=train_data[columns])
             explainer = explainer(N_test[columns].values, check_additivity=False)
             shap_values = explainer.values[:, :, 1]
-            abs_feature_importance = -np.mean(shap_values, axis=0)
+            abs_feature_importance = np.mean(shap_values, axis=0)
             feature_importance_list.append(abs_feature_importance)
 
     mean_auroc = np.mean(auroc_list)
@@ -186,6 +186,7 @@ def feature_weighted_repeated_MRS(
         switched_dict,
         auroc_dict,
         mmd_dict,
+        mrs_step=mrs_step,
     )
 
     for i in trange(number_of_iterations):
@@ -340,12 +341,13 @@ def initialize_dictionaries(
             compute_feature_importance=True,
             hyperparameter=hyperparameter,
             stratify_R=stratify_R,
+            class_weights="balanced"
         )
 
         for temperature in budgets:
             feature_weights_dict[temperature][hyperparameter] = (
                 compute_feature_weights_with_temperature(
-                    temperature, -np.array(abs_feature_importance)
+                    temperature, np.array(abs_feature_importance)
                 ).tolist()
             )
             abs_feature_importance_dict[temperature][

@@ -17,21 +17,21 @@ from sklearn.metrics import (
 )
 from sklearn.svm import SVC, LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
+from functools import partial
 
+min_weight_fractions_leaf_list = [
+    0.0,
+    0.0001,
+    0.0005,
+    0.001,
+    0.005,
+    0.01,
+    0.05,
+]
+class_weight_list = [None, "balanced"]
 param_grid = {
-    "min_weight_fraction_leaf": [
-        0.0,
-        0.0001,
-        0.00025,
-        0.0005,
-        0.001,
-        0.0025,
-        0.005,
-        0.01,
-        0.025,
-        0.05,
-    ],
-    "class_weight": [None, "balanced"],
+    "min_weight_fraction_leaf": min_weight_fractions_leaf_list,
+    "class_weight": class_weight_list,
 }
 
 
@@ -275,11 +275,12 @@ def compute_metrics(
 
 def compute_classification_metrics_random_forest(
     N,
+    R,
     T,
     columns,
     sample_weights_list,
     feature_weights,
-    label,
+    target,
     random_state=None,
     n_splits=5,
     splitter="feature_weighted_best",
@@ -301,16 +302,19 @@ def compute_classification_metrics_random_forest(
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
+        best_weights = None
+        best_temperature = -1
+        best_hyperparameter = -1
         for temperature in sample_weights_list.keys():
             for hyperparameter, sample_weights in sample_weights_list[
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                for iteration, train_sample_weights in sample_weights.items():
-
+                for train_sample_weights in sample_weights.values():
                     clf, score = train_random_forest_classifier(
                         N[columns].values,
-                        N[label].values,
+                        N[target].values,
+                        R[columns].values,
                         train_sample_weights,
                         np.array(feature_weight),
                         random_state=random_state,
@@ -320,9 +324,8 @@ def compute_classification_metrics_random_forest(
                         n_estimators=n_estimators,
                         max_features=max_features,
                     )
-                    
+
                     if score > best_score:
-                        best_iteration = iteration
                         best_score = score
                         best_clf = clf
                         best_weights = train_sample_weights
@@ -334,9 +337,10 @@ def compute_classification_metrics_random_forest(
         best_temperature = 0
         train_sample_weights = sample_weights_list.copy()
 
-        best_clf, _ = train_random_forest_classifier(
+        best_clf, best_score = train_random_forest_classifier(
             N[columns].values,
-            N[label].values,
+            N[target].values,
+            R[columns].values,
             train_sample_weights,
             np.array(feature_weights),
             random_state=random_state,
@@ -352,19 +356,24 @@ def compute_classification_metrics_random_forest(
     if best_clf is not None:
         y_probabilitites = best_clf.predict_proba(T[columns].values)[:, 1]
         y_predictions = best_clf.predict(T[columns].values)
-        fpr, tpr, _ = roc_curve(T[label], y_probabilitites)
+        fpr, tpr, _ = roc_curve(T[target], y_probabilitites)
+    else:
+        y_probabilitites = np.ones(len(T))
+        y_predictions = np.ones(len(T))
+        fpr = np.ones(len(T))
+        tpr = np.ones(len(T))
 
     if compute_feature_importance and best_clf is not None:
         abs_feature_importance = calculate_feature_importance(
             T[columns].values,
-            best_clf.best_estimator_,
+            best_clf,
         )
     else:
         abs_feature_importance = np.ones_like(columns)
 
-    auroc_score = roc_auc_score(T[label], y_probabilitites)
-    auprc = average_precision_score(T[label], y_probabilitites)
-    accuracy = accuracy_score(T[label], y_predictions)
+    auroc_score = roc_auc_score(T[target], y_probabilitites)
+    auprc = average_precision_score(T[target], y_probabilitites)
+    accuracy = accuracy_score(T[target], y_predictions)
 
     return (
         auroc_score,
@@ -376,6 +385,7 @@ def compute_classification_metrics_random_forest(
         best_temperature,
         best_hyperparameter,
         best_clf,
+        best_score,
     )
 
 
@@ -460,6 +470,7 @@ def train_pu_classifier(
     random_state=None,
     splitter="feature_weighted_best",
     hyperparameter=0.0,
+    class_weight="balanced",
 ):
     """Train the positive unlabeled classifier
 
@@ -475,6 +486,7 @@ def train_pu_classifier(
         min_weight_fraction_leaf=hyperparameter,
         splitter=splitter,
         n_jobs=-1,
+        class_weight=class_weight,
     )
 
     return clf.fit(
@@ -533,6 +545,7 @@ def interpolate_roc(y_test, y_predict):
 def train_random_forest_classifier(
     X,
     y,
+    R,
     sample_weights,
     feature_weights=None,
     n_splits=5,
@@ -572,12 +585,16 @@ def train_random_forest_classifier(
         max_features=max_features,
     )
 
+    reverse_validation_scorer_with_data = partial(
+        reverse_validation_scorer, R=R, feature_weights=feature_weights
+    )
+
     grid_cv = GridSearchCV(
         clf,
         param_grid,
         cv=skf,
         n_jobs=-1,
-        scoring=scoring,
+        scoring=reverse_validation_scorer_with_data,
         refit=True,
     )
 
@@ -588,8 +605,21 @@ def train_random_forest_classifier(
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
+    return grid_cv.best_estimator_, grid_cv.best_score_
 
-    return grid_cv, grid_cv.best_score_
+
+def reverse_validation_scorer(estimator, X, y, R, feature_weights):
+    y_predicted = estimator.predict(R)
+    estimator.fit(
+        R,
+        y_predicted,
+        feature_weights=feature_weights,
+        draw_with_feature_weights=True,
+    )
+    y_val_predicted = estimator.predict_proba(X)
+    if np.shape(y_val_predicted)[1] > 1:
+        y_val_predicted = y_val_predicted[:, 1]
+    return roc_auc_score(y, y_val_predicted)
 
 
 def calculate_mean_rocs(rocs_dict_list):
@@ -638,7 +668,7 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
     """
     if temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
-    feature_weights = np.exp(np.array(feature_importance) / temperature)
+    feature_weights = np.exp(np.array(-feature_importance) / temperature)
     return feature_weights / np.sum(feature_weights)
 
 
@@ -776,12 +806,7 @@ def train_random_forest_classifier_fairness(
     return grid_cv
 
 
-def train_svm_pu_classifier(
-    X,
-    y,
-    random_state=None,
-    C=1,
-):
+def train_svm_pu_classifier(X, y, random_state=None, C=1, class_weight="balanced"):
     """Train the positive unlabeled classifier
 
     :param X_train: Training features
@@ -789,7 +814,9 @@ def train_svm_pu_classifier(
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
-    clf = LinearSVC(dual="auto", random_state=random_state, C=C)
+    clf = LinearSVC(
+        dual="auto", random_state=random_state, C=C, class_weight=class_weight
+    )
 
     clf.fit(
         X,
@@ -843,9 +870,7 @@ def compute_classification_metrics_random_forest_lipidomics(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                N_training = (
-                    N_train if N_train is not None else N_train
-                )
+                N_training = N_train if N_train is not None else N_train
                 train_sample_weights = np.array(sample_weights)
                 r_weights = np.ones(len(R_train)) if R_train is not None else []
                 X_sample_weights = np.concatenate([train_sample_weights, r_weights])
@@ -870,12 +895,10 @@ def compute_classification_metrics_random_forest_lipidomics(
                     best_temperature = temperature
                     best_hyperparameter = hyperparameter
                 if best_score == 1:
-                        break
+                    break
     else:
         best_temperature = 0
-        N_training = (
-            N_train if N_train is not None else N_train
-        )
+        N_training = N_train if N_train is not None else N_train
         train_sample_weights = np.array(sample_weights_list)
         r_weights = np.ones(len(R_train)) if R_train is not None else []
         X_sample_weights = np.concatenate([train_sample_weights, r_weights])
@@ -966,3 +989,54 @@ def train_svc(
     )
 
     return grid_cv.best_estimator_, grid_cv.best_score_
+
+
+def compute_classification_metrics_random_forest_perfect(
+    N,
+    T,
+    columns,
+    target,
+    random_state=None,
+    n_splits=5,
+    n_estimators=500,
+):
+    """Computes classification metrics for downstream tasks
+
+    :param N: Non representative data set
+    :param R: Representative data set
+    :param columns: Columns used in the training
+    :param weights: Computed sample weights
+    :param label: Name of the target variable
+    :return: Downstream classification metrics
+    """
+
+    clf = RandomForestClassifier(
+        random_state=random_state,
+        n_estimators=n_estimators,
+    )
+    skf = StratifiedKFold(
+        n_splits=int(n_splits), shuffle=True, random_state=random_state
+    )
+    grid_cv = GridSearchCV(
+        clf,
+        param_grid,
+        cv=skf,
+        n_jobs=-1,
+        scoring="roc_auc",
+        refit=True,
+    )
+
+    grid_cv.fit(
+        N[columns].values,
+        N[target],
+    )
+
+    y_probabilitites = grid_cv.predict_proba(T[columns].values)[:, 1]
+
+    auroc = roc_auc_score(T[target], y_probabilitites)
+    auprc = average_precision_score(T[target], y_probabilitites)
+
+    return (
+        auroc,
+        auprc,
+    )

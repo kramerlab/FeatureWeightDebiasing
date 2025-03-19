@@ -426,6 +426,7 @@ def compute_validation_results(
                     _,
                     _,
                     _,
+                    _,
                 ) = compute_classification_metrics_random_forest(
                     N,
                     R,
@@ -477,6 +478,7 @@ def compute_validation_results(
                 rf_auprc_val,
                 rf_accuracy_val,
                 best_sample_weights_val,
+                _,
                 _,
                 _,
                 _,

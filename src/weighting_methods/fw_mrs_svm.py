@@ -6,7 +6,7 @@ from sklearn.metrics import roc_auc_score
 from tqdm import trange
 
 from sklearn.model_selection import KFold, StratifiedKFold
-from utils.metrics import train_svm_pu_classifier,
+from utils.metrics import train_svm_pu_classifier
 
 from shap import Explainer
 

@@ -57,17 +57,18 @@ def load_dataset(dataset_name):
 
 
 def load_diabetes():
-    cdc_diabetes_health_indicators = fetch_ucirepo(id=891) 
-  
-    # data (as pandas dataframes) 
-    X = cdc_diabetes_health_indicators.data.features 
-    y = cdc_diabetes_health_indicators.data.targets 
-
-    # X = X.replace(feature_replacer)
+    X_file_path = pathlib.Path(f"{file_path}/../../data/diabetes/diabetes_X.csv")
+    y_file_path = pathlib.Path(f"{file_path}/../../data/diabetes/diabetes_y.csv")
+    if X_file_path.is_file():
+        X = pd.read_csv(X_file_path)
+        y = pd.read_csv(y_file_path)
+    else:
+        cdc_diabetes_health_indicators = fetch_ucirepo(id=891) 
+        X = cdc_diabetes_health_indicators.data.features 
+        y = cdc_diabetes_health_indicators.data.targets 
     columns = X.columns
     target = y.columns[0]
     X[target] = y
-    # X[target] = X[target].map({"yes": True, "no": False})
 
     if len(X) > upper_sample_limit:
         X = X.sample(upper_sample_limit, random_state=seed).copy()
@@ -76,8 +77,6 @@ def load_diabetes():
 
 
 def load_bank_marketing():
-    # fetch dataset
-    bank_marketing = fetch_ucirepo(id=222)
     categorical_variables = [
         "job",
         "marital",
@@ -89,9 +88,16 @@ def load_bank_marketing():
     ]
     feature_replacer = {"no": False, "yes": True}
 
-    # data (as pandas dataframes)
-    X = bank_marketing.data.features
-    y = bank_marketing.data.targets
+    X_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_X.csv")
+    y_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_y.csv")
+    if X_file_path.is_file():
+        X = pd.read_csv(X_file_path)
+        y = pd.read_csv(y_file_path)
+    else:
+        # fetch dataset
+        bank_marketing = fetch_ucirepo(id=222)
+        X = bank_marketing.data.features
+        y = bank_marketing.data.targets
     X = pd.get_dummies(X, columns=categorical_variables, drop_first=True)
     X = X.replace(feature_replacer)
     columns = X.columns
@@ -106,8 +112,15 @@ def load_bank_marketing():
 
 
 def load_german_credit():
-    # fetch dataset
-    statlog_german_credit_data = fetch_ucirepo(id=144)
+    X_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_X.csv")
+    y_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_y.csv")
+    if X_file_path.is_file():
+        X = pd.read_csv(X_file_path)
+        y = pd.read_csv(y_file_path)
+    else:
+        statlog_german_credit_data = fetch_ucirepo(id=144)
+        X = statlog_german_credit_data.data.features
+        y = statlog_german_credit_data.data.targets
 
     feature_replacer = {"A191": False, "A192": True, "A201": True, "A202": False}
     categorical_variables = [
@@ -123,11 +136,10 @@ def load_german_credit():
         "Attribute15",
         "Attribute17",
     ]
-    X = statlog_german_credit_data.data.features
+
     X = pd.get_dummies(X, columns=categorical_variables, drop_first=True)
     X = X.replace(feature_replacer)
     columns = X.columns
-    y = statlog_german_credit_data.data.targets
     target = y.columns[0]
     X[target] = y
     X[target] = X[target].map({1: 0, 2: 1})

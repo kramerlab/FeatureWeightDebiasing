@@ -12,7 +12,8 @@ virtual environment is recommended.
 ```shell
 ./downstream_task_experiment.sh
 ./decomposition_experiments.sh
+./temperature_comparison.sh
 ```
 
 ## Reproduce diagrams
-Jupyter notebooks to reproduce the diagrams are in /notebooks.
+Jupyter notebooks to reproduce the diagrams are in the directory /notebooks.

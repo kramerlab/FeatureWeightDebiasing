@@ -38,6 +38,7 @@ sample_weighting_method_list = [
 bias_choice = [
     "less_negative_class",
     "less_positive_class",
+    "less_positive_class_comparison",
     "mean_difference",
     "none",
 ]

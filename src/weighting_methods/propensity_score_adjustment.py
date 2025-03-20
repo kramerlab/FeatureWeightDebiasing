@@ -22,7 +22,7 @@ def propensity_score_adjustment(
         clf = train_logistic_regression(x, y, hyperparameter)
         predictions = clf.predict_proba(N[columns].values)[:, 1]
         weights = (1 - predictions) / predictions
-        sample_weights_dict[hyperparameter] = (weights / weights.sum()).tolist()
+        sample_weights_dict[hyperparameter] = {0: (weights / weights.sum()).tolist()}
         feature_weights_dict[hyperparameter] = (
             np.ones(len(columns)) / len(columns)
         ).tolist()

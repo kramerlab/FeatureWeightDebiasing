@@ -109,7 +109,7 @@ def downstream_tasks_experiment(
         auprc_val_dict,
         accuracy_val_dict,
         hyperparameter_list,
-    ) = set_parameter(method_name, data_set_name, bias_type)
+    ) = set_parameter(method_name, bias_type)
 
     if dropped_samples_val_dict is not None:
         dropped_samples_individual_val_dict = copy.deepcopy(dropped_samples_val_dict)

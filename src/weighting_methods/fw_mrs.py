@@ -9,7 +9,6 @@ from sklearn.model_selection import (
     StratifiedKFold,
 )
 from utils.metrics import (
-    calculate_feature_importance,
     compute_feature_weights_with_temperature,
     train_pu_classifier,
 )
@@ -85,8 +84,8 @@ def mrs_step(
 
         if compute_feature_importance:
             explainer = shap.TreeExplainer(clf, data=train_data[columns])
-            explainer = explainer(N_test[columns].values, check_additivity=False)
-            shap_values = explainer.values[:, :, 1]
+            explainer = explainer(test_data[columns].values, check_additivity=False)
+            shap_values = np.abs(explainer.values[:, :, 1])
             abs_feature_importance = np.mean(shap_values, axis=0)
             feature_importance_list.append(abs_feature_importance)
 
@@ -98,20 +97,6 @@ def mrs_step(
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     return dropped_N.index[drop_ids], mean_feature_importance, mean_auroc
-
-
-def compute_feature_weights_with_budget(budget, feature_importance):
-    if budget is None:
-        return np.ones(len(feature_importance))
-    else:
-        max_importance = np.max(feature_importance)
-        min_importance = np.min(feature_importance)
-        feature_importance = (feature_importance - min_importance) / (
-            max_importance - min_importance
-        )
-        scaled_feature_importance = feature_importance * budget
-        scaled_feature_importance = 1 + scaled_feature_importance
-        return scaled_feature_importance
 
 
 def feature_weighted_repeated_MRS(
@@ -341,7 +326,7 @@ def initialize_dictionaries(
             compute_feature_importance=True,
             hyperparameter=hyperparameter,
             stratify_R=stratify_R,
-            class_weights="balanced"
+            class_weights="balanced",
         )
 
         for temperature in budgets:
@@ -353,31 +338,3 @@ def initialize_dictionaries(
             abs_feature_importance_dict[temperature][
                 hyperparameter
             ] = abs_feature_importance.tolist()
-
-
-def compute_target_importances(
-    X, columns, target, random_state, n_splits, hyperparameter
-):
-    abs_feature_importance_list = []
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for train_indices_N, test_indices_N in skf.split(X, X[target]):
-        X_train, X_test = (
-            X.iloc[train_indices_N],
-            X.iloc[test_indices_N],
-        )
-        clf = train_pu_classifier(
-            X_train[columns],
-            X_train[target],
-            random_state=random_state,
-            splitter="best",
-            hyperparameter=hyperparameter,
-        )
-
-        abs_feature_importance = calculate_feature_importance(
-            test_N=X_test[columns].values,
-            clf=clf,
-            background=X_train[columns],
-        )
-        abs_feature_importance_list.append(abs_feature_importance)
-
-    return np.nanmean(abs_feature_importance_list, axis=0)

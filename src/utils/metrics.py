@@ -585,16 +585,13 @@ def train_random_forest_classifier(
         max_features=max_features,
     )
 
-    reverse_validation_scorer_with_data = partial(
-        reverse_validation_scorer, R=R, feature_weights=feature_weights
-    )
 
     grid_cv = GridSearchCV(
         clf,
         param_grid,
         cv=skf,
         n_jobs=-1,
-        scoring=reverse_validation_scorer_with_data,
+        scoring="auroc",
         refit=True,
     )
 
@@ -606,20 +603,6 @@ def train_random_forest_classifier(
         draw_with_feature_weights=draw_with_feature_weights,
     )
     return grid_cv.best_estimator_, grid_cv.best_score_
-
-
-def reverse_validation_scorer(estimator, X, y, R, feature_weights):
-    y_predicted = estimator.predict(R)
-    estimator.fit(
-        R,
-        y_predicted,
-        feature_weights=feature_weights,
-        draw_with_feature_weights=True,
-    )
-    y_val_predicted = estimator.predict_proba(X)
-    if np.shape(y_val_predicted)[1] > 1:
-        y_val_predicted = y_val_predicted[:, 1]
-    return roc_auc_score(y, y_val_predicted)
 
 
 def calculate_mean_rocs(rocs_dict_list):

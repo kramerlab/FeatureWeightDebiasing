@@ -177,35 +177,41 @@ def downstream_tasks_experiment(
             save_results(sample_weights_save_path, sample_weight_list)
             save_results(feature_weights_save_path, feature_weight_list)
 
-        (
-            rf_auroc,
-            rf_auprc,
-            rf_accuracy,
-            best_sample_weights,
-            abs_feature_importance,
-            roc_curve_values,
-            best_temperature,
-            best_hyperparameter,
-            _,
-            validation_score,
-        ) = compute_classification_metrics_random_forest(
-            N,
-            R,
-            T,
-            columns,
-            sample_weights,
-            feature_weights,
-            target,
-            random_state=seed,
-            draw_with_feature_weights=draw_with_feature_weights,
-            n_estimators=500,
-            n_splits=5,
-        )
-        dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
-        dropped_samples_list.append(dropped_samples)
-        best_temperature_list.append(best_temperature)
-        best_hyperparameter_list.append(best_hyperparameter)
-        validation_score_list.append(validation_score)
+        if not bias_type == "less_positive_class_comparison":
+            (
+                rf_auroc,
+                rf_auprc,
+                rf_accuracy,
+                best_sample_weights,
+                abs_feature_importance,
+                roc_curve_values,
+                best_temperature,
+                best_hyperparameter,
+                _,
+                validation_score,
+            ) = compute_classification_metrics_random_forest(
+                N,
+                R,
+                T,
+                columns,
+                sample_weights,
+                feature_weights,
+                target,
+                random_state=seed,
+                draw_with_feature_weights=draw_with_feature_weights,
+                n_estimators=500,
+                n_splits=5,
+            )
+            dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
+            dropped_samples_list.append(dropped_samples)
+            best_temperature_list.append(best_temperature)
+            best_hyperparameter_list.append(best_hyperparameter)
+            validation_score_list.append(validation_score)
+            rf_auroc_list.append(rf_auroc)
+            rf_auprc_list.append(rf_auprc)
+            rf_accuracy_list.append(rf_accuracy)
+            abs_feature_importance_list.append(abs_feature_importance.tolist())
+            roc_curves_list.append(roc_curve_values)
 
         if method_name not in (
             "fw-mrs-temperature",
@@ -253,12 +259,6 @@ def downstream_tasks_experiment(
         weighted_mmds_list.append(weighted_mmd)
         biases_list.append(relative_bias.astype(float))
         wasserstein_distance_list.append(wasserstein_distances)
-        rf_auroc_list.append(rf_auroc)
-        rf_auprc_list.append(rf_auprc)
-        rf_accuracy_list.append(rf_accuracy)
-
-        abs_feature_importance_list.append(abs_feature_importance.tolist())
-        roc_curves_list.append(roc_curve_values)
 
         if method_name == "uniform" and bias_type == "less_positive_class":
             (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(
@@ -273,116 +273,116 @@ def downstream_tasks_experiment(
             R_auroc_list.append(R_auroc)
             R_auprc_list.append(R_auprc)
 
-    for result_list, file_name in zip(
-        (
+        for result_list, file_name in zip(
+            (
+                rf_auroc_list,
+                rf_auprc_list,
+                rf_accuracy_list,
+                dropped_samples_list,
+                abs_feature_importance_list,
+                feature_importance_list,
+                roc_curves_list,
+                best_temperature_list,
+                best_hyperparameter_list,
+                R_auroc_list,
+                R_auprc_list,
+                validation_score_list,
+            ),
+            (
+                "rf_auroc",
+                "rf_auprc",
+                "rf_accuracy",
+                "dropped_samples",
+                "abs_feature_importance",
+                "feature_importance",
+                "roc_curves",
+                "best_temperature",
+                "best_hyperparameter",
+                "R_auroc_list",
+                "R_auprc_list",
+                "validation_score",
+            ),
+        ):
+            with open(
+                classificiation_result_path / f"{file_name}.json", "w"
+            ) as result_file:
+                result_file.write(json.dumps(result_list))
+
+        if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+            result_columns = columns
+        else:
+            result_columns = N.drop(["label"], axis="columns").columns
+        result_dict = write_result_dict(
+            result_columns,
+            weighted_mmds_list,
+            biases_list,
+            wasserstein_distance_list,
+        )
+
+        with open(result_path / "similarity_results.json", "w") as result_file:
+            result_file.write(json.dumps(result_dict))
+
+        result_dict = {}
+        result_dict = write_result_dict_test_set(
             rf_auroc_list,
             rf_auprc_list,
             rf_accuracy_list,
             dropped_samples_list,
-            abs_feature_importance_list,
-            feature_importance_list,
-            roc_curves_list,
-            best_temperature_list,
-            best_hyperparameter_list,
-            R_auroc_list,
-            R_auprc_list,
-            validation_score_list,
-        ),
-        (
-            "rf_auroc",
-            "rf_auprc",
-            "rf_accuracy",
-            "dropped_samples",
-            "abs_feature_importance",
-            "feature_importance",
-            "roc_curves",
-            "best_temperature",
-            "best_hyperparameter",
-            "R_auroc_list",
-            "R_auprc_list",
-            "validation_score",
-        ),
-    ):
-        with open(
-            classificiation_result_path / f"{file_name}.json", "w"
-        ) as result_file:
-            result_file.write(json.dumps(result_list))
+            len(N),
+        )
 
-    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-        result_columns = columns
-    else:
-        result_columns = N.drop(["label"], axis="columns").columns
-    result_dict = write_result_dict(
-        result_columns,
-        weighted_mmds_list,
-        biases_list,
-        wasserstein_distance_list,
-    )
+        with open(result_path / "classification_results.json", "w") as result_file:
+            result_file.write(json.dumps(result_dict))
 
-    with open(result_path / "similarity_results.json", "w") as result_file:
-        result_file.write(json.dumps(result_dict))
-
-    result_dict = {}
-    result_dict = write_result_dict_test_set(
-        rf_auroc_list,
-        rf_auprc_list,
-        rf_accuracy_list,
-        dropped_samples_list,
-        len(N),
-    )
-
-    with open(result_path / "classification_results.json", "w") as result_file:
-        result_file.write(json.dumps(result_dict))
-
-    if method_name in (
-        "fw-mrs-temperature",
-        "fw-mrs-temperature-svm",
-        "mrs-forest",
-    ):
-        for result_list, file_name in zip(
-            (
-                auroc_val_dict,
-                auprc_val_dict,
-                dropped_samples_val_dict,
-                dropped_samples_individual_val_dict,
-                auroc_individual_val_dict,
-                auprc_individual_val_dict,
-                accuracy_individual_val_dict,
-            ),
-            (
-                "auroc_val_dict",
-                "auprc_val_dict",
-                "dropped_samples_val_dict",
-                "dropped_samples_individual_val_dict",
-                "auroc_individual_val_dict",
-                "auprc_individual_val_dict",
-                "accuracy_individual_val_dict",
-            ),
+        if method_name in (
+            "fw-mrs-temperature",
+            "fw-mrs-temperature-svm",
+            "mrs-forest",
         ):
-            with open(validation_path / f"{file_name}.json", "w") as result_file:
-                result_file.write(json.dumps(result_list))
+            for result_list, file_name in zip(
+                (
+                    auroc_val_dict,
+                    auprc_val_dict,
+                    dropped_samples_val_dict,
+                    dropped_samples_individual_val_dict,
+                    auroc_individual_val_dict,
+                    auprc_individual_val_dict,
+                    accuracy_individual_val_dict,
+                ),
+                (
+                    "auroc_val_dict",
+                    "auprc_val_dict",
+                    "dropped_samples_val_dict",
+                    "dropped_samples_individual_val_dict",
+                    "auroc_individual_val_dict",
+                    "auprc_individual_val_dict",
+                    "accuracy_individual_val_dict",
+                ),
+            ):
+                with open(validation_path / f"{file_name}.json", "w") as result_file:
+                    result_file.write(json.dumps(result_list))
 
-        dropped_samples_val_results_dict = {}
-        if method_name in ("mrs-forest"):
-            for temperature, temperature_values in dropped_samples_val_dict.items():
-                for hyperparameter, values in temperature_values.items():
-                    dropped_samples_val_results_dict[
-                        f"{temperature}_{hyperparameter}_mean"
-                    ] = np.mean(values)
-                    dropped_samples_val_results_dict[
-                        f"{temperature}_{hyperparameter}_std"
-                    ] = np.std(values)
-        else:
-            for temperature, temperature_values in dropped_samples_val_dict.items():
-                dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(
-                    temperature_values
-                )
-                dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(
-                    temperature_values
-                )
+            dropped_samples_val_results_dict = {}
+            if method_name in ("mrs-forest"):
+                for temperature, temperature_values in dropped_samples_val_dict.items():
+                    for hyperparameter, values in temperature_values.items():
+                        dropped_samples_val_results_dict[
+                            f"{temperature}_{hyperparameter}_mean"
+                        ] = np.mean(values)
+                        dropped_samples_val_results_dict[
+                            f"{temperature}_{hyperparameter}_std"
+                        ] = np.std(values)
+            else:
+                for temperature, temperature_values in dropped_samples_val_dict.items():
+                    dropped_samples_val_results_dict[f"{temperature}_mean"] = np.mean(
+                        temperature_values
+                    )
+                    dropped_samples_val_results_dict[f"{temperature}_std"] = np.std(
+                        temperature_values
+                    )
 
-        with open(validation_path / "dropped_elements.json", "w") as result_file:
-            result_file.write(json.dumps(dropped_samples_val_results_dict))
+            with open(validation_path / "dropped_elements.json", "w") as result_file:
+                result_file.write(json.dumps(dropped_samples_val_results_dict))
 
 
 def compute_validation_results(

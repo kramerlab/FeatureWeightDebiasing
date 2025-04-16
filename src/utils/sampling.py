@@ -8,8 +8,15 @@ seed = 5
 def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_generator):
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]
-    if bias_type in ("less_positive_class", "less_negative_class", "less_positive_class_comparison"):
-        if bias_type in ("less_positive_class", "less_positive_class_comparison"):
+    if bias_type in (
+        "less_positive_class",
+        "less_negative_class",
+        "less_positive_class_comparison",
+    ):
+        if bias_type in (
+            "less_positive_class",
+            "less_positive_class_comparison",
+        ):
             positive_fraction = bias_fraction
             negative_fraction = 1
         elif bias_type == "less_negative_class":

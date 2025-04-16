@@ -76,7 +76,7 @@ def write_result_dict(
 def write_result_dict_test_set(
     rf_auroc_list,
     rf_auprc_list,
-    rf_accuracy_list,
+    rf_pad_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -101,9 +101,9 @@ def write_result_dict_test_set(
             "mean": np.mean(rf_auprc_list),
             "sd": np.std(rf_auprc_list),
         },
-        "random forest accuracy": {
-            "mean": np.mean(rf_accuracy_list),
-            "sd": np.std(rf_accuracy_list),
+        "random forest pad": {
+            "mean": np.mean(rf_pad_list),
+            "sd": np.std(rf_pad_list),
         },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),

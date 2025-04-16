@@ -23,9 +23,7 @@ def propensity_score_adjustment(
         predictions = clf.predict_proba(N[columns].values)[:, 1]
         weights = (1 - predictions) / predictions
         sample_weights_dict[hyperparameter] = {0: (weights / weights.sum()).tolist()}
-        feature_weights_dict[hyperparameter] = (
-            np.ones(len(columns)) / len(columns)
-        ).tolist()
+        feature_weights_dict[hyperparameter] = np.ones(len(columns)).tolist()
 
     return sample_weights_dict, feature_weights_dict
 

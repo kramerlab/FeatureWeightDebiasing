@@ -284,9 +284,7 @@ def mrs(
 
     feature_weights = {}
     for hyperparameter in hyperparameter_list:
-        feature_weights[hyperparameter] = (
-            np.ones(len(columns)) / len(columns)
-        ).tolist()
+        feature_weights[hyperparameter] = np.ones(len(columns)).tolist()
 
     if return_metrics:
         return (

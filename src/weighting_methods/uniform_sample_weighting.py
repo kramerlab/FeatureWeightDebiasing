@@ -8,4 +8,4 @@ def uniform_sample_weighting(N, columns, *args, **attributes):
     :return: Sample weights
     """
     weights = np.ones(len(N)) / len(N)
-    return (weights / np.sum(weights)).tolist(), (np.ones(len(columns)) / len(columns)).tolist()
+    return (weights / np.sum(weights)).tolist(), np.ones(len(columns)).tolist()

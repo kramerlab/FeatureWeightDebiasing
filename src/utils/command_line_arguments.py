@@ -29,6 +29,8 @@ sample_weighting_method_list = [
     "soft-mrs-exponential",
     "fw-mrs-temperature",
     "fw-mrs-temperature-svm",
+    "fw-mrs-temperature-negative",
+    "fw-mrs-temperature-comparison",
     "kmm",
     "psa",
 ]
@@ -38,7 +40,6 @@ sample_weighting_method_list = [
 bias_choice = [
     "less_negative_class",
     "less_positive_class",
-    "less_positive_class_comparison",
     "mean_difference",
     "none",
 ]
@@ -57,7 +58,7 @@ dataset_list = [
     "lipidomics",
     "german_credit",
     "bank_marketing",
-    "diabetes"
+    "diabetes",
 ]
 
 
@@ -130,7 +131,11 @@ def get_sample_weighting_function(method_name):
         return propensity_score_adjustment
     elif method_name in ("soft-mrs-linear", "soft-mrs-exponential"):
         return soft_mrs_weighting
-    elif method_name == "fw-mrs-temperature":
+    elif method_name in (
+        "fw-mrs-temperature",
+        "fw-mrs-temperature-negative",
+        "fw-mrs-temperature-comparison",
+    ):
         return feature_weighted_repeated_MRS
     elif method_name == "mrs-forest":
         return mrs

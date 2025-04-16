@@ -1,9 +1,6 @@
 comparison_temperatures = [
-    10.0,
-    5.0,
-    1.0,
-    0.1,
     0.5,
+    0.1,
     0.05,
     0.01,
     0.005,
@@ -13,11 +10,8 @@ comparison_temperatures = [
     -0.005,
     -0.05,
     -0.01,
-    -0.5,
     -0.1,
-    -1,
-    -5.0,
-    -10.0,
+    -0.5,
 ]
 
 
@@ -26,13 +20,19 @@ def set_parameter(method_name, bias_type=None):
     auroc_val_dict = None
     auprc_val_dict = None
     accuracy_val_dict = None
-    if method_name in ("fw-mrs-temperature",):
+    if method_name in (
+        "fw-mrs-temperature",
+        "fw-mrs-temperature-negative",
+        "fw-mrs-temperature-comparison",
+    ):
         draw_with_feature_weights = True
-        if bias_type == "less_positive_class_comparison":
+        if method_name == "fw-mrs-temperature":
+            temperatures = [0.01, 0.05, 0.1]
+        elif method_name == "fw-mrs-temperature-negative":
+            temperatures = [-0.01, -0.05, -0.1]
+        elif method_name == "fw-mrs-temperature-comparison":
             temperatures = comparison_temperatures
-        else:
-            temperatures = [0.1, 0.05, 0.01]
-        hyperparameter_list = [0.025, 0.01, 0.001, 0.0]
+        hyperparameter_list = [0.001, 0.01, 0.025]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
@@ -42,7 +42,7 @@ def set_parameter(method_name, bias_type=None):
         if bias_type == "less_positive_class_comparison":
             temperatures = comparison_temperatures
         else:
-            temperatures = [0.1, 0.05, 0.01]
+            temperatures = [0.01, 0.05, 0.1]
 
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
@@ -50,7 +50,7 @@ def set_parameter(method_name, bias_type=None):
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
     elif method_name in ("mrs-forest",):
-        hyperparameter_list = [0.025, 0.01, 0.0]
+        hyperparameter_list = [0.001, 0.01, 0.025]
         draw_with_feature_weights = False
         temperatures = None
         dropped_samples_val_dict = {

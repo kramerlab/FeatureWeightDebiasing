@@ -72,12 +72,6 @@ def decomposition_experiment(
         _,
         hyperparameter_list,
     ) = set_parameter(method_name)
-    if temperatures is not None:
-        predictions_val_dict = {temperature: [] for temperature in temperatures}
-        probabilities_val_dict = {temperature: [] for temperature in temperatures}
-    elif method_name == "mrs-forest":
-        predictions_val_dict = {0.0: []}
-        probabilities_val_dict = {0.0: []}
 
     for i, (N, R, T) in enumerate(
         repeated_train_val_test_split_fixed_test_set(
@@ -143,37 +137,11 @@ def decomposition_experiment(
             random_state=seed,
             draw_with_feature_weights=draw_with_feature_weights,
             n_estimators=500,
-            n_splits=5,
+            n_splits=10,
         )
         predictions_list.append(predictions)
         probabilities_list.append(probabilities)
 
-        if method_name in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-svm",
-            "mrs-forest",
-        ):
-            for temperature, temperature_sample_weights in sample_weights.items():
-                temperature_feature_weights = {"tmp": feature_weights[temperature]}
-                temperature_sample_weights = {"tmp": temperature_sample_weights}
-
-                predictions, probabilities = (
-                    compute_decomposition_metrics_random_forest(
-                        N,
-                        R,
-                        columns,
-                        temperature_sample_weights,
-                        temperature_feature_weights,
-                        target,
-                        random_state=seed,
-                        draw_with_feature_weights=draw_with_feature_weights,
-                        n_estimators=500,
-                        n_splits=5,
-                    )
-                )
-
-                predictions_val_dict[float(temperature)].append(predictions)
-                probabilities_val_dict[float(temperature)].append(probabilities)
 
     predictions_list = np.array(predictions_list).squeeze()
     predictions_list = predictions_list.astype(int)

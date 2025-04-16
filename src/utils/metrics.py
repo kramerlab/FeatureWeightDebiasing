@@ -17,17 +17,23 @@ from sklearn.metrics import (
 )
 from sklearn.svm import SVC, LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
-from functools import partial
 
 min_weight_fractions_leaf_list = [
     0.0,
     0.0001,
+    0.00025,
     0.0005,
     0.001,
+    0.0025,
     0.005,
     0.01,
+    0.025,
     0.05,
+    0.1,
+    0.2,
+    0.3,
 ]
+
 class_weight_list = [None, "balanced"]
 param_grid = {
     "min_weight_fraction_leaf": min_weight_fractions_leaf_list,
@@ -195,68 +201,33 @@ def compute_metrics(
     N_dropped = scaled_N[columns].values
     R_dropped = scaled_R[columns].values
     columns_and_target = np.append(columns, target)
-    if isinstance(sample_weights_list, dict):
-        best_mmd = np.inf
-        for temperature in sample_weights_list.keys():
-            for _, sample_weights in sample_weights_list[temperature].items():
-                tmp_wasserstein_distances = []
-                weighted_mmd = weighted_maximum_mean_discrepancy(
-                    N_dropped,
-                    R_dropped,
-                    sample_weights,
-                    gamma,
-                )
 
-                for feature_name in columns_and_target:
-                    u_values = scaled_N[feature_name].values
-                    v_values = scaled_R[feature_name].values
-                    wasserstein_distance_value = wasserstein_distance(
-                        u_values, v_values, sample_weights
-                    )
-                    tmp_wasserstein_distances.append(wasserstein_distance_value)
+    final_wasserstein_distances = []
+    weighted_mmd = weighted_maximum_mean_discrepancy(
+        N_dropped,
+        R_dropped,
+        sample_weights_list,
+        gamma,
+    )
 
-                unscaled_N = scaled_N.copy()
-                unscaled_R = scaled_R.copy()
-                unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
-                unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
-                sample_biases = compute_relative_bias(
-                    unscaled_N[columns_and_target],
-                    unscaled_R[columns_and_target],
-                    sample_weights,
-                )
-
-                if weighted_mmd < best_mmd:
-                    best_sample_weights = sample_weights
-                    best_mmd = weighted_mmd
-                    final_sample_biases = sample_biases.copy()
-                    final_wasserstein_distances = tmp_wasserstein_distances.copy()
-    else:
-        final_wasserstein_distances = []
-        weighted_mmd = weighted_maximum_mean_discrepancy(
-            N_dropped,
-            R_dropped,
-            sample_weights_list,
-            gamma,
+    for feature_name in columns_and_target:
+        u_values = scaled_N[feature_name].values
+        v_values = scaled_R[feature_name].values
+        wasserstein_distance_value = wasserstein_distance(
+            u_values, v_values, sample_weights_list
         )
+        final_wasserstein_distances.append(wasserstein_distance_value)
 
-        for feature_name in columns_and_target:
-            u_values = scaled_N[feature_name].values
-            v_values = scaled_R[feature_name].values
-            wasserstein_distance_value = wasserstein_distance(
-                u_values, v_values, sample_weights_list
-            )
-            final_wasserstein_distances.append(wasserstein_distance_value)
-
-        unscaled_N = scaled_N.copy()
-        unscaled_R = scaled_R.copy()
-        unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
-        unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
-        final_sample_biases = compute_relative_bias(
-            unscaled_N[columns_and_target],
-            unscaled_R[columns_and_target],
-            sample_weights_list,
-        )
-        best_sample_weights = sample_weights_list
+    unscaled_N = scaled_N.copy()
+    unscaled_R = scaled_R.copy()
+    unscaled_N[columns] = scaler.inverse_transform(scaled_N[columns])
+    unscaled_R[columns] = scaler.inverse_transform(scaled_R[columns])
+    final_sample_biases = compute_relative_bias(
+        unscaled_N[columns_and_target],
+        unscaled_R[columns_and_target],
+        sample_weights_list,
+    )
+    best_sample_weights = sample_weights_list
 
     if return_sample_weights:
         return (
@@ -302,7 +273,7 @@ def compute_classification_metrics_random_forest(
     if isinstance(sample_weights_list, dict):
         best_clf = None
         best_score = -1
-        best_weights = None
+        best_sample_weights = None
         best_temperature = -1
         best_hyperparameter = -1
         for temperature in sample_weights_list.keys():
@@ -326,9 +297,10 @@ def compute_classification_metrics_random_forest(
                     )
 
                     if score > best_score:
+                        best_feature_weight = feature_weight
                         best_score = score
                         best_clf = clf
-                        best_weights = train_sample_weights
+                        best_sample_weights = train_sample_weights
                         best_temperature = temperature
                         best_hyperparameter = hyperparameter
                     if best_score == 1:
@@ -351,7 +323,8 @@ def compute_classification_metrics_random_forest(
             max_features=max_features,
         )
         best_hyperparameter = None
-        best_weights = sample_weights_list
+        best_sample_weights = sample_weights_list
+        best_feature_weight = feature_weights
 
     if best_clf is not None:
         y_probabilitites = best_clf.predict_proba(T[columns].values)[:, 1]
@@ -379,7 +352,8 @@ def compute_classification_metrics_random_forest(
         auroc_score,
         auprc,
         accuracy,
-        best_weights,
+        best_sample_weights,
+        best_feature_weight,
         abs_feature_importance,
         (fpr.tolist(), tpr.tolist()),
         best_temperature,
@@ -421,30 +395,31 @@ def compute_decomposition_metrics_random_forest(
                 temperature
             ].items():
                 feature_weight = feature_weights[temperature][hyperparameter]
-                train_sample_weights = np.array(sample_weights)
+                for train_sample_weights in sample_weights.values():
 
-                clf, score = train_random_forest_classifier(
-                    N[columns].values,
-                    N[label].values,
-                    np.array(train_sample_weights),
-                    np.array(feature_weight),
-                    random_state=random_state,
-                    n_splits=n_splits,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    splitter=splitter,
-                    n_estimators=n_estimators,
-                    max_features=max_features,
-                    scoring="accuracy",
-                )
-                if score > best_score:
-                    best_score = score
-                    best_clf = clf
+                    clf, score = train_random_forest_classifier(
+                        N[columns].values,
+                        N[label].values,
+                        None,
+                        np.array(train_sample_weights),
+                        np.array(feature_weight),
+                        random_state=random_state,
+                        n_splits=n_splits,
+                        draw_with_feature_weights=draw_with_feature_weights,
+                        splitter=splitter,
+                        n_estimators=n_estimators,
+                        max_features=max_features,
+                    )
+                    if score > best_score:
+                        best_score = score
+                        best_clf = clf
     else:
         train_sample_weights = sample_weights_list.copy()
 
         best_clf, _ = train_random_forest_classifier(
             N[columns].values,
             N[label].values,
+            None,
             np.array(train_sample_weights),
             np.array(feature_weights),
             random_state=random_state,
@@ -453,7 +428,6 @@ def compute_decomposition_metrics_random_forest(
             splitter=splitter,
             n_estimators=n_estimators,
             max_features=max_features,
-            scoring="accuracy",
         )
 
     y_predictions = best_clf.predict(T[columns].values)
@@ -566,6 +540,7 @@ def train_random_forest_classifier(
     :param n_splits: Number of cross-validation iterations, defaults to 5
     :return: Trained classifier
     """
+
     target_sum = np.sum(y)
     if target_sum < n_splits:
         n_splits = target_sum
@@ -576,8 +551,10 @@ def train_random_forest_classifier(
     skf = StratifiedKFold(
         n_splits=int(n_splits), shuffle=True, random_state=random_state
     )
+
     if draw_with_feature_weights:
         feature_weights = np.array(feature_weights)
+
     clf = RandomForestClassifier(
         random_state=random_state,
         splitter=splitter,
@@ -585,13 +562,12 @@ def train_random_forest_classifier(
         max_features=max_features,
     )
 
-
     grid_cv = GridSearchCV(
         clf,
         param_grid,
         cv=skf,
         n_jobs=-1,
-        scoring="auroc",
+        scoring=scoring,
         refit=True,
     )
 
@@ -1023,3 +999,55 @@ def compute_classification_metrics_random_forest_perfect(
         auroc,
         auprc,
     )
+
+
+from sklearn.model_selection import train_test_split, PredefinedSplit
+
+
+def compute_pad(
+    N, R, columns, sample_weights, feature_weights, random_state, n_repeats=10
+):
+    r_sample_weights = np.ones(len(R)) / len(R)
+    all_sample_weights = np.concatenate([sample_weights, r_sample_weights])
+    N_copy = N.copy()
+    N_copy["domain"] = 0
+    R_copy = R.copy()
+    R_copy["domain"] = 1
+    data = pd.concat([N_copy, R_copy]).reset_index().copy()
+    X = data[columns]
+    y = data["domain"]
+    error_sum = 0.0
+    for _ in range(n_repeats):
+        best_error = 1
+        X_train, _, _, _ = train_test_split(
+            X, y, test_size=0.5, random_state=random_state, stratify=y
+        )
+        test_fold = np.zeros(len(X))
+        test_fold[X_train.index] = -1
+        predefined_split = PredefinedSplit(test_fold)
+
+        skf = GridSearchCV(
+            RandomForestClassifier(splitter="feature_weighted_best"),
+            param_grid=param_grid,
+            cv=predefined_split,
+            refit=False,
+        )
+        skf.fit(
+            X,
+            y,
+            sample_weight=all_sample_weights,
+            feature_weights=np.array(feature_weights),
+            draw_with_feature_weights=True,
+        )
+        accuracy = skf.best_score_
+        error = 1 - accuracy
+
+        if error > 0.5:
+            error = 1.0 - error
+
+        best_error = min(best_error, error)
+
+        error_sum += best_error
+    mean_error = error_sum / n_repeats
+
+    return 2 * (1 - 2 * mean_error)

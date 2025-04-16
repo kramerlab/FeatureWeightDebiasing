@@ -1031,6 +1031,7 @@ def compute_pad(
             param_grid=param_grid,
             cv=predefined_split,
             refit=False,
+            scoring="roc_auc",
         )
         skf.fit(
             X,
@@ -1039,8 +1040,8 @@ def compute_pad(
             feature_weights=np.array(feature_weights),
             draw_with_feature_weights=True,
         )
-        accuracy = skf.best_score_
-        error = 1 - accuracy
+        auroc = skf.best_score_
+        error = 1 - auroc
 
         if error > 0.5:
             error = 1.0 - error

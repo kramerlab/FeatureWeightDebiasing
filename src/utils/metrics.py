@@ -6,7 +6,15 @@ from scipy.spatial.distance import pdist
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import rbf_kernel
 
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.metrics import make_scorer
+from sklearn import set_config
+
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    train_test_split,
+    PredefinedSplit,
+)
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     roc_curve,
@@ -14,6 +22,7 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
     average_precision_score,
+    balanced_accuracy_score,
 )
 from sklearn.svm import SVC, LinearSVC
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
@@ -1001,23 +1010,50 @@ def compute_classification_metrics_random_forest_perfect(
     )
 
 
-from sklearn.model_selection import train_test_split, PredefinedSplit
+pad_param_grid = {"C": np.logspace(-5, 5, 11)}
 
 
 def compute_pad(
-    N, R, columns, sample_weights, feature_weights, random_state, n_repeats=10
+    N,
+    R,
+    columns,
+    sample_weights,
+    feature_weights,
+    random_state,
+    n_repeats=10,
+    sample=False,
 ):
-    r_sample_weights = np.ones(len(R)) / len(R)
-    all_sample_weights = np.concatenate([sample_weights, r_sample_weights])
-    N_copy = N.copy()
+    set_config(enable_metadata_routing=True)
+    sample_weights_copy = np.array(sample_weights).copy()
+    mask = sample_weights_copy != 0
+    sample_weights_copy = sample_weights_copy[mask]
+    N_copy = N[mask].copy()
     N_copy["domain"] = 0
     R_copy = R.copy()
     R_copy["domain"] = 1
-    data = pd.concat([N_copy, R_copy]).reset_index().copy()
-    X = data[columns]
-    y = data["domain"]
+    min_size = min(len(R_copy), len(N_copy))
+    R_sample_weights = np.ones(len(R_copy)) / len(R_copy)
+
+    balanced_accuracy = make_scorer(
+        balanced_accuracy_score, greater_is_better=True, response_method="predict"
+    ).set_score_request(sample_weight=True)
+
     error_sum = 0.0
     for _ in range(n_repeats):
+        if sample:
+            N_indices = np.random.choice(len(N_copy), min_size, replace=False)
+            N_sampled = N_copy.iloc[N_indices]
+            N_sample_weights = sample_weights_copy[N_indices]
+            N_sample_weights = N_sample_weights / np.sum(N_sample_weights)
+        else:
+            N_sampled = N_copy
+            N_sample_weights = sample_weights_copy
+
+        all_sample_weights = np.concatenate([N_sample_weights, R_sample_weights])
+        data = pd.concat([N_sampled, R_copy]).reset_index().copy()
+        X = data[columns]
+        y = data["domain"]
+        X = X * feature_weights
         best_error = 1
         X_train, _, _, _ = train_test_split(
             X, y, test_size=0.5, random_state=random_state, stratify=y
@@ -1027,21 +1063,19 @@ def compute_pad(
         predefined_split = PredefinedSplit(test_fold)
 
         skf = GridSearchCV(
-            RandomForestClassifier(splitter="feature_weighted_best"),
-            param_grid=param_grid,
+            LinearSVC(dual="auto").set_fit_request(sample_weight=True),
+            param_grid=pad_param_grid,
             cv=predefined_split,
             refit=False,
-            scoring="roc_auc",
+            scoring=balanced_accuracy,
         )
         skf.fit(
             X,
             y,
             sample_weight=all_sample_weights,
-            feature_weights=np.array(feature_weights),
-            draw_with_feature_weights=True,
         )
-        auroc = skf.best_score_
-        error = 1 - auroc
+        accuracy = skf.best_score_
+        error = 1 - accuracy
 
         if error > 0.5:
             error = 1.0 - error
@@ -1050,5 +1084,69 @@ def compute_pad(
 
         error_sum += best_error
     mean_error = error_sum / n_repeats
+    set_config(enable_metadata_routing=False)
 
     return 2 * (1 - 2 * mean_error)
+
+
+def compute_domain_classifier_auroc(
+    N, R, columns, sample_weights, feature_weights, random_state, n_repeats=10
+):
+    set_config(enable_metadata_routing=True)
+    sample_weights_copy = np.array(sample_weights).copy()
+    mask = sample_weights_copy != 0
+    sample_weights_copy = sample_weights_copy[mask]
+    N_copy = N[mask].copy()
+    N_copy["domain"] = 0
+    R_copy = R.copy()
+    R_copy["domain"] = 1
+
+    N_sample_weights = sample_weights_copy / np.sum(sample_weights_copy)
+    R_sample_weights = np.ones(len(R_copy)) / len(R_copy)
+    all_sample_weights = np.concatenate([N_sample_weights, R_sample_weights])
+
+    balanced_auroc = make_scorer(
+        roc_auc_score,
+        greater_is_better=True,
+        response_method="predict_proba",
+    ).set_score_request(sample_weight=True)
+
+    auroc_sum = 0.0
+    for _ in range(n_repeats):
+
+        data = pd.concat([N_copy, R_copy]).reset_index().copy()
+        X = data[columns]
+        y = data["domain"]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.5, random_state=random_state, stratify=y
+        )
+
+        train_sample_weights = all_sample_weights[X_train.index]
+        test_sample_weights = all_sample_weights[X_test.index]
+
+        skf = GridSearchCV(
+            RandomForestClassifier(splitter="feature_weighted_best").set_fit_request(
+                sample_weight=True,
+                feature_weights=True,
+                draw_with_feature_weights=True,
+            ),
+            param_grid=param_grid,
+            refit=True,
+            scoring=balanced_auroc,
+        )
+        skf.fit(
+            X_train,
+            y_train,
+            sample_weight=train_sample_weights,
+            feature_weights=np.array(feature_weights),
+            draw_with_feature_weights=True,
+        )
+        proba_predictions = skf.predict_proba(X_test)[:, 1]
+        auroc = roc_auc_score(
+            y_test, proba_predictions, sample_weight=test_sample_weights
+        )
+
+        auroc_sum += auroc
+    mean_auroc = auroc_sum / n_repeats
+    set_config(enable_metadata_routing=False)
+    return mean_auroc

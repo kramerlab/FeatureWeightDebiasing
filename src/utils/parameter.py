@@ -32,7 +32,7 @@ def set_parameter(method_name, bias_type=None):
             temperatures = [-0.01, -0.05, -0.1]
         elif method_name == "fw-mrs-temperature-comparison":
             temperatures = comparison_temperatures
-        hyperparameter_list = [0.001, 0.01, 0.025]
+        hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
@@ -50,7 +50,7 @@ def set_parameter(method_name, bias_type=None):
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
     elif method_name in ("mrs-forest",):
-        hyperparameter_list = [0.001, 0.01, 0.025]
+        hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
         draw_with_feature_weights = False
         temperatures = None
         dropped_samples_val_dict = {

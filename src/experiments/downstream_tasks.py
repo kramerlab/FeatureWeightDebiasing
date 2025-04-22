@@ -16,6 +16,7 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_classification_metrics_random_forest,
     compute_classification_metrics_random_forest_perfect,
+    compute_domain_classifier_auroc,
     compute_metrics,
     compute_pad,
 )
@@ -57,6 +58,7 @@ def downstream_tasks_experiment(
     rf_auroc_list = []
     rf_auprc_list = []
     pad_list = []
+    domain_auroc_list = []
 
     weighted_mmds_list = []
     biases_list = []
@@ -72,6 +74,7 @@ def downstream_tasks_experiment(
     R_auroc_list = []
     R_auprc_list = []
     R_pad_list = []
+    R_domain_auroc_list = []
     validation_score_list = []
 
     result_path = create_result_path(
@@ -215,7 +218,17 @@ def downstream_tasks_experiment(
                 random_state=seed,
             )
 
+            domain_auroc = compute_domain_classifier_auroc(
+                N,
+                T,
+                columns,
+                best_sample_weights,
+                best_feature_weights,
+                random_state=seed,
+            )
+
             pad_list.append(pad)
+            domain_auroc_list.append(domain_auroc)
             dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
             dropped_samples_list.append(dropped_samples)
             best_temperature_list.append(best_temperature)
@@ -292,8 +305,19 @@ def downstream_tasks_experiment(
                 np.ones(len(R)),
                 best_feature_weights,
                 random_state=seed,
+                sample=True,
             )
 
+            R_domain_auroc = compute_domain_classifier_auroc(
+                R,
+                T,
+                columns,
+                np.ones(len(R)),
+                best_feature_weights,
+                random_state=seed,
+            )
+
+            R_domain_auroc_list.append(R_domain_auroc)
             R_auroc_list.append(R_auroc)
             R_auprc_list.append(R_auprc)
             R_pad_list.append(R_pad)
@@ -303,6 +327,7 @@ def downstream_tasks_experiment(
                 rf_auroc_list,
                 rf_auprc_list,
                 pad_list,
+                domain_auroc_list,
                 dropped_samples_list,
                 abs_feature_importance_list,
                 feature_importance_list,
@@ -312,12 +337,14 @@ def downstream_tasks_experiment(
                 R_auroc_list,
                 R_auprc_list,
                 R_pad_list,
+                R_domain_auroc_list,
                 validation_score_list,
             ),
             (
                 "rf_auroc_list",
                 "rf_auprc_list",
                 "pad_list",
+                "domain_auroc_list",
                 "dropped_samples",
                 "abs_feature_importance",
                 "feature_importance",
@@ -327,6 +354,7 @@ def downstream_tasks_experiment(
                 "R_auroc_list",
                 "R_auprc_list",
                 "R_pad_list",
+                "R_domain_auroc_list",
                 "validation_score",
             ),
         ):
@@ -354,6 +382,7 @@ def downstream_tasks_experiment(
             rf_auroc_list,
             rf_auprc_list,
             pad_list,
+            domain_auroc_list,
             dropped_samples_list,
             len(N),
         )
@@ -487,7 +516,7 @@ def compute_validation_results(
                 )
 
         for temperature, temperature_sample_weights in sample_weights.items():
-            hyperparameter = 0.001
+            hyperparameter = 0.0
 
             temperature_feature_weights = feature_weights[temperature]
             temperature_feature_weights = {
@@ -585,7 +614,7 @@ def compute_validation_results(
             accuracy_val_dict[float(temperature)].append(rf_accuracy_val)
 
         for temperature, temperature_sample_weights in sample_weights.items():
-            hyperparameter = 1.0 if method_name == "fw-mrs-temperature-svm" else 0.001
+            hyperparameter = 1.0 if method_name == "fw-mrs-temperature-svm" else 0.0
             temperature_feature_weights = feature_weights[temperature]
             temperature_feature_weights = {
                 float(k): v for k, v in temperature_feature_weights.items()

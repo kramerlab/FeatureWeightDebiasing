@@ -15,7 +15,7 @@ Run the scripts individually:
 ```
 
 or all together:
-```
+```shell
 ./all_experiments.sh
 ```
 

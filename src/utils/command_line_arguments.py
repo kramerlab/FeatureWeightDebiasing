@@ -1,17 +1,12 @@
 import argparse
 
 from experiments import (
-    temperature_comparison,
-    perform_statistical_analysis_mrs,
     downstream_tasks_experiment,
-    fairness_tasks_experiment,
     decomposition_experiment,
-    lipidomics_quantification_experiment,
 )
 
 
 from weighting_methods import (
-    soft_mrs_weighting,
     kernel_mean_matching,
     propensity_score_adjustment,
     feature_weighted_repeated_MRS,
@@ -25,8 +20,6 @@ from weighting_methods import (
 sample_weighting_method_list = [
     "uniform",
     "mrs-forest",
-    "soft-mrs-linear",
-    "soft-mrs-exponential",
     "fw-mrs-temperature",
     "fw-mrs-temperature-svm",
     "fw-mrs-temperature-comparison",
@@ -37,17 +30,11 @@ sample_weighting_method_list = [
 
 # Possible bias types
 bias_choice = [
-    "less_negative_class",
     "less_positive_class",
-    "mean_difference",
-    "none",
 ]
 
 # Possible data sets
 dataset_list = [
-    "gbs_allensbach",
-    "gbs_gesis",
-    "fairness_adult",
     "fairness_folktables_income",
     "folktables_income",
     "folktables_employment",
@@ -91,33 +78,6 @@ def none_or_float(value):
     return float(value)
 
 
-def parse_mrs_analysis_command_line_arguments():
-    """Parses the command line arguments for the MRS analysis.
-
-    :return: Parsed command line arguments for the MRS analysis.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_set_name", choices=dataset_list, required=True)
-    parser.add_argument("--mrs_function", default="mrs_step")
-    parser.add_argument("--n_cv_splits", default=2, type=int)
-    parser.add_argument("--n_cv_repeats", default=5, type=int)
-    parser.add_argument("--bias_type", choices=bias_choice, default="none")
-    parser.add_argument("--drop", default=1, type=int)
-    parser.add_argument("--bias_fraction", default=0.1, type=float)
-    parser.add_argument("--load_previous_results", default=False, action="store_true")
-
-    return parser.parse_args()
-
-
-def parse_command_line_arguments_statistical_analysis():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--drop", default=1, type=int)
-    parser.add_argument("--patience", default=25, type=int)
-    parser.add_argument("--n_repeats", default=1000, type=int)
-
-    return parser.parse_args()
-
-
 def get_sample_weighting_function(method_name):
     """Returns the function to the function name.
 
@@ -128,8 +88,6 @@ def get_sample_weighting_function(method_name):
         return uniform_sample_weighting
     elif method_name == "psa":
         return propensity_score_adjustment
-    elif method_name in ("soft-mrs-linear", "soft-mrs-exponential"):
-        return soft_mrs_weighting
     elif method_name in (
         "fw-mrs-temperature",
         "fw-mrs-temperature-comparison",
@@ -151,13 +109,5 @@ def get_experiment_function(experiment_name=""):
     """
     if experiment_name == "downstream_task":
         return downstream_tasks_experiment
-    elif experiment_name == "temperature_comparison":
-        return temperature_comparison
-    elif experiment_name == "statistical_analysis":
-        return perform_statistical_analysis_mrs
-    elif experiment_name == "fairness_task":
-        return fairness_tasks_experiment
     elif experiment_name == "decomposition":
         return decomposition_experiment
-    elif experiment_name == "lipidomics":
-        return lipidomics_quantification_experiment

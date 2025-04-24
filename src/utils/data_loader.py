@@ -27,24 +27,16 @@ def load_dataset(dataset_name):
     :param dataset_name: Data set name
     :return: Data set as pandas.DataFrame
     """
-    if dataset_name == "gbs_allensbach":
-        return load_gbs_allensbach()
-    elif dataset_name == "folktables_income":
+    if dataset_name == "folktables_income":
         return load_folktables_income_data()
     elif dataset_name == "folktables_employment":
         return load_folktables_employment_data()
     elif dataset_name == "breast_cancer":
         return load_breast_cancer_data()
-    elif dataset_name == "gbs_gesis":
-        return load_gbs_gesis()
     elif dataset_name == "hr_analytics":
         return load_hr_analytics()
     elif dataset_name == "loan_prediction":
         return load_loan_prediction()
-    elif dataset_name == "fairness_adult":
-        return load_fairness_adult()
-    elif dataset_name == "lipidomics":
-        return load_lipid_quantification()
     elif dataset_name == "german_credit":
         return load_german_credit()
     elif dataset_name == "bank_marketing":
@@ -63,9 +55,9 @@ def load_diabetes():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
     else:
-        cdc_diabetes_health_indicators = fetch_ucirepo(id=891) 
-        X = cdc_diabetes_health_indicators.data.features 
-        y = cdc_diabetes_health_indicators.data.targets 
+        cdc_diabetes_health_indicators = fetch_ucirepo(id=891)
+        X = cdc_diabetes_health_indicators.data.features
+        y = cdc_diabetes_health_indicators.data.targets
     columns = X.columns
     target = y.columns[0]
     X[target] = y
@@ -88,8 +80,12 @@ def load_bank_marketing():
     ]
     feature_replacer = {"no": False, "yes": True}
 
-    X_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_X.csv")
-    y_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_y.csv")
+    X_file_path = pathlib.Path(
+        f"{file_path}/../../data/bank_marketing/bank_marketing_X.csv"
+    )
+    y_file_path = pathlib.Path(
+        f"{file_path}/../../data/bank_marketing/bank_marketing_y.csv"
+    )
     if X_file_path.is_file():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
@@ -112,8 +108,12 @@ def load_bank_marketing():
 
 
 def load_german_credit():
-    X_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_X.csv")
-    y_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_y.csv")
+    X_file_path = pathlib.Path(
+        f"{file_path}/../../data/german_credit/german_credit_X.csv"
+    )
+    y_file_path = pathlib.Path(
+        f"{file_path}/../../data/german_credit/german_credit_y.csv"
+    )
     if X_file_path.is_file():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
@@ -147,69 +147,6 @@ def load_german_credit():
     if len(X) > upper_sample_limit:
         X = X.sample(upper_sample_limit, random_state=seed).copy()
     return X, columns, target
-
-
-def load_gbs_allensbach():
-    """Load GBS and allensbach
-
-    :return: GBS and Allensbach data
-    """
-    allensbach_path = f"{file_path}/../../data/allensbach_mrs.csv"
-    allensbach = pd.read_csv(allensbach_path)
-    allensbach.drop(["Unnamed: 0", "Gruppe", "GBS-CODE"], axis=1, inplace=True)
-    allensbach_columns = [
-        "Alter",
-        "Berufsgruppe",
-        "Erwerbstaetigkeit",
-        "Geschlecht",
-        "Optimismus",
-        "Pessimismus",
-        "Schulabschluss",
-        "woechentlicheArbeitszeit",
-        "Resilienz",
-    ]
-    return allensbach, allensbach_columns, "Wahlteilnahme"
-
-
-def load_gbs_gesis():
-    """Load GBS and GESIS
-
-    :return: GBS and GESIS data
-    """
-    gesis_columns = [
-        "Geschlecht",
-        "Geburtsjahr",
-        "Geburtsland",
-        "Nationalitaet",
-        "Familienstand",
-        "Hoechster Bildungsabschluss",
-        "Berufliche Ausbildung",
-        "Erwerbstaetigkeit",
-        "Nettoeinkommen Selbst",
-        "Zufriedenheit Wahlergebnis",
-        "Gesellig",
-        "Andere kritisieren",
-        "Gruendlich",
-        "Nervoes",
-        "Phantasievoll",
-        "Berufsgruppe",
-        "BRS6",
-    ]
-
-    gesis = pd.read_csv(f"{file_path}/../../data/gesis_processed.csv", engine="python")
-    gbs = pd.read_csv(f"{file_path}/../../data/gbs_processed.csv", engine="python")
-
-    N = gbs.copy()
-    R = gesis.copy()
-    N["BRS6"] = 6 - N["BRS6"]
-    N[N["Erwerbstaetigkeit"] == 4] = 3
-    N = N.drop(N[N["Wahlteilnahme"] == 3].index)
-
-    N["label"] = 1
-    R["label"] = 0
-
-    gesis_gbs = pd.concat([N, R], ignore_index=True)
-    return gesis_gbs, gesis_columns, "Wahlteilnahme"
 
 
 def load_folktables_income_data():
@@ -383,63 +320,6 @@ def load_breast_cancer_data():
     df[columns] = df[columns]
 
     return df, columns, "class"
-
-
-def load_fairness_adult():
-    data = fetch_adult(as_frame=True)
-    X = pd.get_dummies(data.data)
-    X = X.replace({False: 0, True: 1}).infer_objects(copy=False)
-    X = X.drop(columns="fnlwgt")
-    columns = X.columns
-    y_true = (data.target == ">50K") * 1
-    sex = data.data["sex"]
-    sex = sex.replace({"Male": 0, "Female": 1}).infer_objects(copy=False)
-
-    df = pd.concat([X, sex, pd.DataFrame({"income": y_true})], axis=1)
-
-    return df, columns, ("sex", "income")
-
-
-def load_lipid_quantification():
-    unprocessed_data_file_name = (
-        "data/MyoVasc cohort 1 - different quan strat_3 final sets.xlsx"
-    )
-    processed_data_file_name = "data/preprocessed_data_for_classification.csv"
-    stage_mapping = {"S0": 0, "S1": 1, "S2": 2, "S3": 3}
-    if not pathlib.Path(processed_data_file_name).exists():
-        cal_data = pd.read_excel(
-            unprocessed_data_file_name, sheet_name="cal", index_col=0, header=None
-        ).T
-        set1_data = pd.read_excel(
-            unprocessed_data_file_name, sheet_name="set1", index_col=0, header=None
-        ).T
-        set2_data = pd.read_excel(
-            unprocessed_data_file_name, sheet_name="set2", index_col=0, header=None
-        ).T
-
-        cal_data["Method"] = "cal"
-        cal_data["ID"] = list(range(len(cal_data)))
-        set1_data["Method"] = "set1"
-        set1_data["ID"] = list(range(len(set1_data)))
-        set2_data["Method"] = "set2"
-        set2_data["ID"] = list(range(len(set2_data)))
-        df = pd.concat([cal_data, set1_data, set2_data])
-        lipid_names = cal_data.columns.drop(["Stages", "Method", "ID"])
-        df[lipid_names] = df[lipid_names].astype("float64")
-        df["Stages"] = df["Stages"].replace(stage_mapping)
-        df[lipid_names] = df[lipid_names].replace({0.0: np.nan})
-        df.to_csv(processed_data_file_name, index=False)
-    else:
-        df = pd.read_csv(
-            f"{file_path}/../../data/preprocessed_data_for_classification.csv",
-        )
-    lipid_names = df.drop(columns=["Method", "Stages", "ID"]).columns
-
-    binary_data = df[df["Stages"].isin([0, 3])].copy()
-    binary_data = binary_data[binary_data["Method"].isin(["cal", "set2"])].copy()
-    binary_data["Stages"] = binary_data["Stages"].replace({0: 0, 3: 1})
-
-    return binary_data, lipid_names, "Stages"
 
 
 def save_results(path, weights_list, file_name="weights"):

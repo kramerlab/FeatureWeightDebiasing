@@ -11,7 +11,7 @@ comparison_temperatures = [
     0.0,
 ]
 
-temperatures = [
+fw_temperatures = [
     0.001,
     0.0025,
     0.005,
@@ -35,7 +35,7 @@ def set_parameter(method_name, bias_type=None):
     ):
         draw_with_feature_weights = True
         if method_name == "fw-mrs-temperature":
-            temperatures = temperatures
+            temperatures = fw_temperatures
         elif method_name == "fw-mrs-temperature-comparison":
             temperatures = comparison_temperatures
         hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
@@ -43,12 +43,9 @@ def set_parameter(method_name, bias_type=None):
         auroc_val_dict = {temperature: [] for temperature in temperatures}
         auprc_val_dict = {temperature: [] for temperature in temperatures}
         accuracy_val_dict = {temperature: [] for temperature in temperatures}
-    elif method_name in ("fw-mrs-temperature-svm",):
+    elif method_name == "fw-mrs-temperature-svm":
         draw_with_feature_weights = True
-        if bias_type == "less_positive_class_comparison":
-            temperatures = comparison_temperatures
-        else:
-            temperatures = temperatures
+        temperatures = fw_temperatures
 
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}

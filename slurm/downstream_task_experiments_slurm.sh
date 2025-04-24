@@ -1,14 +1,14 @@
 #!/bin/bash
 
 #SBATCH -A m2_datamining
-#SBATCH -p parallel 
+#SBATCH -p longtime 
 #SBATCH -J "feature_weighting_cross_validation" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 5-00 
-#SBATCH --cpus-per-task=5
+#SBATCH -t 12-00 
+#SBATCH --cpus-per-task=10
 #SBATCH --nodes=1
 #SBATCH --mem=16G
-#SBATCH --array=1-175
+#SBATCH --array=1-49
 
 source ~/.bashrc
 conda_initialize

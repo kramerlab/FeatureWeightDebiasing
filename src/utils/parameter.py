@@ -1,17 +1,26 @@
 comparison_temperatures = [
     0.5,
+    0.25,
     0.1,
     0.05,
+    0.025,
     0.01,
     0.005,
+    0.0025,
     0.001,
     0.0,
-    -0.001,
-    -0.005,
-    -0.05,
-    -0.01,
-    -0.1,
-    -0.5,
+]
+
+temperatures = [
+    0.001,
+    0.0025,
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
 ]
 
 
@@ -22,14 +31,11 @@ def set_parameter(method_name, bias_type=None):
     accuracy_val_dict = None
     if method_name in (
         "fw-mrs-temperature",
-        "fw-mrs-temperature-negative",
         "fw-mrs-temperature-comparison",
     ):
         draw_with_feature_weights = True
         if method_name == "fw-mrs-temperature":
-            temperatures = [0.01, 0.05, 0.1]
-        elif method_name == "fw-mrs-temperature-negative":
-            temperatures = [-0.01, -0.05, -0.1]
+            temperatures = temperatures
         elif method_name == "fw-mrs-temperature-comparison":
             temperatures = comparison_temperatures
         hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
@@ -42,7 +48,7 @@ def set_parameter(method_name, bias_type=None):
         if bias_type == "less_positive_class_comparison":
             temperatures = comparison_temperatures
         else:
-            temperatures = [0.01, 0.05, 0.1]
+            temperatures = temperatures
 
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
         dropped_samples_val_dict = {temperature: [] for temperature in temperatures}

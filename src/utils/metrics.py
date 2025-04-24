@@ -1019,7 +1019,7 @@ def compute_pad(
     columns,
     sample_weights,
     feature_weights,
-    random_state,
+    seed,
     n_repeats=10,
     sample=False,
 ):
@@ -1037,6 +1037,7 @@ def compute_pad(
     balanced_accuracy = make_scorer(
         balanced_accuracy_score, greater_is_better=True, response_method="predict"
     ).set_score_request(sample_weight=True)
+    random_state = np.random.RandomState(seed=seed)
 
     error_sum = 0.0
     for _ in range(n_repeats):
@@ -1047,7 +1048,7 @@ def compute_pad(
             N_sample_weights = N_sample_weights / np.sum(N_sample_weights)
         else:
             N_sampled = N_copy
-            N_sample_weights = sample_weights_copy
+            N_sample_weights = sample_weights_copy / np.sum(sample_weights_copy)
 
         all_sample_weights = np.concatenate([N_sample_weights, R_sample_weights])
         data = pd.concat([N_sampled, R_copy]).reset_index().copy()
@@ -1090,7 +1091,7 @@ def compute_pad(
 
 
 def compute_domain_classifier_auroc(
-    N, R, columns, sample_weights, feature_weights, random_state, n_repeats=10
+    N, R, columns, sample_weights, feature_weights, seed, n_repeats=10
 ):
     set_config(enable_metadata_routing=True)
     sample_weights_copy = np.array(sample_weights).copy()
@@ -1104,6 +1105,7 @@ def compute_domain_classifier_auroc(
     N_sample_weights = sample_weights_copy / np.sum(sample_weights_copy)
     R_sample_weights = np.ones(len(R_copy)) / len(R_copy)
     all_sample_weights = np.concatenate([N_sample_weights, R_sample_weights])
+    random_state = np.random.RandomState(seed=seed)
 
     balanced_auroc = make_scorer(
         roc_auc_score,
@@ -1145,6 +1147,9 @@ def compute_domain_classifier_auroc(
         auroc = roc_auc_score(
             y_test, proba_predictions, sample_weight=test_sample_weights
         )
+
+        if auroc < 0.5:
+            auroc = 1.0 - auroc
 
         auroc_sum += auroc
     mean_auroc = auroc_sum / n_repeats

@@ -182,7 +182,7 @@ def downstream_tasks_experiment(
             save_results(sample_weights_save_path, sample_weight_list)
             save_results(feature_weights_save_path, feature_weight_list)
 
-        if not bias_type == "less_positive_class_comparison":
+        if not method_name == "fw-mrs-temperature-comparison":
             (
                 rf_auroc,
                 rf_auprc,
@@ -215,7 +215,7 @@ def downstream_tasks_experiment(
                 columns,
                 best_sample_weights,
                 best_feature_weights,
-                random_state=seed,
+                seed=seed,
             )
 
             domain_auroc = compute_domain_classifier_auroc(
@@ -224,7 +224,7 @@ def downstream_tasks_experiment(
                 columns,
                 best_sample_weights,
                 best_feature_weights,
-                random_state=seed,
+                seed=seed,
             )
 
             pad_list.append(pad)
@@ -242,6 +242,7 @@ def downstream_tasks_experiment(
         if method_name not in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
+            "fw-mrs-temperature-comparison",
         ):
             weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
                 N,
@@ -261,7 +262,7 @@ def downstream_tasks_experiment(
         if method_name in (
             "fw-mrs-temperature",
             "fw-mrs-temperature-svm",
-            "fw-mrs-temperature-negative",
+            "fw-mrs-temperature-comparison",
             "mrs-forest",
         ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             compute_validation_results(
@@ -304,7 +305,7 @@ def downstream_tasks_experiment(
                 columns,
                 np.ones(len(R)),
                 best_feature_weights,
-                random_state=seed,
+                seed=seed,
                 sample=True,
             )
 
@@ -314,7 +315,7 @@ def downstream_tasks_experiment(
                 columns,
                 np.ones(len(R)),
                 best_feature_weights,
-                random_state=seed,
+                seed=seed,
             )
 
             R_domain_auroc_list.append(R_domain_auroc)
@@ -392,8 +393,8 @@ def downstream_tasks_experiment(
 
         if method_name in (
             "fw-mrs-temperature",
+            "fw-mrs-temperature-comparison",
             "fw-mrs-temperature-svm",
-            "fw-mrs-temperature-negative",
             "mrs-forest",
         ):
             for result_list, file_name in zip(

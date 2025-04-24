@@ -29,7 +29,6 @@ sample_weighting_method_list = [
     "soft-mrs-exponential",
     "fw-mrs-temperature",
     "fw-mrs-temperature-svm",
-    "fw-mrs-temperature-negative",
     "fw-mrs-temperature-comparison",
     "kmm",
     "psa",
@@ -133,7 +132,6 @@ def get_sample_weighting_function(method_name):
         return soft_mrs_weighting
     elif method_name in (
         "fw-mrs-temperature",
-        "fw-mrs-temperature-negative",
         "fw-mrs-temperature-comparison",
     ):
         return feature_weighted_repeated_MRS

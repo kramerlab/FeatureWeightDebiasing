@@ -102,10 +102,7 @@ def downstream_tasks_experiment(
 
     scaler = StandardScaler()
 
-    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-        split_method = gbs_allensbach_split
-    else:
-        split_method = repeated_train_val_test_split
+    split_method = repeated_train_val_test_split
     (
         draw_with_feature_weights,
         temperatures,
@@ -264,7 +261,7 @@ def downstream_tasks_experiment(
             "fw-mrs-temperature-svm",
             "fw-mrs-temperature-comparison",
             "mrs-forest",
-        ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
+        ):
             compute_validation_results(
                 columns,
                 target,
@@ -364,10 +361,7 @@ def downstream_tasks_experiment(
             ) as result_file:
                 result_file.write(json.dumps(result_list))
 
-        if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-            result_columns = columns
-        else:
-            result_columns = N.drop(["label"], axis="columns").columns
+        result_columns = N.drop(["label"], axis="columns").columns
         result_dict = write_result_dict(
             result_columns,
             weighted_mmds_list,
@@ -461,7 +455,7 @@ def compute_validation_results(
     feature_weights,
     method_name,
 ):
-    if method_name in ("mrs-forest"):
+    if method_name == "mrs-forest":
         for temperature, temperature_sample_weights in sample_weights.items():
             for (
                 hyperparameter,
@@ -664,22 +658,3 @@ def compute_validation_results(
             auroc_individual_val_dict[float(temperature)].append(rf_auroc_val)
             auprc_individual_val_dict[float(temperature)].append(rf_auprc_val)
             accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)
-
-
-def gbs_allensbach_split(
-    n_cv_splits, n_cv_repeats, df, target_values, random_generator
-):
-    # Is used to draw radom states
-    max_int = 2**32 - 1
-    N = df[df["label"] == 1]
-    R = df[df["label"] == 0]
-    for _ in range(n_cv_repeats):
-        skf = StratifiedKFold(
-            n_splits=n_cv_splits,
-            shuffle=True,
-            random_state=random_generator.randint(max_int),
-        )
-        for train_val_index, test_index in skf.split(N, N["Wahlteilnahme"]):
-            N_train = N.iloc[train_val_index]
-            N_test = N.iloc[test_index]
-            yield N_train, R, N_test

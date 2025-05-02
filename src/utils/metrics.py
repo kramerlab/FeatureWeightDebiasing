@@ -312,10 +312,14 @@ def compute_classification_metrics_random_forest(
                         best_sample_weights = train_sample_weights
                         best_temperature = temperature
                         best_hyperparameter = hyperparameter
-                    if best_score == 1:
+                    if best_score == 1.0:
                         break
+                if best_score == 1.0:
+                    break
+            if best_score == 1.0:
+                break
     else:
-        best_temperature = 0
+        best_temperature = 0.0
         train_sample_weights = sample_weights_list.copy()
 
         best_clf, best_score = train_random_forest_classifier(
@@ -525,6 +529,9 @@ def interpolate_roc(y_test, y_predict):
     return interpolated_fpr, interpolated_tpr
 
 
+import math
+
+
 def train_random_forest_classifier(
     X,
     y,
@@ -549,14 +556,13 @@ def train_random_forest_classifier(
     :param n_splits: Number of cross-validation iterations, defaults to 5
     :return: Trained classifier
     """
+    set_config(enable_metadata_routing=True)
+    balanced_auroc = make_scorer(
+        roc_auc_score,
+        greater_is_better=True,
+        response_method="predict_proba",
+    ).set_score_request(sample_weight=True)
 
-    target_sum = np.sum(y)
-    if target_sum < n_splits:
-        n_splits = target_sum
-    elif (len(y) - target_sum) < n_splits:
-        n_splits = len(y) - target_sum
-    if n_splits in (1, 0):
-        n_splits = 2
     skf = StratifiedKFold(
         n_splits=int(n_splits), shuffle=True, random_state=random_state
     )
@@ -569,6 +575,10 @@ def train_random_forest_classifier(
         splitter=splitter,
         n_estimators=n_estimators,
         max_features=max_features,
+    ).set_fit_request(
+        sample_weight=True,
+        feature_weights=True,
+        draw_with_feature_weights=True,
     )
 
     grid_cv = GridSearchCV(
@@ -576,7 +586,7 @@ def train_random_forest_classifier(
         param_grid,
         cv=skf,
         n_jobs=-1,
-        scoring=scoring,
+        scoring=balanced_auroc,
         refit=True,
     )
 
@@ -587,7 +597,10 @@ def train_random_forest_classifier(
         feature_weights=feature_weights,
         draw_with_feature_weights=draw_with_feature_weights,
     )
-    return grid_cv.best_estimator_, grid_cv.best_score_
+
+    best_score = 0 if math.isnan(grid_cv.best_score_) else grid_cv.best_score_
+    set_config(enable_metadata_routing=True)
+    return grid_cv.best_estimator_, best_score
 
 
 def calculate_mean_rocs(rocs_dict_list):

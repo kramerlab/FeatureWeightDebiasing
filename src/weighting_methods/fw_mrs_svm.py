@@ -1,4 +1,3 @@
-import shap
 import numpy as np
 import pandas as pd
 
@@ -74,7 +73,8 @@ def mrs_step(
             random_state=random_state,
             C=hyperparameter,
         )
-        test_data = pd.concat([N_test, R_test])
+        test_data = pd.concat([N_test, R_test]) 
+        test_data[columns] = test_data[columns] * np.array(feature_weight)
         distances = clf.decision_function(test_data[columns])
         all_predictions[test_indices_N] = distances[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, distances))
@@ -93,15 +93,6 @@ def mrs_step(
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
     return dropped_N.index[drop_ids], mean_feature_importance, mean_auroc
-
-
-def calculate_feature_importance(test_N, clf, background=None):
-    explainer = shap.KernelExplainer(clf.predict, background)
-    explainer = explainer(test_N)
-    shap_values = explainer.values[:, 1]
-    abs_feature_importance = np.mean(np.abs(shap_values), axis=0)
-
-    return abs_feature_importance
 
 
 def fw_MRS_SVM(

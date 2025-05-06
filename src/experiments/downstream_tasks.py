@@ -1,9 +1,8 @@
 import json
+import copy
 import numpy as np
 
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-
 from utils.data_loader import load_saved_results, save_results
 from utils.parameter import set_parameter
 from utils.statistics import (
@@ -20,7 +19,6 @@ from utils.metrics import (
     compute_metrics,
     compute_pad,
 )
-import copy
 
 seed = 5
 sampling_random_generator = np.random.RandomState(seed)
@@ -47,13 +45,17 @@ def downstream_tasks_experiment(
 
     :param df: pandas.DataFrame with the data
     :param columns: Name of training columns
-    :param weighting_method: The weighting function
+    :param sample_weighting_method: The weighting function
     :param target: Target name
-    :param method: Method name, defaults to ""
-    :param number_of_repetitions: Number of repetetions of the experiment,
-        defaults to 100
+    :param n_cv_repeats
+    :param n_cv_splits
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
+    :param random_generator: Random generator for repeatability
+    :param load_previous_results: If load weights from previous runs
+    :param bias_fraction: Bias strength
+    :param drop: Number of dropped elements per iteration
+    :param method_name: Method name, defaults to ""
     """
     rf_auroc_list = []
     rf_auprc_list = []
@@ -163,7 +165,7 @@ def downstream_tasks_experiment(
                 early_stopping=True,
                 random_generator=random_generator,
                 target=target,
-                budgets=temperatures,
+                temperatures=temperatures,
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
                 compute_bias=False,
@@ -455,6 +457,25 @@ def compute_validation_results(
     feature_weights,
     method_name,
 ):
+    """Computes the validation metrics
+
+    :param columns: List with column names
+    :param target: Target Name
+    :param draw_with_feature_weights: If use feature weights
+    :param dropped_samples_val_dict: Dictionary for number of dropped samples
+    :param auroc_val_dict: Dictionary for validation AUROCs
+    :param auprc_val_dict: Dictionary for validation AUPRCs
+    :param accuracy_val_dict: Dictionary for validation accuracy
+    :param dropped_samples_individual_val_dict: Dictionary for dropped samples for individual hyperparameter
+    :param auroc_individual_val_dict: Dictionary for validation AUROC for individual hyperparameter
+    :param auprc_individual_val_dict: Dictionary for validation AUPRC for individual hyperparameter
+    :param accuracy_individual_val_dict: Dictionary for accuracy for individual hyperparameter
+    :param N: N dataframe
+    :param R: R dataframe
+    :param sample_weights: Sample weights
+    :param feature_weights: Feature weights
+    :param method_name: Weighting method string
+    """
     if method_name == "mrs-forest":
         for temperature, temperature_sample_weights in sample_weights.items():
             for (

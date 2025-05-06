@@ -1,9 +1,10 @@
+import shap
+
 import numpy as np
 import pandas as pd
-import shap
-from sklearn.metrics import roc_auc_score
-from tqdm import trange
 
+from tqdm import trange
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import (
     KFold,
     StratifiedKFold,
@@ -39,10 +40,17 @@ def mrs_step(
     :param N: Non-representative data set
     :param R: Representative data set
     :param columns: Columns names used for training
+    :param target: Target column name
     :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param cv: Number of cross-validation iterations, defaults to 5
+    :param n_splits: Number of cross validation splits
     :param random_state: Random state to make results reproducible
-    :return: _description_
+    :param feature_weight: Feature weight list
+    :param splitter: Splitter for decision trees
+    :param sample_weights: Sample weights list
+    :param compute_feature_importance: If compute feature importance
+    :param hyperparameter: Current hyperparameter
+    :param stratify_R: If also stratify on R
+    :return: Index for dropping samples, current AUROC or feature importances
     """
     auroc_list = []
     feature_importance_list = []
@@ -107,7 +115,7 @@ def feature_weighted_repeated_MRS(
     delta=0.0,
     early_stopping=False,
     drop=1,
-    budgets=[1.0],
+    temperatures=[1.0],
     random_generator=None,
     n_pu_splits=5,
     hyperparameter_list=[],
@@ -116,20 +124,21 @@ def feature_weighted_repeated_MRS(
     *args,
     **attributes,
 ):
-    """Performs MRS
+    """Performs FW-MRS-RF
 
     :param N: Non-representative data set
     :param R: Representative data set
+    :param target: Target column name
     :param columns: Name of the columns used in training
     :param delta: Delta for the stopping criterion, defaults to 0.001
     :param early_stopping: If true, stops before dropping all samples, defaults to False
-    :param mrs_function: Function that is used in evers mrs iteration, defaults to mrs
-    :param return_metrics: If true, return test metrics, defaults to False
-    :param use_bias_mean: If true, compute relative bias, defaults to True
-    :param bias_variable: Name of the biased variable, defaults to None
-    :param cv: Number of cross-validation iterations, defaults to 5
     :param drop: Defines how many samples are dropped per iteration, defaults to 1
+    :param temperatures: Temperatures list
     :param random_generator: Random generator to create random_states to make results reproducible
+    :param n_pu_splits: Number of cross-validation splits
+    :param hyperparameter_list: List of hyperparameter
+    :param return_metrics: If true, return test metrics, defaults to False
+    :param stratify_R: If also stratify on R
     :return: Sample weights or test metrics
     """
     number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
@@ -154,7 +163,7 @@ def feature_weighted_repeated_MRS(
         columns,
         target,
         drop,
-        budgets,
+        temperatures,
         random_generator,
         n_pu_splits,
         hyperparameter_list,
@@ -175,7 +184,7 @@ def feature_weighted_repeated_MRS(
     )
 
     for i in trange(number_of_iterations):
-        for temperature in budgets:
+        for temperature in temperatures:
             for hyperparameter in hyperparameter_list:
                 if finished_dict[temperature][hyperparameter] and not return_metrics:
                     continue
@@ -262,7 +271,7 @@ def initialize_dictionaries(
     columns,
     target,
     drop,
-    budgets,
+    temperatures,
     random_generator,
     n_pu_splits,
     hyperparameter_list,
@@ -282,7 +291,34 @@ def initialize_dictionaries(
     mrs_step=mrs_step,
     stratify_R=False,
 ):
-    for temperature in budgets:
+    """Initialize all dictionaries
+
+    :param N: Non-representative data frame
+    :param R: Representative data frame
+    :param columns: Feature column names
+    :param target: Target column name
+    :param drop: Number of dropped elements per iteration
+    :param temperatures: Temperature lsit
+    :param random_generator: Random generator for reproducibility
+    :param n_pu_splits: Number of cross-validation splits
+    :param hyperparameter_list: List with hyperparameter
+    :param dropped_N: Subset of N
+    :param best_difference_dict: Dictionary for best differences
+    :param best_sample_weights_dict: Dictionary for best sample weights
+    :param dropped_samples_dict: Dictionaries for dropped samples
+    :param auc_difference_dict: Disctionaries for AUROC differences
+    :param abs_feature_importance_dict: Dictionary for feature importances
+    :param sample_weights_dict: Dictionary for sample weights
+    :param feature_weights_dict: Dictionary for feature weights
+    :param feature_weighted_aurocs_dict: Dictionary for feature weightes AUROCs
+    :param finished_dict: Dictionary for finished boolean
+    :param switched_dict: Dictionary for switched boolean, defaults to {}
+    :param auc_dict: Dictionary for AUROCs, defaults to {}
+    :param mmd_dict: Dictionary for MMDs, defaults to {}
+    :param mrs_step: MRS step method, defaults to mrs_step
+    :param stratify_R: If also stratify on R, defaults to False
+    """
+    for temperature in temperatures:
         best_difference_dict[temperature] = {}
         auc_difference_dict[temperature] = {}
         dropped_samples_dict[temperature] = {}
@@ -329,7 +365,7 @@ def initialize_dictionaries(
             class_weights="balanced",
         )
 
-        for temperature in budgets:
+        for temperature in temperatures:
             feature_weights_dict[temperature][hyperparameter] = (
                 compute_feature_weights_with_temperature(
                     temperature, np.array(abs_feature_importance)

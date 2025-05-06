@@ -1,14 +1,15 @@
-import pandas as pd
 import shap
+import math
+
 import numpy as np
+import pandas as pd
+
 from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import pdist
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import rbf_kernel
-
 from sklearn.metrics import make_scorer
 from sklearn import set_config
-
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedKFold,
@@ -51,11 +52,11 @@ param_grid = {
 
 
 def compute_weighted_means(N, weights):
-    """Compute the weighted mean
+    """Compute  weighted means
 
     :param N: Non-representative data set
     :param weights: Sample weights
-    :return: Weighted mean
+    :return: Weighted means
     """
     return np.average(N, weights=weights, axis=0)
 
@@ -140,7 +141,7 @@ def compute_weighted_maximum_mean_discrepancy(
     r_r_rbf_matrix=None,
     n_r_rbf_matrix=None,
 ):
-    """_summary_
+    """Computes MMD
 
     :param gamma: _description_
     :param x: The first data set
@@ -461,8 +462,13 @@ def train_pu_classifier(
 ):
     """Train the positive unlabeled classifier
 
-    :param X_train: Training features
-    :param y_train: Training target
+    :param X: Training features
+    :param y: Training target
+    :param n_estimators: Number of estimators in random forest
+    :param feature_weight: Feature weights list
+    :param random_state: Random state to allow repeatability
+    :param splitter: Splitter of the random forest
+    :param hyperparameter: Hyperparameter for the random forest
     :param class_weight: Sample weights, defaults to "balanced"
     :return: Trained positive unlabeled classifier
     """
@@ -493,9 +499,11 @@ def train_pu_classifier_mrs(
 ):
     """Train the positive unlabeled classifier
 
-    :param X_train: Training features
-    :param y_train: Training target
-    :param class_weight: Sample weights, defaults to "balanced"
+    :param X: Training features
+    :param y: Training target
+    :param n_estimators: Number of estimators in random forest
+    :param random_state: Random state to allow repeatability
+    :param hyperparameter: Hyperparameter for the random forest
     :return: Trained positive unlabeled classifier
     """
 
@@ -529,9 +537,6 @@ def interpolate_roc(y_test, y_predict):
     return interpolated_fpr, interpolated_tpr
 
 
-import math
-
-
 def train_random_forest_classifier(
     X,
     y,
@@ -549,11 +554,18 @@ def train_random_forest_classifier(
 ):
     """Train a classifier to measure the auroc
 
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
+    :param X: Training features
+    :param y: Training targets
+    :param R: Representative data set
+    :param sample_weights: Sample weights
+    :param feature_weights: Feature weights, defaults to None
     :param n_splits: Number of cross-validation iterations, defaults to 5
+    :param draw_with_feature_weights: If drawing features according to feature weights
+    :param random_state: Random state to allow repeatability
+    :param splitter: Splitter of the random forest
+    :param n_estimators: Number of estimators of the random forest
+    :param max_features: Max features per split in random forest
+    :param scoring: Scoring method used in cross_validation
     :return: Trained classifier
     """
     set_config(enable_metadata_routing=True)
@@ -641,11 +653,11 @@ def calculate_mean_roc(interpolated_fpr, interpolated_tpr):
 
 
 def compute_feature_weights_with_temperature(temperature, feature_importance):
-    """_summary_
+    """Computes feature weights from feature importances
 
-    :param temperature: _description_
-    :param feature_importance: _description_
-    :return: _description_
+    :param temperature: Temperature for Softmin
+    :param feature_importance: Feature importance list
+    :return: Feature weights
     """
     if temperature == 0.0:
         return np.ones(len(feature_importance)) / len(feature_importance)
@@ -654,6 +666,13 @@ def compute_feature_weights_with_temperature(temperature, feature_importance):
 
 
 def calculate_feature_importance(test_N, clf, background=None):
+    """Computes feature importances with TreeShap
+
+    :param test_N: Test data
+    :param clf: Trained classifier
+    :param background: Background data
+    :return: SHAP values
+    """
     explainer = shap.TreeExplainer(clf, data=background)
     explainer = explainer(test_N, check_additivity=False)
     shap_values = np.abs(explainer.values[:, :, 1])
@@ -662,138 +681,15 @@ def calculate_feature_importance(test_N, clf, background=None):
     return abs_feature_importance
 
 
-def compute_classification_metrics_random_forest_fairness(
-    N,
-    columns,
-    sensitive_attribute,
-    sample_weights_list,
-    feature_weights,
-    label,
-    random_state=None,
-    n_splits=5,
-    splitter="feature_weighted_best",
-    n_estimators=500,
-    draw_with_feature_weights=False,
-    max_features="sqrt",
-    mitigate=False,
-):
-    """Computes classification metrics for downstream tasks
-
-    :param N: Non representative data set
-    :param R: Representative data set
-    :param columns: Columns used in the training
-    :param weights: Computed sample weights
-    :param label: Name of the target variable
-    :return: Downstream classification metrics
-    """
-    clf_list = []
-    if isinstance(sample_weights_list, dict):
-        for sample_weights, feature_weight in zip(
-            sample_weights_list.values(), feature_weights.values()
-        ):
-            N_train = N.copy()
-            train_sample_weights = sample_weights.copy()
-
-            clf = train_random_forest_classifier_fairness(
-                N_train[columns].values,
-                N_train[label].values,
-                N_train[sensitive_attribute],
-                train_sample_weights,
-                feature_weight,
-                random_state=random_state,
-                n_splits=n_splits,
-                draw_with_feature_weights=draw_with_feature_weights,
-                splitter=splitter,
-                n_estimators=n_estimators,
-                max_features=max_features,
-            )
-            clf_list.append(clf)
-    else:
-        N_train = N.copy()
-        clf = train_random_forest_classifier_fairness(
-            N_train[columns].values,
-            N_train[label].values,
-            N_train[sensitive_attribute],
-            sample_weights_list,
-            feature_weights,
-            random_state=random_state,
-            n_splits=n_splits,
-            draw_with_feature_weights=draw_with_feature_weights,
-            splitter=splitter,
-            n_estimators=n_estimators,
-            max_features=max_features,
-            mitigate=mitigate,
-        )
-        clf_list = clf
-
-    return clf_list
-
-
-def train_random_forest_classifier_fairness(
-    X,
-    y,
-    sensitive_attribute,
-    sample_weights,
-    feature_weights=None,
-    n_splits=5,
-    draw_with_feature_weights=False,
-    random_state=None,
-    splitter="feature_weighted_best",
-    n_estimators=500,
-    max_features="sqrt",
-    mitigate=False,
-    **kwargs,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 5
-    :return: Trained classifier
-    """
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    if draw_with_feature_weights:
-        feature_weights = np.array(feature_weights)
-
-    clf = RandomForestClassifier(
-        random_state=random_state,
-        splitter=splitter,
-        n_estimators=n_estimators,
-        max_features=max_features,
-    )
-    grid_cv = GridSearchCV(
-        clf,
-        param_grid,
-        cv=skf,
-        n_jobs=-1,
-        scoring="roc_auc",
-        refit=True,
-    )
-    if mitigate:
-        constraint = DemographicParity()
-        mitigator = ExponentiatedGradient(grid_cv, constraint)
-        grid_cv = mitigator.fit(X, y, sensitive_features=sensitive_attribute)
-    else:
-        grid_cv.fit(
-            X,
-            y,
-            sample_weight=sample_weights,
-            feature_weights=feature_weights,
-            draw_with_feature_weights=draw_with_feature_weights,
-        )
-
-    return grid_cv
-
-
 def train_svm_pu_classifier(X, y, random_state=None, C=1, class_weight="balanced"):
-    """Train the positive unlabeled classifier
+    """Train the positive unlabeled classifier SVM
 
-    :param X_train: Training features
-    :param y_train: Training target
+    :param X: Training features
+    :param y: Training target
+    :param random_state: Random state to allow repeatability
+    :param C: Hyperparameter for the Linear SVM
     :param class_weight: Sample weights, defaults to "balanced"
-    :return: Trained positive unlabeled classifier
+    :return: Trained positive unlabeled classifier SVM
     """
     clf = LinearSVC(
         dual="auto", random_state=random_state, C=C, class_weight=class_weight
@@ -807,171 +703,6 @@ def train_svm_pu_classifier(X, y, random_state=None, C=1, class_weight="balanced
     return clf
 
 
-def compute_classification_metrics_random_forest_lipidomics(
-    N_train,
-    R_train,
-    N_test,
-    R_test,
-    columns,
-    sample_weights_list,
-    feature_weights,
-    label,
-    random_state=None,
-    n_splits=5,
-    splitter="feature_weighted_best",
-    n_estimators=500,
-    draw_with_feature_weights=False,
-    max_features="sqrt",
-    classifier_function=train_random_forest_classifier,
-):
-    """Computes classification metrics for downstream tasks
-
-    :param N: Non representative data set
-    :param R: Representative data set
-    :param columns: Columns used in the training
-    :param weights: Computed sample weights
-    :param label: Name of the target variable
-    :return: Downstream classification metrics
-    """
-
-    if isinstance(sample_weights_list, dict) or isinstance(feature_weights, dict):
-        if isinstance(sample_weights_list, list):
-            sample_weights_list = {
-                temperature: {
-                    hyperparameter: []
-                    for hyperparameter in feature_weights[temperature].keys()
-                }
-                for temperature in feature_weights.keys()
-            }
-            pass
-        best_clf = None
-        best_score = -1
-        for temperature in sample_weights_list.keys():
-            for hyperparameter, sample_weights in sample_weights_list[
-                temperature
-            ].items():
-                feature_weight = feature_weights[temperature][hyperparameter]
-                N_training = N_train if N_train is not None else N_train
-                train_sample_weights = np.array(sample_weights)
-                r_weights = np.ones(len(R_train)) if R_train is not None else []
-                X_sample_weights = np.concatenate([train_sample_weights, r_weights])
-                X_train = pd.concat([N_training, R_train])
-
-                clf, score = classifier_function(
-                    X_train[columns].values,
-                    X_train[label].values,
-                    X_sample_weights,
-                    np.array(feature_weight),
-                    random_state=random_state,
-                    n_splits=n_splits,
-                    draw_with_feature_weights=draw_with_feature_weights,
-                    splitter=splitter,
-                    n_estimators=n_estimators,
-                    max_features=max_features,
-                )
-                if score > best_score:
-                    best_score = score
-                    best_clf = clf
-                    best_weights = sample_weights
-                    best_temperature = temperature
-                    best_hyperparameter = hyperparameter
-                if best_score == 1:
-                    break
-    else:
-        best_temperature = 0
-        N_training = N_train if N_train is not None else N_train
-        train_sample_weights = np.array(sample_weights_list)
-        r_weights = np.ones(len(R_train)) if R_train is not None else []
-        X_sample_weights = np.concatenate([train_sample_weights, r_weights])
-
-        X_train = pd.concat([N_training, R_train])
-
-        best_clf, _ = classifier_function(
-            X_train[columns].values,
-            X_train[label].values,
-            X_sample_weights,
-            np.array(feature_weights),
-            random_state=random_state,
-            n_splits=n_splits,
-            draw_with_feature_weights=draw_with_feature_weights,
-            splitter=splitter,
-            n_estimators=n_estimators,
-            max_features=max_features,
-        )
-        best_hyperparameter = None
-        best_weights = train_sample_weights
-    if classifier_function.__name__ == "train_random_forest_classifier":
-        y_probabilitites_cal = best_clf.predict_proba(N_test[columns].values)[:, 1]
-        y_probabilitites_set2 = best_clf.predict_proba(R_test[columns].values)[:, 1]
-    else:
-        y_probabilitites_cal = best_clf.decision_function(N_test[columns].values)
-        y_probabilitites_set2 = best_clf.decision_function(R_test[columns].values)
-
-    auroc_score_cal = roc_auc_score(N_test[label], y_probabilitites_cal)
-    auprc_cal = average_precision_score(N_test[label], y_probabilitites_cal)
-    auroc_score_set2 = roc_auc_score(R_test[label], y_probabilitites_set2)
-    auprc_set2 = average_precision_score(R_test[label], y_probabilitites_set2)
-
-    return (
-        auroc_score_cal,
-        auprc_cal,
-        auroc_score_set2,
-        auprc_set2,
-        best_weights,
-        best_temperature,
-        best_hyperparameter,
-    )
-
-
-def train_svc(
-    X,
-    y,
-    sample_weights,
-    feature_weights=None,
-    n_splits=5,
-    draw_with_feature_weights=False,
-    random_state=None,
-    **kwargs,
-):
-    """Train a classifier to measure the auroc
-
-    :param X_train: Training features
-    :param y_train: Training targets
-    :param weights: Sample weights, defaults to None
-    :param speedup: If true, use only a subset of the cost complexities, defaults to True
-    :param n_splits: Number of cross-validation iterations, defaults to 5
-    :return: Trained classifier
-    """
-
-    if draw_with_feature_weights:
-        X = X * feature_weights
-
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    param_grid = {
-        "kernel": ["linear", "rbf"],
-        "C": [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e2],
-    }
-    clf = SVC(
-        random_state=random_state,
-    )
-    grid_cv = GridSearchCV(
-        clf,
-        param_grid,
-        cv=skf,
-        n_jobs=-1,
-        scoring="roc_auc",
-        refit=True,
-    )
-
-    grid_cv.fit(
-        X,
-        y,
-        sample_weight=sample_weights,
-    )
-
-    return grid_cv.best_estimator_, grid_cv.best_score_
-
-
 def compute_classification_metrics_random_forest_perfect(
     N,
     T,
@@ -981,14 +712,16 @@ def compute_classification_metrics_random_forest_perfect(
     n_splits=5,
     n_estimators=500,
 ):
-    """Computes classification metrics for downstream tasks
+    """Computes classification metrics with unbiased data
 
-    :param N: Non representative data set
-    :param R: Representative data set
+    :param N: Representative data set
+    :param T: Test data set
     :param columns: Columns used in the training
-    :param weights: Computed sample weights
-    :param label: Name of the target variable
-    :return: Downstream classification metrics
+    :target: Target Name
+    :param random_state: Random state to allow repeatability
+    :param n_splits: Number of cross-validation splits
+    :param n_estimators: Number of trees in random forest
+    :return: Unbiased downstream classification metrics
     """
 
     clf = RandomForestClassifier(
@@ -1036,6 +769,18 @@ def compute_pad(
     n_repeats=10,
     sample=False,
 ):
+    """Computes PADs
+
+    :param N: Non-representative data set
+    :param R: Representative data set
+    :param columns: Feature column names
+    :param sample_weights: Sample weight list
+    :param feature_weights: Feature weight list
+    :param seed: Seed for repeatability
+    :param n_repeats: Number of cross-validation splits, defaults to 10
+    :param sample: Downsample N if it is too big, defaults to False
+    :return: PADs
+    """
     set_config(enable_metadata_routing=True)
     sample_weights_copy = np.array(sample_weights).copy()
     mask = sample_weights_copy != 0
@@ -1106,6 +851,17 @@ def compute_pad(
 def compute_domain_classifier_auroc(
     N, R, columns, sample_weights, feature_weights, seed, n_repeats=10
 ):
+    """Compute domain auroc
+
+    :param N: Non-representative data set
+    :param R: Representative data set
+    :param columns: Feature column names
+    :param sample_weights: Sample weight list
+    :param feature_weights: Feature weight list
+    :param seed: Seed for repeatability
+    :param n_repeats: Number of cross-validation splits, defaults to 10
+    :return: Domain AUROC
+    """
     set_config(enable_metadata_routing=True)
     sample_weights_copy = np.array(sample_weights).copy()
     mask = sample_weights_copy != 0

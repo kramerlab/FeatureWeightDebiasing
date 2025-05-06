@@ -6,17 +6,23 @@ seed = 5
 
 
 def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_generator):
+    """Sample from fata to create the non-representative data set N
+
+    :param bias_type: Bias Type
+    :param bias_fraction: Bias Strength
+    :param columns: Feature column names
+    :param train: Train data set
+    :param bias_variable: The variable to bias on
+    :param random_generator: Random generator for repeatability
+    :return: Non-representative data set N
+    """
     positive_samples = train[train[bias_variable] == 1]
     negative_samples = train[train[bias_variable] == 0]
     if bias_type in (
         "less_positive_class",
         "less_negative_class",
-        "less_positive_class_comparison",
     ):
-        if bias_type in (
-            "less_positive_class",
-            "less_positive_class_comparison",
-        ):
+        if bias_type == "less_positive_class":
             positive_fraction = bias_fraction
             negative_fraction = 1
         elif bias_type == "less_negative_class":
@@ -29,90 +35,9 @@ def sample_N(bias_type, bias_fraction, columns, train, bias_variable, random_gen
             negative_fraction=negative_fraction,
             random_generator=random_generator,
         )
-    elif bias_type == "mean_difference":
-        N = less_outlier_sampling(train, bias_fraction, columns, random_generator)
     else:
         N = train.reset_index(drop=True)
     return N
-
-
-def less_outlier_sampling(train, bias_fraction, columns, random_generator):
-    mean_sample = train[columns].mean().values
-    differences = (
-        np.linalg.norm(
-            train[columns].values - mean_sample,
-            axis=1,
-        )
-        ** 3
-    )
-    temperature = -(1 / 20)
-    sample_weights = np.exp(temperature * differences)
-    N = train.sample(
-        frac=bias_fraction,
-        weights=sample_weights,
-        random_state=random_generator,
-    )
-    return N
-
-
-def sample_with_test_set(
-    bias_type,
-    df,
-    bias_variable,
-    bias_fraction=0.1,
-    train_fraction=0.25,
-    test_fraction=0.1,
-    columns=None,
-    random_generator=None,
-):
-    """Samples a biased and a representative data set.
-
-    :param bias_type: Defines how the data should be biased
-    :param df: Data set as pandas.DataFrame
-    :param bias_variable: The target variable
-    :param bias_fraction: Defines which fraction of the biased class is samples, defaults to 0.1
-    :param train_fraction: Defines the size of the train set, defaults to 0.25
-    :param columns: Columns that are used to compute the mean sample, defaults to None
-    :return: A biased and a representative data set
-    """
-    T = (
-        df.groupby(bias_variable, group_keys=False)
-        .apply(
-            lambda x: x.sample(
-                frac=test_fraction,
-                random_state=random_generator,
-                replace=False,
-            )
-        )
-        .copy()
-    )
-    df_without_T = df.drop(T.index).copy()
-    R = (
-        df_without_T.groupby(bias_variable, group_keys=False)
-        .apply(
-            lambda x: x.sample(
-                frac=1 - train_fraction,
-                random_state=random_generator,
-                replace=False,
-            )
-        )
-        .copy()
-    )
-    train = df_without_T.drop(R.index).copy()
-
-    N = sample_N(
-        bias_type,
-        bias_fraction,
-        columns,
-        train,
-        bias_variable,
-        random_generator=random_generator,
-    )
-
-    N["label"] = 1
-    R["label"] = 0
-
-    return N, R, T
 
 
 def sample_class_biased_N(
@@ -128,6 +53,7 @@ def sample_class_biased_N(
     :param negative_samples: Samples of the negative class
     :param positive_fraction: Fraction for positive class
     :param negative_fraction: Fraction for negative class
+    :param random_generator:
     :return: The sampled biased data ste
     """
     N = (
@@ -151,6 +77,15 @@ def sample_class_biased_N(
 def repeated_train_val_test_split(
     n_cv_splits, n_cv_repeats, df, target_values, random_generator
 ):
+    """Repeated cross_validation
+
+    :param n_cv_splits: Number of cross-validation splits
+    :param n_cv_repeats: Number of repetetions
+    :param df: Data frame
+    :param target_values: Target values
+    :param random_generator: Random generator for repeatability
+    :yield: Returns the training, validation and test set of the current iteration
+    """
     # Is used to draw radom states
     max_int = 2**32 - 1
     for _ in range(n_cv_repeats):
@@ -178,6 +113,14 @@ def repeated_train_val_test_split(
 def repeated_train_val_test_split_fixed_test_set(
     n_cv_repeats, df, target_values, random_generator
 ):
+    """Repeated sampling with fixed test set for decomposition
+
+    :param n_cv_repeats: Number repetetions
+    :param df: Data frame
+    :param target_values: Target values
+    :param random_generator: Random generator for reproducibility
+    :yield: Current training, validation and fixed test set
+    """
     # Is used to draw radom states
     max_int = 2**32 - 1
 

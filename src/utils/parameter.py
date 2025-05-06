@@ -25,6 +25,12 @@ fw_temperatures = [
 
 
 def set_parameter(method_name, bias_type=None):
+    """Load parameter for a method
+
+    :param method_name: Method that needs parameter
+    :param bias_type: Bias type, defaults to None
+    :return: Parameter for the method
+    """
     dropped_samples_val_dict = None
     auroc_val_dict = None
     auprc_val_dict = None

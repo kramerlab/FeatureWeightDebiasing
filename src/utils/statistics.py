@@ -14,10 +14,6 @@ def write_result_dict(
     :param weighted_mmds_list: List of result mmds
     :param biases_list: List of result relative biases
     :param wasserstein_parameter_list: List of wasserstein distances
-    :param remaining_samples_list: List of remaining samples
-    :param auroc_list: List of auroc values
-    :param auprc_list: List of auprc values
-    :param number_of_samples: Number of samples in the original data set
     :return: The result dictionary
     """
     result_dict = {
@@ -56,15 +52,13 @@ def write_result_dict_test_set(
 ):
     """Creates the result dictionary
 
-    :param columns: Column names
-    :param weighted_mmds_list: List of result mmds
-    :param biases_list: List of result relative biases
-    :param wasserstein_parameter_list: List of wasserstein distances
-    :param remaining_samples_list: List of remaining samples
-    :param auroc_list: List of auroc values
-    :param auprc_list: List of auprc values
-    :param number_of_samples: Number of samples in the original data set
-    :return: The result dictionary
+    :param rf_auroc_list: List with AUROC values
+    :param rf_auprc_list: List with AUPRC values
+    :param svm_pad_list: List with pad values
+    :param rf_domain_auroc_list: List with domain AUROC values
+    :param dropped_samples_list: List with dropped samples values
+    :param number_of_samples: List with number of samples in non-representative data set
+    :return: Filled dictionary
     """
     result_dict = {
         "random forest auroc": {
@@ -106,6 +100,9 @@ def create_result_path(
     :param method: Method name
     :param bias_type: Bias type name
     :param data_set_name: Data set name
+    :param experiment: Experiment name
+    :param bias_fraction: Bias strength
+    :param prefix: additional prefix for save path
     :return: The result path
     """
     file_directory = Path(__file__).parent

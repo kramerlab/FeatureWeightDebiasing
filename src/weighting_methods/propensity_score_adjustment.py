@@ -11,6 +11,7 @@ def propensity_score_adjustment(
     :param N: Non-representative data set
     :param R: Representative data set
     :param columns: Training columns
+    :param hyperparameter_list: List with hyperparameters
     :return: Sample weights
     """
     sample_weights_dict = {}
@@ -33,6 +34,7 @@ def train_logistic_regression(X_train, y_train, hyperparameter):
 
     :param X_train: Training data
     :param y_train: Training target
+    :param hyperparameter: The current hyperparameter
     :return: Trained logistic regression
     """
     logistic_regression = LogisticRegression(max_iter=10000, C=hyperparameter)

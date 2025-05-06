@@ -19,18 +19,20 @@ def weighting_experiment(
     n_cv_repeats,
     load_previous_results: bool,
     experiment_name: str,
-    budget: float,
     drop: int,
-    transformation_method,
-    validation_method,
     bias_fraction,
 ) -> None:
-    """_summary_
+    """Main method that starts all experiments
 
     :param data_set_name: Data set name
-    :param method_name: Method name
+    :param sample_weighting_method_name: Used weighting method
     :param bias_type: Bias Type
-    :param number_of_repetitions: Number of repetitions
+    :param n_cv_splits: Number of cross-validation splits
+    :param n_cv_repeats: Number of repetetions of the cross-validation
+    :param load_previous_results: Load weights from previous runs
+    :param experiment_name: Save name of th experiment
+    :param drop: Number of dropped samples per iteration
+    :param bias_fraction: Bias strength
     """
     # Set random seeds for reproducibility.
     np.random.seed(seed)
@@ -54,15 +56,13 @@ def weighting_experiment(
         random_generator=random_generator,
         load_previous_results=load_previous_results,
         method_name=sample_weighting_method_name,
-        budget=budget,
         drop=drop,
-        transformation_method=transformation_method,
-        validation_method=validation_method,
         bias_fraction=bias_fraction,
     )
 
 
 if __name__ == "__main__":
+    """Parse arguments and call main method"""
     args = parse_command_line_arguments()
     weighting_experiment(
         args.dataset,
@@ -72,9 +72,6 @@ if __name__ == "__main__":
         args.n_cv_repeats,
         args.load_previous_results,
         args.experiment_name,
-        args.budget,
         args.drop,
-        args.transformation_method,
-        args.validation_method,
         args.bias_fraction,
     )

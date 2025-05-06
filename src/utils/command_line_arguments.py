@@ -61,18 +61,20 @@ def parse_command_line_arguments():
     parser.add_argument("--bias_type", choices=bias_choice, default="none")
     parser.add_argument("--n_cv_splits", default=2, type=int)
     parser.add_argument("--n_cv_repeats", default=5, type=int)
-    parser.add_argument("--budget", default=0.01, type=none_or_float)
     parser.add_argument("--load_previous_results", default=False, action="store_true")
     parser.add_argument("--experiment_name", default="downstream")
     parser.add_argument("--drop", default=1, type=int)
-    parser.add_argument("--transformation_method", default="temperature")
-    parser.add_argument("--validation_method", default="random_forest")
     parser.add_argument("--bias_fraction", default=0.25, type=float)
 
     return parser.parse_args()
 
 
 def none_or_float(value):
+    """Returns None for "None" string or value
+
+    :param value: Input parameter
+    :return: value or None
+    """
     if value == "None":
         return None
     return float(value)
@@ -82,7 +84,7 @@ def get_sample_weighting_function(method_name):
     """Returns the function to the function name.
 
     :param method_name: Method name
-    :return: corresponding weighting function
+    :return: weighting function
     """
     if method_name == "uniform":
         return uniform_sample_weighting

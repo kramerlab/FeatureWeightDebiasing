@@ -1,14 +1,12 @@
 import numpy as np
 import pandas as pd
 
+from shap import Explainer
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import KFold, StratifiedKFold
 from tqdm import trange
 
-from sklearn.model_selection import KFold, StratifiedKFold
 from utils.metrics import train_svm_pu_classifier
-
-from shap import Explainer
-
 from weighting_methods.fw_mrs import initialize_dictionaries
 
 # Used to draw radom states
@@ -35,12 +33,17 @@ def mrs_step(
 
     :param N: Non-representative data set
     :param R: Representative data set
+    :param target: Target column name
     :param columns: Columns names used for training
     :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param cv: Number of cross-validation iterations, defaults to 5
-    :param class_weight: Type of class weights, defaults to "balanced_subsample"
+    :param n_splits: Number of cross validation splits
     :param random_state: Random state to make results reproducible
-    :return: _description_
+    :param feature_weight: Feature weight list
+    :param sample_weights: Sample weights list
+    :param hyperparameter: Current hyperparameter
+    :param stratify_R: If also stratify on R
+    :param compute_feature_importance: If compute feature importance
+    :return: Index for dropping samples, current AUROC or feature importances
     """
     auroc_list = []
     feature_importance_list = []
@@ -103,32 +106,32 @@ def fw_MRS_SVM(
     delta=0.0,
     early_stopping=False,
     drop=1,
-    budgets=[1.0],
+    temperatures=[1.0],
     random_generator=None,
     class_weight="balanced",
     n_pu_splits=5,
-    temperature=0.0,
     hyperparameter_list=[0.0],
     return_metrics=False,
     stratify_R=False,
     *args,
     **attributes,
 ):
-    """Performs MRS
+    """Performs FW-MRS-SVM
 
     :param N: Non-representative data set
     :param R: Representative data set
+    :param target: Target column name
     :param columns: Name of the columns used in training
     :param delta: Delta for the stopping criterion, defaults to 0.001
     :param early_stopping: If true, stops before dropping all samples, defaults to False
-    :param mrs_function: Function that is used in evers mrs iteration, defaults to mrs
-    :param return_metrics: If true, return test metrics, defaults to False
-    :param use_bias_mean: If true, compute relative bias, defaults to True
-    :param bias_variable: Name of the biased variable, defaults to None
-    :param cv: Number of cross-validation iterations, defaults to 5
-    :param class_weight: Type of class weights, defaults to "balanced_subsample"
     :param drop: Defines how many samples are dropped per iteration, defaults to 1
+    :param temperatures: Temperatures list
     :param random_generator: Random generator to create random_states to make results reproducible
+    :param class_weight: Class weight for PU classifier
+    :param n_pu_splits: Number of cross-validation splits
+    :param hyperparameter_list: List of hyperparameter
+    :param return_metrics: If true, return test metrics, defaults to False
+    :param stratify_R: If also stratify on R
     :return: Sample weights or test metrics
     """
     number_of_iterations = (len(N) - (n_pu_splits + 1)) // drop
@@ -153,7 +156,7 @@ def fw_MRS_SVM(
         columns,
         target,
         drop,
-        budgets,
+        temperatures,
         random_generator,
         n_pu_splits,
         hyperparameter_list,
@@ -173,7 +176,7 @@ def fw_MRS_SVM(
     )
 
     for i in trange(number_of_iterations):
-        for temperature in budgets:
+        for temperature in temperatures:
             for hyperparameter in hyperparameter_list:
                 if finished_dict[temperature][hyperparameter] and not return_metrics:
                     continue

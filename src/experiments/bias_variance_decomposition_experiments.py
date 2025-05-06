@@ -33,13 +33,16 @@ def decomposition_experiment(
 
     :param df: pandas.DataFrame with the data
     :param columns: Name of training columns
-    :param weighting_method: The weighting function
+    :param sample_weighting_method: The weighting function
     :param target: Target name
-    :param method: Method name, defaults to ""
-    :param number_of_repetitions: Number of repetetions of the experiment,
-        defaults to 100
+    :param n_cv_repeats: Number of cross-validation repetetions
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
+    :param random_generator: Random generator for repeatability
+    :param load_previous_results: If load weights from previous runs
+    :param bias_fraction: Bias strength
+    :param drop: Number of dropped elements per iteration
+    :param method_name: Method name, defaults to ""
     """
     predictions_list = []
     probabilities_list = []
@@ -111,7 +114,7 @@ def decomposition_experiment(
                 early_stopping=True,
                 random_generator=random_generator,
                 target=target,
-                budgets=temperatures,
+                temperatures=temperatures,
                 hyperparameter_list=hyperparameter_list,
                 method_name=method_name,
                 compute_bias=False,
@@ -141,7 +144,6 @@ def decomposition_experiment(
         )
         predictions_list.append(predictions)
         probabilities_list.append(probabilities)
-
 
     predictions_list = np.array(predictions_list).squeeze()
     predictions_list = predictions_list.astype(int)

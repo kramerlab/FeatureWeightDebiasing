@@ -3,14 +3,12 @@ import numpy as np
 import pandas as pd
 
 from tqdm import trange
-
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.model_selection import (
     StratifiedKFold,
     KFold,
 )
 from sklearn.metrics import roc_auc_score
-
 from utils.metrics import (
     calculate_mean_roc,
     calculate_rbf_gamma,
@@ -44,10 +42,14 @@ def mrs_step(
     :param N: Non-representative data set
     :param R: Representative data set
     :param columns: Columns names used for training
+    :param target: Target variable
     :param n_drop: Number of samples to drop every iteration, defaults to 1
-    :param cv: Number of cross-validation iterations, defaults to 5
+    :param n_splits: Number of cross-validation splits
     :param random_state: Random state to make results reproducible
-    :return: _description_
+    :param calculate_roc: If calculate ROC
+    :param sample_weights: Sample weights list
+    :param hyperparameter: Current hyperparameter
+    :return: Ids for dropping, current AUROC
     """
     auroc_list = []
     ifpr_list = []
@@ -135,10 +137,12 @@ def mrs(
     :param mrs_function: Function that is used in evers mrs iteration, defaults to mrs
     :param return_metrics: If true, return test metrics, defaults to False
     :param compute_bias: If true, compute relative bias, defaults to True
-    :param bias_variable: Name of the biased variable, defaults to None
-    :param cv: Number of cross-validation iterations, defaults to 5
+    :param target: Target name
+    :param n_pu_splits: Number of cross-validation splits
     :param drop: Defines how many samples are dropped per iteration, defaults to 1
     :param random_generator: Random generator to create random_states to make results reproducible
+    :param hyperparameter_list: List with hyperparameters
+    :param wasserstein_target: Target name for the Wasserstein calculation
     :return: Sample weights or test metrics
     """
     auc_dict = {}
@@ -152,7 +156,6 @@ def mrs(
     finished_dict = {}
     wasserstein_dict = {}
 
-    mrs_function = random_drops if mrs_function == "random" else mrs_step
     wasserstein_target = target if wasserstein_target is None else wasserstein_target
 
     for hyperparameter in hyperparameter_list:
@@ -297,74 +300,3 @@ def mrs(
         )
     else:
         return (best_weights_dict, feature_weights)
-
-
-def random_drops(
-    N,
-    R,
-    columns,
-    target,
-    n_drop: int = 1,
-    n_splits=5,
-    random_state=None,
-    calculate_roc=False,
-    sample_weights=None,
-    hyperparameter=0.0,
-    *args,
-    **attributes
-):
-    """MRS variant that drops sample randomly
-
-    :param N: Non-representative data set
-    :param n_drop: Defines how many samples are dropped per iteration, defaults to 1
-    :return: Index of the samples to drop
-    """
-
-    auroc_list = []
-    ifpr_list = []
-    itpr_list = []
-
-    dropped_N = N[sample_weights != 0.0]
-    all_predictions = np.zeros(len(dropped_N))
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
-        skf.split(dropped_N, dropped_N[target]), kf.split(R)
-    ):
-        N_train, N_test = (
-            dropped_N.iloc[train_indices_N],
-            dropped_N.iloc[test_indices_N],
-        )
-        R_train, R_test = R.iloc[train_indices_R], R.iloc[test_indices_R]
-        train_data = pd.concat([N_train, R_train])
-        clf = train_pu_classifier_mrs(
-            train_data[columns],
-            train_data.label,
-            random_state=random_state,
-            hyperparameter=hyperparameter,
-        )
-
-        test_data = pd.concat([N_test, R_test])
-        predictions = clf.predict_proba(test_data[columns])[:, 1]
-        all_predictions[test_indices_N] += predictions[: len(N_test)]
-        auroc_list.append(roc_auc_score(test_data.label, predictions))
-
-        if calculate_roc:
-            interpolated_fpr, interpolated_tpr = interpolate_roc(
-                test_data.label, predictions
-            )
-            ifpr_list.append(interpolated_fpr)
-            itpr_list.append(interpolated_tpr)
-
-    drop_ids = random.sample(range(0, len(dropped_N)), n_drop)
-
-    if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(ifpr_list, itpr_list)
-        return (
-            dropped_N.index[drop_ids],
-            np.mean(auroc_list),
-            mean_ifpr_list,
-            mean_itpr_list,
-        )
-    else:
-        return dropped_N.index[drop_ids], np.mean(auroc_list)

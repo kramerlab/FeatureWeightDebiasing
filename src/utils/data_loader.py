@@ -3,7 +3,6 @@ import pathlib
 
 import pandas as pd
 import numpy as np
-from fairlearn.datasets import fetch_adult
 
 from folktables import (
     ACSDataSource,
@@ -49,6 +48,10 @@ def load_dataset(dataset_name):
 
 
 def load_diabetes():
+    """Loads the diabetes data set
+
+    :return: The diabetes data set
+    """
     X_file_path = pathlib.Path(f"{file_path}/../../data/diabetes/diabetes_X.csv")
     y_file_path = pathlib.Path(f"{file_path}/../../data/diabetes/diabetes_y.csv")
     if X_file_path.is_file():
@@ -69,6 +72,10 @@ def load_diabetes():
 
 
 def load_bank_marketing():
+    """Loads the bank marketing data set
+
+    :return: The bank marketing data set
+    """
     categorical_variables = [
         "job",
         "marital",
@@ -108,6 +115,10 @@ def load_bank_marketing():
 
 
 def load_german_credit():
+    """Load german credit data set
+
+    :return: The german credit data set
+    """
     X_file_path = pathlib.Path(
         f"{file_path}/../../data/german_credit/german_credit_X.csv"
     )
@@ -152,7 +163,7 @@ def load_german_credit():
 def load_folktables_income_data():
     """Load folktable income
 
-    :return: Folktable income data
+    :return: The Folktables income data set
     """
     # Create a new income problem loader.
     ACSIncomeNew = BasicProblem(
@@ -197,7 +208,7 @@ def load_folktables_income_data():
 def load_hr_analytics():
     """Load HR Analytics
 
-    :return: HR ANalytics data
+    :return: The HR ANalytics data set
     """
     categorical_variables = [
         "gender",
@@ -229,7 +240,7 @@ def load_hr_analytics():
 def load_loan_prediction():
     """Load Loan
 
-    :return: Loan data
+    :return: The Loan data set
     """
     categorical_columns = [
         "Gender",
@@ -264,7 +275,7 @@ def load_loan_prediction():
 def load_folktables_employment_data():
     """Load folktables exployment
 
-    :return: Folktables employment data
+    :return: The Folktables employment data set
     """
     data_source = ACSDataSource(survey_year="2018", horizon="1-Year", survey="person")
     data = data_source.get_data(states=["CA"], download=True)
@@ -305,7 +316,7 @@ breast_cancer_names = [
 def load_breast_cancer_data():
     """Load Wisconsin Breast cancer
 
-    :return: Wisconsin Breast cancer data
+    :return: The Wisconsin Breast cancer data set
     """
     df = pd.read_csv(
         f"{file_path}/../../data/breast_cancer/breast-cancer-wisconsin.data",
@@ -323,11 +334,23 @@ def load_breast_cancer_data():
 
 
 def save_results(path, weights_list, file_name="weights"):
+    """Save weights to directory
+
+    :param path: Path to the directory
+    :param weights_list: Weights list
+    :param file_name: file name, defaults to "weights"
+    """
     with open(path / f"{file_name}.json", "w") as file:
         json.dump(weights_list, file, indent=4)
 
 
 def load_saved_results(path, file_name="weights"):
+    """Load weights from directory
+
+    :param path: Path to the directory
+    :param file_name: File name, defaults to "weights"
+    :return: Loaded weights
+    """
     weight_file = path / f"{file_name}.json"
     if weight_file.is_file():
         with open(weight_file, "r") as file:

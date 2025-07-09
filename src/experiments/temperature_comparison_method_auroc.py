@@ -20,7 +20,7 @@ def temperature_comparison(
     target: str,
     n_cv_splits: int = 3,
     n_cv_repeats=10,
-    bias_type: str = None,
+    bias_type: str = "",
     data_set_name: str = "",
     random_generator=None,
     method_name=None,
@@ -43,13 +43,11 @@ def temperature_comparison(
     :param data_set_name: Data set name, defaults to ""
     """
     if method_name in ("fw-mrs-temperature",):
-        # temperatures = [0.0, 0.1, 0.05, 0.01]
-        temperatures = [10, 1.0, 0.05, 0.01, 0.0, -0.01, -0.001]
+        temperatures = [0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
         hyperparameter_list = [0.025, 0.01, 0.0]
         fixed_hyperparameter = 0.01
     if method_name in ("fw-mrs-temperature-svm",):
-        # temperatures = [0.0, 0.05, 0.025, 0.01]
-        temperatures = [10, 1.0, 0.05, 0.01, 0.0, -0.001, -0.01, -1, -10]
+        temperatures = [0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
         fixed_hyperparameter = 1e0
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
@@ -155,6 +153,7 @@ def temperature_comparison(
                         _,
                         _,
                         _,
+                        _, 
                         best_hyperparameter,
                         _,
                         _,
@@ -225,6 +224,10 @@ def temperature_comparison(
                 file_name="fixed_method_aurocs",
             )
 
+            meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples_list}
+            with open(result_path / "metadata.json", "w") as file:
+                json.dump(meta_data_dict, file)
+
         for temperature, values in sample_weights.items():
             key = next(iter(values.keys()))
             dropped_samples_dict[float(temperature)].append(
@@ -250,6 +253,7 @@ def temperature_comparison(
 
     with open(result_path / "dropped_elements.json", "w") as result_file:
         result_file.write(json.dumps(dropped_samples_dict))
+    
 
     plot_temperature_comparison_auroc_mean(
         feature_weighted_aurocs_list,
@@ -264,9 +268,6 @@ def temperature_comparison(
         drop,
         result_path / "fixed_mean_auroc",
     )
-    meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples_list}
-    with open(result_path / "metadata.json", "w") as file:
-        json.dump(meta_data_dict, file)
 
 
 def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):

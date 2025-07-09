@@ -125,7 +125,7 @@ def create_result_path(
     bias_type,
     data_set_name,
     experiment_name="downstream",
-    bias_fraction="",
+    bias_fraction=0.0,
     prefix="../..",
 ):
     """The function creates the save path and makes the directory.

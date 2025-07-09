@@ -25,6 +25,17 @@ temperatures = [
 
 
 def set_parameter(method_name, bias_type=None):
+    temperatures = [
+        0.001,
+        0.0025,
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.25,
+        0.5,
+    ]
     dropped_samples_val_dict = None
     auroc_val_dict = None
     auprc_val_dict = None

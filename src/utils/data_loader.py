@@ -29,14 +29,14 @@ def load_dataset(dataset_name):
     """
     if dataset_name == "gbs_allensbach":
         return load_gbs_allensbach()
+    elif dataset_name == "gbs_gesis":
+        return load_gbs_gesis()
     elif dataset_name == "folktables_income":
         return load_folktables_income_data()
     elif dataset_name == "folktables_employment":
         return load_folktables_employment_data()
     elif dataset_name == "breast_cancer":
         return load_breast_cancer_data()
-    elif dataset_name == "gbs_gesis":
-        return load_gbs_gesis()
     elif dataset_name == "hr_analytics":
         return load_hr_analytics()
     elif dataset_name == "loan_prediction":

@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from sklearn.model_selection import KFold, StratifiedKFold
 
 from experiments.downstream_tasks import load_saved_results
 from utils.data_loader import save_results
@@ -43,11 +44,11 @@ def temperature_comparison(
     :param data_set_name: Data set name, defaults to ""
     """
     if method_name in ("fw-mrs-temperature",):
-        temperatures = [0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
-        hyperparameter_list = [0.025, 0.01, 0.0]
+        temperatures = [0.0, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
+        hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
         fixed_hyperparameter = 0.01
     if method_name in ("fw-mrs-temperature-svm",):
-        temperatures = [0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
+        temperatures = [0.0, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
         fixed_hyperparameter = 1e0
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
@@ -85,8 +86,10 @@ def temperature_comparison(
     number_of_samples_list = []
     scaler = StandardScaler()
 
-    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
-        split_method = gbs_split
+    if data_set_name == "gbs_gesis":
+        split_method = gbs_gesis_split
+    elif data_set_name == "gbs_allensbach":
+        split_method = gbs_allensbach_split
     else:
         split_method = repeated_train_val_test_split
 
@@ -153,7 +156,7 @@ def temperature_comparison(
                         _,
                         _,
                         _,
-                        _, 
+                        _,
                         best_hyperparameter,
                         _,
                         _,
@@ -224,7 +227,10 @@ def temperature_comparison(
                 file_name="fixed_method_aurocs",
             )
 
-            meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples_list}
+            meta_data_dict = {
+                "n_dropped": drop,
+                "number_of_samples": number_of_samples_list,
+            }
             with open(result_path / "metadata.json", "w") as file:
                 json.dump(meta_data_dict, file)
 
@@ -253,7 +259,6 @@ def temperature_comparison(
 
     with open(result_path / "dropped_elements.json", "w") as result_file:
         result_file.write(json.dumps(dropped_samples_dict))
-    
 
     plot_temperature_comparison_auroc_mean(
         feature_weighted_aurocs_list,
@@ -270,8 +275,37 @@ def temperature_comparison(
     )
 
 
-def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
+def gbs_gesis_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
     N = df[df["label"] == 1]
     R = df[df["label"] == 0]
-    for _ in range(n_cv_splits * n_cv_repeats):
-        yield N, R, _
+    for _ in range(n_cv_repeats):
+        skf = StratifiedKFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(R, R["Wahlteilnahme"]):
+            R_train = R.iloc[train_val_index]
+            R_test = R.iloc[test_index]
+            yield N, R_train, R_test
+
+
+def gbs_allensbach_split(
+    n_cv_splits, n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+    N = df[df["label"] == 1]
+    R = df[df["label"] == 0]
+    for _ in range(n_cv_repeats):
+        skf = KFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(R):
+            R_train = R.iloc[train_val_index]
+            R_test = R.iloc[test_index]
+            yield N, R_train, R_test

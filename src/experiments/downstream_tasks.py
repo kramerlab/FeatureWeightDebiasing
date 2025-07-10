@@ -1,7 +1,7 @@
 import json
 import numpy as np
 
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from utils.data_loader import load_saved_results, save_results
@@ -102,7 +102,9 @@ def downstream_tasks_experiment(
 
     scaler = StandardScaler()
 
-    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+    if data_set_name == "gbs_gesis":
+        split_method = gbs_gesis_split
+    elif data_set_name == "gbs_allensbach":
         split_method = gbs_allensbach_split
     else:
         split_method = repeated_train_val_test_split
@@ -138,14 +140,16 @@ def downstream_tasks_experiment(
         N[columns] = scaler.fit_transform(N[columns])
         R[columns] = scaler.transform(R[columns])
         T[columns] = scaler.transform(T[columns])
-        N = sample_N(
-            train=N,
-            bias_type=bias_type,
-            bias_fraction=bias_fraction,
-            columns=columns,
-            bias_variable=target,
-            random_generator=sampling_random_generator,
-        )
+
+        if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
+            N = sample_N(
+                train=N,
+                bias_type=bias_type,
+                bias_fraction=bias_fraction,
+                columns=columns,
+                bias_variable=target,
+                random_generator=sampling_random_generator,
+            )
         N["label"] = 1
         R["label"] = 0
 
@@ -288,7 +292,7 @@ def downstream_tasks_experiment(
         biases_list.append(relative_bias.astype(float))
         wasserstein_distance_list.append(wasserstein_distances)
 
-        if method_name == "uniform" and bias_type == "less_positive_class":
+        if method_name == "uniform" and bias_type in ("less_positive_class", "none"):
             (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(
                 R,
                 T,
@@ -666,7 +670,7 @@ def compute_validation_results(
             accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)
 
 
-def gbs_allensbach_split(
+def gbs_gesis_split(
     n_cv_splits, n_cv_repeats, df, target_values, random_generator
 ):
     # Is used to draw radom states
@@ -679,7 +683,26 @@ def gbs_allensbach_split(
             shuffle=True,
             random_state=random_generator.randint(max_int),
         )
-        for train_val_index, test_index in skf.split(N, N["Wahlteilnahme"]):
-            N_train = N.iloc[train_val_index]
-            N_test = N.iloc[test_index]
-            yield N_train, R, N_test
+        for train_val_index, test_index in skf.split(R, R["Wahlteilnahme"]):
+            R_train = R.iloc[train_val_index]
+            R_test = R.iloc[test_index]
+            yield N, R_train, R_test
+
+
+def gbs_allensbach_split(
+    n_cv_splits, n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+    N = df[df["label"] == 1]
+    R = df[df["label"] == 0]
+    for _ in range(n_cv_repeats):
+        skf = KFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(R):
+            R_train = R.iloc[train_val_index]
+            R_test = R.iloc[test_index]
+            yield N, R_train, R_test

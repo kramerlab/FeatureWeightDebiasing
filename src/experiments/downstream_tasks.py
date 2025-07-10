@@ -686,7 +686,7 @@ def gbs_gesis_split(
         for train_val_index, test_index in skf.split(R, R["Wahlteilnahme"]):
             R_train = R.iloc[train_val_index]
             R_test = R.iloc[test_index]
-            yield N, R_train, R_test
+            yield N.copy(), R_train.copy(), R_test.copy()
 
 
 def gbs_allensbach_split(
@@ -705,4 +705,4 @@ def gbs_allensbach_split(
         for train_val_index, test_index in skf.split(R):
             R_train = R.iloc[train_val_index]
             R_test = R.iloc[test_index]
-            yield N, R_train, R_test
+            yield N.copy(), R_train.copy(), R_test.copy()

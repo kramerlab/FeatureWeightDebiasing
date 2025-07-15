@@ -1,6 +1,5 @@
 import json
 import numpy as np
-from sklearn.model_selection import KFold, StratifiedKFold
 
 from experiments.downstream_tasks import load_saved_results
 from utils.data_loader import save_results
@@ -86,14 +85,12 @@ def temperature_comparison(
     number_of_samples_list = []
     scaler = StandardScaler()
 
-    if data_set_name == "gbs_gesis":
-        split_method = gbs_gesis_split
-    elif data_set_name == "gbs_allensbach":
-        split_method = gbs_allensbach_split
+    if data_set_name in ("gbs_gesis", "gbs_allensbach"):
+        split_method = gbs_split
     else:
         split_method = repeated_train_val_test_split
 
-    for i, (N, R, _) in enumerate(
+    for i, (N, R) in enumerate(
         split_method(
             n_cv_splits,
             n_cv_repeats,
@@ -275,37 +272,10 @@ def temperature_comparison(
     )
 
 
-def gbs_gesis_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
+def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
     # Is used to draw radom states
-    max_int = 2**32 - 1
     N = df[df["label"] == 1]
     R = df[df["label"] == 0]
-    for _ in range(n_cv_repeats):
-        skf = StratifiedKFold(
-            n_splits=n_cv_splits,
-            shuffle=True,
-            random_state=random_generator.randint(max_int),
-        )
-        for train_val_index, test_index in skf.split(R, R["Wahlteilnahme"]):
-            R_train = R.iloc[train_val_index]
-            R_test = R.iloc[test_index]
-            yield N.copy(), R_train.copy(), R_test.copy()
+    for _ in range(n_cv_repeats * n_cv_splits):
+        yield N.copy(), R.copy()
 
-
-def gbs_allensbach_split(
-    n_cv_splits, n_cv_repeats, df, target_values, random_generator
-):
-    # Is used to draw radom states
-    max_int = 2**32 - 1
-    N = df[df["label"] == 1]
-    R = df[df["label"] == 0]
-    for _ in range(n_cv_repeats):
-        skf = KFold(
-            n_splits=n_cv_splits,
-            shuffle=True,
-            random_state=random_generator.randint(max_int),
-        )
-        for train_val_index, test_index in skf.split(R):
-            R_train = R.iloc[train_val_index]
-            R_test = R.iloc[test_index]
-            yield N.copy(), R_train.copy(), R_test.copy()

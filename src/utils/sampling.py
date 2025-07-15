@@ -161,18 +161,9 @@ def repeated_train_val_test_split(
         )
         for train_val_index, test_index in skf.split(df, target_values):
             train_val_samples = df.iloc[train_val_index].copy()
-            train_val_target_values = target_values.iloc[train_val_index]
-            test_samples = df.iloc[test_index].copy()
+            train_samples = df.iloc[test_index].copy()
 
-            train_samples, val_samples, _, _ = train_test_split(
-                train_val_samples,
-                train_val_target_values,
-                stratify=train_val_target_values,
-                random_state=random_generator.randint(max_int),
-                test_size=0.5,
-            )
-
-            yield train_samples, val_samples, test_samples
+            yield train_val_samples, train_samples
 
 
 def repeated_train_val_test_split_fixed_test_set(

@@ -102,6 +102,7 @@ def weighted_maximum_mean_discrepancy(
     x,
     y,
     sample_weights,
+    feature_weights=None,
     gamma=None,
     x_x_rbf_matrix=None,
     y_y_rbf_matrix=None,
@@ -120,15 +121,27 @@ def weighted_maximum_mean_discrepancy(
     """
     if gamma is None:
         gamma = calculate_rbf_gamma(np.append(x, y, axis=0))
-    return compute_weighted_maximum_mean_discrepancy(
-        x,
-        y,
-        sample_weights,
-        gamma,
-        x_x_rbf_matrix,
-        y_y_rbf_matrix,
-        x_y_rbf_matrix,
-    )
+    if feature_weights is None:
+        return compute_weighted_maximum_mean_discrepancy(
+            x,
+            y,
+            sample_weights,
+            gamma,
+            x_x_rbf_matrix,
+            y_y_rbf_matrix,
+            x_y_rbf_matrix,
+        )
+    else:
+        return compute_feature_weighted_maximum_mean_discrepancy(
+            x,
+            y,
+            sample_weights,
+            feature_weights,
+            gamma,
+            x_x_rbf_matrix,
+            y_y_rbf_matrix,
+            x_y_rbf_matrix,
+        )
 
 
 def compute_weighted_maximum_mean_discrepancy(
@@ -185,6 +198,65 @@ def compute_weighted_maximum_mean_discrepancy(
     return mmd
 
 
+def compute_feature_weighted_maximum_mean_discrepancy(
+    n,
+    r,
+    sample_weights,
+    feature_weights,
+    gamma,
+    n_n_rbf_matrix=None,
+    r_r_rbf_matrix=None,
+    n_r_rbf_matrix=None,
+):
+    """_summary_
+
+    :param gamma: _description_
+    :param x: The first data set
+    :param y: The second data set
+    :param weights: Weights for the first data set (x)
+    :param n_n_rbf_matrix: Pre-computed pairwise rbf matrix to save computing time, defaults to None
+    :param r_r_rbf_matrix: Pre-computed pairwise rbf matrix to save computing time, defaults to None
+    :param n_r_rbf_matrix: Pre-computed pairwise rbf matrix to save computing time, defaults to None
+    :return: The MMD between a weighted data set and a uniform weighted reference data set
+    """
+    uniform_weights = np.ones(len(r)) / len(r)
+    sample_weights = sample_weights / np.sum(sample_weights)
+    feature_weights = feature_weights / np.sum(feature_weights) * len(feature_weights)
+
+    weighted_n = n * feature_weights
+    weighted_r = r * feature_weights
+
+    if n_n_rbf_matrix is None:
+        n_n_rbf_matrix = rbf_kernel(weighted_n, gamma=gamma)
+    weights_n_n = np.matmul(
+        np.expand_dims(sample_weights, 1), np.expand_dims(sample_weights, 0)
+    )
+    n_n_mean = (weights_n_n * n_n_rbf_matrix).sum()
+
+    r_r_rbf_matrix = (
+        rbf_kernel(
+            weighted_r,
+            gamma=gamma,
+        )
+        if r_r_rbf_matrix is None
+        else r_r_rbf_matrix
+    )
+    weight_matrix_r_r = np.matmul(
+        np.expand_dims(uniform_weights, 1), np.expand_dims(uniform_weights, 0)
+    )
+    r_r_mean = (weight_matrix_r_r * r_r_rbf_matrix).sum()
+
+    if n_r_rbf_matrix is None:
+        n_r_rbf_matrix = rbf_kernel(weighted_n, weighted_r, gamma=gamma)
+    weight_matrix_n_r = np.matmul(
+        np.expand_dims(sample_weights, 1), np.expand_dims(uniform_weights, 0)
+    )
+    n_r_mean = (weight_matrix_n_r * n_r_rbf_matrix).sum()
+
+    mmd = np.sqrt(n_n_mean + r_r_mean - 2 * n_r_mean)
+    return mmd
+
+
 def compute_metrics(
     scaled_N,
     scaled_R,
@@ -192,6 +264,7 @@ def compute_metrics(
     columns,
     target,
     sample_weights_list,
+    feature_weights,
     gamma,
     return_sample_weights=False,
 ):
@@ -216,7 +289,8 @@ def compute_metrics(
         N_dropped,
         R_dropped,
         sample_weights_list,
-        gamma,
+        feature_weights,
+        gamma=gamma,
     )
 
     for feature_name in columns_and_target:

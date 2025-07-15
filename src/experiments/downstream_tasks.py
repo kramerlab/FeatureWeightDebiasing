@@ -57,8 +57,6 @@ def downstream_tasks_experiment(
     """
     rf_auroc_list = []
     rf_auprc_list = []
-    pad_list = []
-    domain_auroc_list = []
 
     weighted_mmds_list = []
     biases_list = []
@@ -73,8 +71,6 @@ def downstream_tasks_experiment(
     dropped_samples_list = []
     R_auroc_list = []
     R_auprc_list = []
-    R_pad_list = []
-    R_domain_auroc_list = []
     validation_score_list = []
 
     result_path = create_result_path(
@@ -213,26 +209,6 @@ def downstream_tasks_experiment(
                 n_splits=10,
             )
 
-            pad = compute_pad(
-                N,
-                T,
-                columns,
-                best_sample_weights,
-                best_feature_weights,
-                seed=seed,
-            )
-
-            domain_auroc = compute_domain_classifier_auroc(
-                N,
-                T,
-                columns,
-                best_sample_weights,
-                best_feature_weights,
-                seed=seed,
-            )
-
-            pad_list.append(pad)
-            domain_auroc_list.append(domain_auroc)
             dropped_samples = np.count_nonzero(np.array(best_sample_weights) == 0.0)
             dropped_samples_list.append(dropped_samples)
             best_temperature_list.append(best_temperature)
@@ -243,25 +219,19 @@ def downstream_tasks_experiment(
             abs_feature_importance_list.append(abs_feature_importance.tolist())
             roc_curves_list.append(roc_curve_values)
 
-        if method_name not in (
-            "fw-mrs-temperature",
-            "fw-mrs-temperature-svm",
-            "fw-mrs-temperature-comparison",
-        ):
-            weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                target,
-                best_sample_weights,
-                gamma,
-            )
+        
+        feature_weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+            N,
+            R,
+            scaler,
+            columns,
+            target,
+            best_sample_weights,
+            best_feature_weights,
+            gamma,
+        )
 
-        else:
-            weighted_mmd = np.ones(len(N.columns))
-            relative_bias = np.ones(len(N.columns))
-            wasserstein_distances = np.ones(len(N.columns))
+
 
         if method_name in (
             "fw-mrs-temperature",
@@ -288,7 +258,7 @@ def downstream_tasks_experiment(
                 method_name,
             )
 
-        weighted_mmds_list.append(weighted_mmd)
+        weighted_mmds_list.append(feature_weighted_mmd)
         biases_list.append(relative_bias.astype(float))
         wasserstein_distance_list.append(wasserstein_distances)
 
@@ -303,36 +273,13 @@ def downstream_tasks_experiment(
                 n_splits=10,
             )
 
-            R_pad = compute_pad(
-                R,
-                T,
-                columns,
-                np.ones(len(R)),
-                best_feature_weights,
-                seed=seed,
-                sample=True,
-            )
-
-            R_domain_auroc = compute_domain_classifier_auroc(
-                R,
-                T,
-                columns,
-                np.ones(len(R)),
-                best_feature_weights,
-                seed=seed,
-            )
-
-            R_domain_auroc_list.append(R_domain_auroc)
             R_auroc_list.append(R_auroc)
             R_auprc_list.append(R_auprc)
-            R_pad_list.append(R_pad)
 
         for result_list, file_name in zip(
             (
                 rf_auroc_list,
                 rf_auprc_list,
-                pad_list,
-                domain_auroc_list,
                 dropped_samples_list,
                 abs_feature_importance_list,
                 feature_importance_list,
@@ -341,15 +288,11 @@ def downstream_tasks_experiment(
                 best_hyperparameter_list,
                 R_auroc_list,
                 R_auprc_list,
-                R_pad_list,
-                R_domain_auroc_list,
                 validation_score_list,
             ),
             (
                 "rf_auroc_list",
                 "rf_auprc_list",
-                "pad_list",
-                "domain_auroc_list",
                 "dropped_samples",
                 "abs_feature_importance",
                 "feature_importance",
@@ -358,8 +301,6 @@ def downstream_tasks_experiment(
                 "best_hyperparameter",
                 "R_auroc_list",
                 "R_auprc_list",
-                "R_pad_list",
-                "R_domain_auroc_list",
                 "validation_score",
             ),
         ):
@@ -386,8 +327,6 @@ def downstream_tasks_experiment(
         result_dict = write_result_dict_test_set(
             rf_auroc_list,
             rf_auprc_list,
-            pad_list,
-            domain_auroc_list,
             dropped_samples_list,
             len(N),
         )

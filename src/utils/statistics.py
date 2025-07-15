@@ -76,8 +76,6 @@ def write_result_dict(
 def write_result_dict_test_set(
     rf_auroc_list,
     rf_auprc_list,
-    svm_pad_list,
-    rf_domain_auroc_list,
     dropped_samples_list,
     number_of_samples,
 ):
@@ -101,14 +99,6 @@ def write_result_dict_test_set(
         "random forest auprc": {
             "mean": np.mean(rf_auprc_list),
             "sd": np.std(rf_auprc_list),
-        },
-        "svm pad": {
-            "mean": np.mean(svm_pad_list),
-            "sd": np.std(svm_pad_list),
-        },
-        "rf domain auroc": {
-            "mean": np.mean(rf_domain_auroc_list),
-            "sd": np.std(rf_domain_auroc_list),
         },
         "dropped_samples": {
             "mean": np.mean(dropped_samples_list),

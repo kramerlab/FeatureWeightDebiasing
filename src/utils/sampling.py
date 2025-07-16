@@ -128,6 +128,7 @@ def sample_class_biased_N(
     :param negative_samples: Samples of the negative class
     :param positive_fraction: Fraction for positive class
     :param negative_fraction: Fraction for negative class
+    :param random_generator:
     :return: The sampled biased data ste
     """
     N = (
@@ -151,6 +152,15 @@ def sample_class_biased_N(
 def repeated_train_val_test_split(
     n_cv_splits, n_cv_repeats, df, target_values, random_generator
 ):
+    """Repeated cross_validation
+
+    :param n_cv_splits: Number of cross-validation splits
+    :param n_cv_repeats: Number of repetetions
+    :param df: Data frame
+    :param target_values: Target values
+    :param random_generator: Random generator for repeatability
+    :yield: Returns the training, validation and test set of the current iteration
+    """
     # Is used to draw radom states
     max_int = 2**32 - 1
     for _ in range(n_cv_repeats):
@@ -161,9 +171,18 @@ def repeated_train_val_test_split(
         )
         for train_val_index, test_index in skf.split(df, target_values):
             train_val_samples = df.iloc[train_val_index].copy()
-            train_samples = df.iloc[test_index].copy()
+            train_val_target_values = target_values.iloc[train_val_index]
+            test_samples = df.iloc[test_index].copy()
 
-            yield train_val_samples, train_samples
+            train_samples, val_samples, _, _ = train_test_split(
+                train_val_samples,
+                train_val_target_values,
+                stratify=train_val_target_values,
+                random_state=random_generator.randint(max_int),
+                test_size=0.5,
+            )
+
+            yield train_samples, val_samples, test_samples
 
 
 def repeated_train_val_test_split_fixed_test_set(

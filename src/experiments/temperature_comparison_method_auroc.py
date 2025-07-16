@@ -1,10 +1,11 @@
 import json
 import numpy as np
+from sklearn.model_selection import StratifiedKFold
 
 from experiments.downstream_tasks import load_saved_results
 from utils.data_loader import save_results
 from utils.statistics import create_result_path
-from utils.sampling import sample_N, repeated_train_val_test_split
+from utils.sampling import sample_N
 from utils.metrics import compute_classification_metrics_random_forest
 from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean
 from sklearn.preprocessing import StandardScaler
@@ -279,3 +280,20 @@ def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
     for _ in range(n_cv_repeats * n_cv_splits):
         yield N.copy(), R.copy()
 
+
+def repeated_train_val_test_split(
+    n_cv_splits, n_cv_repeats, df, target_values, random_generator
+):
+    # Is used to draw radom states
+    max_int = 2**32 - 1
+    for _ in range(n_cv_repeats):
+        skf = StratifiedKFold(
+            n_splits=n_cv_splits,
+            shuffle=True,
+            random_state=random_generator.randint(max_int),
+        )
+        for train_val_index, test_index in skf.split(df, target_values):
+            train_val_samples = df.iloc[train_val_index].copy()
+            train_samples = df.iloc[test_index].copy()
+
+            yield train_val_samples, train_samples

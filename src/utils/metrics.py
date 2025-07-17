@@ -223,8 +223,8 @@ def compute_feature_weighted_maximum_mean_discrepancy(
     sample_weights = sample_weights / np.sum(sample_weights)
     feature_weights = feature_weights / np.sum(feature_weights) * len(feature_weights)
 
-    weighted_n = n * feature_weights
-    weighted_r = r * feature_weights
+    weighted_n = n * np.sqrt(feature_weights)
+    weighted_r = r * np.sqrt(feature_weights)
 
     if n_n_rbf_matrix is None:
         n_n_rbf_matrix = rbf_kernel(weighted_n, gamma=gamma)

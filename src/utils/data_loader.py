@@ -63,9 +63,9 @@ def load_diabetes():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
     else:
-        cdc_diabetes_health_indicators = fetch_ucirepo(id=891) 
-        X = cdc_diabetes_health_indicators.data.features 
-        y = cdc_diabetes_health_indicators.data.targets 
+        cdc_diabetes_health_indicators = fetch_ucirepo(id=891)
+        X = cdc_diabetes_health_indicators.data.features
+        y = cdc_diabetes_health_indicators.data.targets
     columns = X.columns
     target = y.columns[0]
     X[target] = y
@@ -88,8 +88,12 @@ def load_bank_marketing():
     ]
     feature_replacer = {"no": False, "yes": True}
 
-    X_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_X.csv")
-    y_file_path = pathlib.Path(f"{file_path}/../../data/bank_marketing/bank_marketing_y.csv")
+    X_file_path = pathlib.Path(
+        f"{file_path}/../../data/bank_marketing/bank_marketing_X.csv"
+    )
+    y_file_path = pathlib.Path(
+        f"{file_path}/../../data/bank_marketing/bank_marketing_y.csv"
+    )
     if X_file_path.is_file():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
@@ -112,8 +116,12 @@ def load_bank_marketing():
 
 
 def load_german_credit():
-    X_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_X.csv")
-    y_file_path = pathlib.Path(f"{file_path}/../../data/german_credit/german_credit_y.csv")
+    X_file_path = pathlib.Path(
+        f"{file_path}/../../data/german_credit/german_credit_X.csv"
+    )
+    y_file_path = pathlib.Path(
+        f"{file_path}/../../data/german_credit/german_credit_y.csv"
+    )
     if X_file_path.is_file():
         X = pd.read_csv(X_file_path)
         y = pd.read_csv(y_file_path)
@@ -454,6 +462,11 @@ def load_saved_results(path, file_name="weights"):
             saved_results = json.load(file)
         if isinstance(saved_results, dict):
             saved_results = {float(k): v for k, v in saved_results.items()}
+        elif isinstance(saved_results, list) and isinstance(saved_results[0], dict):
+            saved_results = [
+                {float(k): v for k, v in saved_result.items()}
+                for saved_result in saved_results
+            ]
     else:
         saved_results = []
     return saved_results

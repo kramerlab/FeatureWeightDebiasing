@@ -267,7 +267,6 @@ def fw_MRS_SVM(
             and early_stopping
         ):
             break
-
     if return_metrics:
         return (
             auroc_dict,

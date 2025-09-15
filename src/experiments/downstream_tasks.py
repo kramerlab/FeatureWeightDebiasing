@@ -56,9 +56,13 @@ def downstream_tasks_experiment(
     rf_auroc_list = []
     rf_auprc_list = []
 
-    weighted_mmds_list = []
-    biases_list = []
-    wasserstein_distance_list = []
+    weighted_mmds_list_R = []
+    biases_list_R = []
+    wasserstein_distance_list_R = []
+
+    weighted_mmds_list_T = []
+    biases_list_T = []
+    wasserstein_distance_list_T = []
 
     abs_feature_importance_list = []
     feature_importance_list = []
@@ -218,7 +222,7 @@ def downstream_tasks_experiment(
             roc_curves_list.append(roc_curve_values)
 
         
-        feature_weighted_mmd, relative_bias, wasserstein_distances = compute_metrics(
+        feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = compute_metrics(
             N,
             R,
             scaler,
@@ -229,6 +233,16 @@ def downstream_tasks_experiment(
             gamma,
         )
 
+        feature_weighted_mmd_T, relative_bias_T, wasserstein_distances_T = compute_metrics(
+            N,
+            T,
+            scaler,
+            columns,
+            target,
+            best_sample_weights,
+            best_feature_weights,
+            gamma,
+        )
 
 
         if method_name in (
@@ -256,9 +270,13 @@ def downstream_tasks_experiment(
                 method_name,
             )
 
-        weighted_mmds_list.append(feature_weighted_mmd)
-        biases_list.append(relative_bias.astype(float))
-        wasserstein_distance_list.append(wasserstein_distances)
+        weighted_mmds_list_R.append(feature_weighted_mmd_R)
+        biases_list_R.append(relative_bias_R.astype(float))
+        wasserstein_distance_list_R.append(wasserstein_distances_R)
+
+        weighted_mmds_list_T.append(feature_weighted_mmd_T)
+        biases_list_T.append(relative_bias_T.astype(float))
+        wasserstein_distance_list_T.append(wasserstein_distances_T)
 
         if method_name == "uniform" and bias_type in ("less_positive_class", "none"):
             (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(
@@ -311,18 +329,29 @@ def downstream_tasks_experiment(
             result_columns = columns
         else:
             result_columns = N.drop(["label"], axis="columns").columns
-        result_dict = write_result_dict(
+        result_dict_similarity_R = write_result_dict(
             result_columns,
-            weighted_mmds_list,
-            biases_list,
-            wasserstein_distance_list,
+            weighted_mmds_list_R,
+            biases_list_R,
+            wasserstein_distance_list_R,
         )
 
-        with open(result_path / "similarity_results.json", "w") as result_file:
-            result_file.write(json.dumps(result_dict))
+        result_dict_similarity_T = write_result_dict(
+            result_columns,
+            weighted_mmds_list_T,
+            biases_list_T,
+            wasserstein_distance_list_T,
+        )
 
-        result_dict = {}
-        result_dict = write_result_dict_test_set(
+        with open(result_path / "similarity_results_R.json", "w") as result_file:
+            result_file.write(json.dumps(result_dict_similarity_R))
+
+        with open(result_path / "similarity_results_T.json", "w") as result_file:
+            result_file.write(json.dumps(result_dict_similarity_T))
+
+
+        result_dict_classification = {}
+        result_dict_classification = write_result_dict_test_set(
             rf_auroc_list,
             rf_auprc_list,
             dropped_samples_list,
@@ -330,7 +359,7 @@ def downstream_tasks_experiment(
         )
 
         with open(result_path / "classification_results.json", "w") as result_file:
-            result_file.write(json.dumps(result_dict))
+            result_file.write(json.dumps(result_dict_classification))
 
         if method_name in (
             "fw-mrs-temperature",

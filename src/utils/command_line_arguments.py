@@ -25,7 +25,7 @@ from weighting_methods import (
 sample_weighting_method_list = [
     "uniform",
     "mrs-forest",
-    "soft-mrs-exponential",
+    "soft-mrs-linear",
     "fw-mrs-temperature",
     "fw-mrs-temperature-svm",
     "fw-mrs-temperature-comparison",
@@ -127,7 +127,7 @@ def get_sample_weighting_function(method_name):
         return uniform_sample_weighting
     elif method_name == "psa":
         return propensity_score_adjustment
-    elif method_name == "soft-mrs-exponential":
+    elif method_name == "soft-mrs-linear":
         return soft_mrs_weighting
     elif method_name in (
         "fw-mrs-temperature",

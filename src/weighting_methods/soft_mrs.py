@@ -34,9 +34,7 @@ def soft_mrs_weighting(
     R,
     columns,
     random_generator=None,
-    exponential=False,
     patience=50,
-    method_name="",
     return_metrics=False,
     compute_bias=False,
     target=None,
@@ -68,14 +66,6 @@ def soft_mrs_weighting(
 
     gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
     loss_function = WeightedMMDLoss(gamma, N[columns], R[columns])
-    exponential = (
-        True
-        if (
-            method_name in ("soft-mrs-exponential", "exponential")
-            or exponential is True
-        )
-        else False
-    )
     wasserstein_target = target if wasserstein_target is None else wasserstein_target
 
     # Optimize until MMD stagnates
@@ -86,7 +76,6 @@ def soft_mrs_weighting(
             weights=np.concatenate([weights_N, weights_R]),
             loss_function=loss_function,
             random_state=random_generator.randint(max_int),
-            exponential=exponential,
         )
 
         if return_metrics:
@@ -118,7 +107,7 @@ def soft_mrs_weighting(
                 current_patience += 1
 
         predictions_N = predictions[: len(N), 1]
-        weights_N = update_weights(weights_N, predictions_N, exponential=exponential)
+        weights_N = update_weights(weights_N, predictions_N)
         iteration += 1
         if iteration == n_iterations:
             break
@@ -136,7 +125,7 @@ def soft_mrs_weighting(
 
 
 def train_weighted_random_forest(
-    x, label, weights, loss_function, random_state, exponential
+    x, label, weights, loss_function, random_state
 ):
     """Trains a random forest and returns the predicted probabilties
 
@@ -150,7 +139,6 @@ def train_weighted_random_forest(
         MMDScoring(
             loss_function,
             weights,
-            exponential=exponential,
         ),
         greater_is_better=False,
         response_method="predict_proba",

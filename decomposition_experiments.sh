@@ -4,7 +4,7 @@ DROP=1
 for BIAS_TYPE in less_positive_class less_negative_class 
 do
     for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform  fw-mrs-temperature-svm \
-        soft-mrs-exponential 
+        soft-mrs-linear
     do
         for DATASET in breast_cancer loan_prediction
         do
@@ -19,7 +19,7 @@ DROP=5
 for BIAS_TYPE in less_positive_class less_negative_class 
 do
     for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform fw-mrs-temperature-svm \
-        soft-mrs-exponential
+        soft-mrs-linear
     do
         for DATASET in folktables_income hr_analytics folktables_employment
         do
@@ -32,7 +32,7 @@ done
 
 DROP=1
 for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform  \
-    soft-mrs-exponential fw-mrs-temperature-svm
+    soft-mrs-linear fw-mrs-temperature-svm
 do
     for DATASET in breast_cancer loan_prediction
     do
@@ -44,7 +44,7 @@ done
 
 DROP=5
 for SAMPLE_WEIGHTING_METHOD in fw-mrs-temperature mrs-forest psa kmm uniform  fw-mrs-temperature-svm \
-    soft-mrs-exponential
+    soft-mrs-linear
 do
     for DATASET in folktables_income hr_analytics folktables_employment
     do

@@ -4,7 +4,7 @@ import numpy as np
 class MMDScoring:
     """Update weights and compute the MMD"""
 
-    def __init__(self, loss_function, weights, exponential) -> None:
+    def __init__(self, loss_function, weights) -> None:
         """Init
 
         :param loss_function: The mmd loss function
@@ -12,7 +12,6 @@ class MMDScoring:
         """
         self.loss_function = loss_function
         self.weights = weights
-        self.exponential = exponential
 
     def __call__(self, ground_truth, predictions):
         """Update weights and returns the mmd calculated with updated weights
@@ -23,7 +22,7 @@ class MMDScoring:
         """
         N_indices = np.where(ground_truth == 1)[0]
         tmp_weights = update_weights(
-            self.weights[N_indices], predictions[N_indices], self.exponential
+            self.weights[N_indices], predictions[N_indices]
         )
         loss = self.loss_function(tmp_weights)
         return loss
@@ -60,7 +59,7 @@ class FullSample:
             yield list(range(len(X))), list(range(len(X)))
 
 
-def update_weights(weights, predictions, exponential):
+def update_weights(weights, predictions):
     """Updates sample weights based on the prediction probabilities
 
     :param weights: Sample weights
@@ -71,10 +70,7 @@ def update_weights(weights, predictions, exponential):
     """
     epsilon = np.finfo(weights.dtype).eps
     predictions = np.clip(predictions, a_min=epsilon, a_max=None)
-    if exponential:
-        weight_modificator = 1.5 - (1 / (1 + ((1 / predictions) - 1) ** 0.5))
-    else:
-        weight_modificator = 1.5 - predictions
+    weight_modificator = 1.5 - predictions
     weights *= weight_modificator
     weights = weights / weights.sum()
     return weights

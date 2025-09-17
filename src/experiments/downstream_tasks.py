@@ -252,7 +252,7 @@ def downstream_tasks_experiment(
             "fw-mrs-temperature-svm",
             "fw-mrs-temperature-comparison",
             "mrs-forest",
-        ) and data_set_name not in ("gbs_gesis", "gbs_allensbach"):
+        ):
             compute_validation_results(
                 columns,
                 target,

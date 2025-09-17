@@ -221,29 +221,31 @@ def downstream_tasks_experiment(
             abs_feature_importance_list.append(abs_feature_importance.tolist())
             roc_curves_list.append(roc_curve_values)
 
-        
-        feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = compute_metrics(
-            N,
-            R,
-            scaler,
-            columns,
-            target,
-            best_sample_weights,
-            best_feature_weights,
-            gamma,
+        feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = (
+            compute_metrics(
+                N,
+                R,
+                scaler,
+                columns,
+                target,
+                best_sample_weights,
+                best_feature_weights,
+                gamma,
+            )
         )
 
-        feature_weighted_mmd_T, relative_bias_T, wasserstein_distances_T = compute_metrics(
-            N,
-            T,
-            scaler,
-            columns,
-            target,
-            best_sample_weights,
-            best_feature_weights,
-            gamma,
+        feature_weighted_mmd_T, relative_bias_T, wasserstein_distances_T = (
+            compute_metrics(
+                N,
+                T,
+                scaler,
+                columns,
+                target,
+                best_sample_weights,
+                best_feature_weights,
+                gamma,
+            )
         )
-
 
         if method_name in (
             "fw-mrs-temperature",
@@ -348,7 +350,6 @@ def downstream_tasks_experiment(
 
         with open(result_path / "similarity_results_T.json", "w") as result_file:
             result_file.write(json.dumps(result_dict_similarity_T))
-
 
         result_dict_classification = {}
         result_dict_classification = write_result_dict_test_set(
@@ -636,9 +637,7 @@ def compute_validation_results(
             accuracy_individual_val_dict[float(temperature)].append(rf_accuracy_val)
 
 
-def gbs_gesis_split(
-    n_cv_splits, n_cv_repeats, df, target_values, random_generator
-):
+def gbs_gesis_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):
     # Is used to draw radom states
     max_int = 2**32 - 1
     N = df[df["label"] == 1]

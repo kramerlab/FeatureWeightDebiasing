@@ -8,7 +8,6 @@ from utils.statistics import create_result_path
 from utils.sampling import sample_N
 from utils.metrics import (
     calculate_rbf_gamma,
-    compute_classification_metrics_random_forest,
     compute_metrics,
 )
 from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean
@@ -214,9 +213,16 @@ def temperature_comparison(
                 random_forest_feature_weighted_aurocs[temperature][fixed_hyperparameter]
             )
 
-            key = list(temperature_sample_weights[best_hyperparameter_temperature].keys())[0]
+            key = list(
+                temperature_sample_weights[best_hyperparameter_temperature].keys()
+            )[0]
             dropped_samples_dict[temperature].append(
-                np.count_nonzero(np.array(temperature_sample_weights[best_hyperparameter_temperature][key]) == 0.0)
+                np.count_nonzero(
+                    np.array(
+                        temperature_sample_weights[best_hyperparameter_temperature][key]
+                    )
+                    == 0.0
+                )
             )
 
         optimised_feature_weighted_aurocs_list.append(
@@ -271,13 +277,12 @@ def temperature_comparison(
 
         with open(result_path / "optimised_mmd.json", "w") as result_file:
             result_file.write(json.dumps(optimized_mmd_dict))
-    
+
         with open(result_path / "all_mmds.json", "w") as result_file:
             result_file.write(json.dumps(all_mmd_list))
 
         with open(result_path / "dropped_elements.json", "w") as result_file:
             result_file.write(json.dumps(dropped_samples_dict))
-
 
 
 def gbs_split(n_cv_splits, n_cv_repeats, df, target_values, random_generator):

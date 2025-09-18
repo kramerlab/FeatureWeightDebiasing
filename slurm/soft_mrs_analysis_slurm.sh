@@ -7,7 +7,7 @@
 #SBATCH -t 10-00 
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=16G
-#SBATCH --array=1-12
+#SBATCH --array=1-2
 
 
 N_CV_REPEATS=10

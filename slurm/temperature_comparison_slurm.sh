@@ -5,7 +5,7 @@
 #SBATCH -J "Temperature Comparison" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
 #SBATCH -t 12-00 
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=16G 
 #SBATCH --array=1-4
 

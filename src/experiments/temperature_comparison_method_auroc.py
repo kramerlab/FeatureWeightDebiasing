@@ -10,7 +10,7 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_metrics,
 )
-from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean
+from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean, plot_temperature_comparison_mmd_mean
 from sklearn.preprocessing import StandardScaler
 
 seed = 5
@@ -46,14 +46,13 @@ def temperature_comparison(
     :param bias_type: Name of the bias that will be induced, defaults to None
     :param data_set_name: Data set name, defaults to ""
     """
+    temperatures = [0.0, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
     if method_name in ("fw-mrs-temperature",):
-        temperatures = [0.0, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
         hyperparameter_list = [0.0, 0.001, 0.01, 0.025]
         fixed_hyperparameter = 0.01
     if method_name in ("fw-mrs-temperature-svm",):
-        temperatures = [0.0, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001]
         hyperparameter_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
-        fixed_hyperparameter = 1e0
+        fixed_hyperparameter = 1.0
     dropped_samples_dict = {temperature: [] for temperature in temperatures}
 
     result_path = create_result_path(
@@ -68,25 +67,30 @@ def temperature_comparison(
     feature_weights_save_path = result_path / "feature_weights"
     feature_importances_save_path = result_path / "feature_importances"
     auroc_save_path = result_path / "method_aurocs"
+    mmd_save_path = result_path / "method_mmds"
 
     sample_weights_save_path.mkdir(exist_ok=True)
     feature_weights_save_path.mkdir(exist_ok=True)
     auroc_save_path.mkdir(exist_ok=True)
+    mmd_save_path.mkdir(exist_ok=True)
     feature_importances_save_path.mkdir(exist_ok=True)
 
     feature_weighted_aurocs_list = load_saved_results(
         auroc_save_path, file_name="aurocs"
     )
+    feature_weighted_mmd_list = load_saved_results(
+        mmd_save_path, file_name="iteration_mmds"
+    )
     optimised_feature_weighted_aurocs_list = []
     fixed_feature_weighted_aurocs_list = []
-    all_feature_weighted_aurocs_list = []
+    optimised_feature_weighted_mmds_list = []
+    fixed_feature_weighted_mmds_list = []
     sample_weights_list = load_saved_results(sample_weights_save_path)
     feature_weights_list = load_saved_results(feature_weights_save_path)
     feature_importances_list = load_saved_results(
         feature_weights_save_path, "feature_importances"
     )
     optimized_mmd_dict = {temperature: [] for temperature in temperatures}
-    all_mmd_list = []
 
     number_of_samples_list = []
     scaler = StandardScaler()
@@ -130,6 +134,7 @@ def temperature_comparison(
             fixed_hyperparameter = float(fixed_hyperparameter)
             (
                 random_forest_feature_weighted_aurocs,
+                iteration_mmd_dict,
                 sample_weights,
                 feature_weights,
                 feature_importances,
@@ -161,17 +166,23 @@ def temperature_comparison(
             )
 
             feature_weighted_aurocs_list.append(random_forest_feature_weighted_aurocs)
+            feature_weighted_mmd_list.append(iteration_mmd_dict)
             save_results(
                 auroc_save_path,
                 feature_weighted_aurocs_list,
                 file_name="aurocs",
             )
+            save_results(
+                mmd_save_path,
+                feature_weighted_mmd_list,
+                file_name="iteration_mmds",
+            )
 
         optimised_random_forest_feature_weighted_aurocs = {}
         fixed_feature_weighted_aurocs = {}
-        best_feature_weighted_aurocs = []
+        fixed_feature_weighted_mmds = {}
+        optimised_feature_weighted_mmds = {}
 
-        best_mmd_all = np.inf
         for temperature, temperature_sample_weights in sample_weights.items():
             temperature_feature_weights = feature_weights[temperature]
             best_mmd_temperature = np.inf
@@ -198,20 +209,25 @@ def temperature_comparison(
                     best_hyperparameter_temperature = hyperparameter
                     best_mmd_temperature = feature_weighted_mmd
 
-                if feature_weighted_mmd < best_mmd_all:
-                    best_hyperparameter_all = hyperparameter
-                    best_temperature_all = temperature
-                    best_mmd_all = feature_weighted_mmd
-
             optimised_random_forest_feature_weighted_aurocs[temperature] = (
                 random_forest_feature_weighted_aurocs[temperature][
                     best_hyperparameter_temperature
                 ]
             )
+            optimised_feature_weighted_mmds[temperature] = (
+                iteration_mmd_dict[temperature][
+                    best_hyperparameter_temperature
+                ]
+            )
+
+            
             optimized_mmd_dict[temperature].append(best_mmd_temperature)
             fixed_feature_weighted_aurocs[temperature] = (
                 random_forest_feature_weighted_aurocs[temperature][fixed_hyperparameter]
             )
+            fixed_feature_weighted_mmds[temperature] = iteration_mmd_dict[temperature][
+                fixed_hyperparameter
+            ]
 
             key = list(
                 temperature_sample_weights[best_hyperparameter_temperature].keys()
@@ -228,14 +244,10 @@ def temperature_comparison(
         optimised_feature_weighted_aurocs_list.append(
             optimised_random_forest_feature_weighted_aurocs
         )
+        optimised_feature_weighted_mmds_list.append(optimised_feature_weighted_mmds)
 
         fixed_feature_weighted_aurocs_list.append(fixed_feature_weighted_aurocs)
-
-        best_feature_weighted_aurocs = random_forest_feature_weighted_aurocs[
-            best_temperature_all
-        ][best_hyperparameter_all]
-        all_feature_weighted_aurocs_list.append(best_feature_weighted_aurocs)
-        all_mmd_list.append(best_mmd_all)
+        fixed_feature_weighted_mmds_list.append(fixed_feature_weighted_mmds)
 
         save_results(
             auroc_save_path,
@@ -248,9 +260,14 @@ def temperature_comparison(
             file_name="fixed_method_aurocs",
         )
         save_results(
-            auroc_save_path,
-            all_feature_weighted_aurocs_list,
-            file_name="all_method_aurocs",
+            mmd_save_path,
+            fixed_feature_weighted_mmds_list,
+            file_name="fixed_method_mmds",
+        )
+        save_results(
+            mmd_save_path,
+            optimised_feature_weighted_mmds_list,
+            file_name="optimised_method_mmds",
         )
 
         meta_data_dict = {
@@ -274,12 +291,21 @@ def temperature_comparison(
             drop,
             result_path / "fixed_mean_auroc",
         )
+        plot_temperature_comparison_mmd_mean(
+            fixed_feature_weighted_mmds_list,
+            number_of_samples_list,
+            drop,
+            result_path / "fixed_mean_mmds",
+        )
+        plot_temperature_comparison_mmd_mean(
+            optimised_feature_weighted_mmds_list,
+            number_of_samples_list,
+            drop,
+            result_path / "optimised_mean_mmds",
+        )
 
         with open(result_path / "optimised_mmd.json", "w") as result_file:
             result_file.write(json.dumps(optimized_mmd_dict))
-
-        with open(result_path / "all_mmds.json", "w") as result_file:
-            result_file.write(json.dumps(all_mmd_list))
 
         with open(result_path / "dropped_elements.json", "w") as result_file:
             result_file.write(json.dumps(dropped_samples_dict))

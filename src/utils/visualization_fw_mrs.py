@@ -90,14 +90,52 @@ def plot_temperature_comparison_auroc_mean(
         std_aurocs = np.std(auroc_list, axis=0)
         ratio_upper = mean_aurocs + std_aurocs
         ratio_lower = (mean_aurocs - std_aurocs).clip(min=0)
-        sns.lineplot(
-            x=x_labels, y=mean_aurocs, label=str(budget)
-        )
+        sns.lineplot(x=x_labels, y=mean_aurocs, label=str(budget))
         plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.3)
     plt.plot(
         [min_number_of_samples, x_labels[-1]], [0.5, 0.5], color="black", linestyle="--"
     )
     plt.ylabel("Feature Weighted AUROC")
+    plt.xlabel("Number of Remaining Samples")
+    step_size = len(x_labels) // n_ticks
+    x_ticks = x_labels[::-step_size]
+    plt.xticks(x_ticks)
+    plt.gca().invert_xaxis()
+
+    plt.savefig(f"{file_name}.pdf")
+    plt.close()
+
+
+def plot_temperature_comparison_mmd_mean(
+    auroc_list_of_dictionaries,
+    number_of_samples,
+    drop,
+    file_name,
+    wide=True,
+    n_ticks=5,
+):
+    if wide:
+        plt.figure(figsize=(10, 5))
+    min_length = np.min(
+        [
+            [len(auroc_list) for auroc_list in auroc_lists.values()]
+            for auroc_lists in auroc_list_of_dictionaries
+        ]
+    )
+    min_number_of_samples = np.min(number_of_samples)
+    x_labels = list(range(min_number_of_samples, 0, -drop))[:min_length]
+    for i, budget in enumerate(auroc_list_of_dictionaries[0].keys()):
+        auroc_list = []
+        for dictionary in auroc_list_of_dictionaries:
+            dictionary = {float(k): v for k, v in dictionary.items()}
+            auroc_list.append(dictionary[float(budget)][:min_length])
+        mean_aurocs = np.mean(auroc_list, axis=0)
+        std_aurocs = np.std(auroc_list, axis=0)
+        ratio_upper = mean_aurocs + std_aurocs
+        ratio_lower = (mean_aurocs - std_aurocs).clip(min=0)
+        sns.lineplot(x=x_labels, y=mean_aurocs, label=str(budget))
+        plt.fill_between(x_labels, ratio_lower, ratio_upper, alpha=0.3)
+    plt.ylabel("Feature Weighted MMD")
     plt.xlabel("Number of Remaining Samples")
     step_size = len(x_labels) // n_ticks
     x_ticks = x_labels[::-step_size]

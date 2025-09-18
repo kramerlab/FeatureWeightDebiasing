@@ -2,13 +2,12 @@
 
 #SBATCH -A m2_datamining
 #SBATCH -p longtime 
-#SBATCH -J "feature_weighting_temperature_comparison" # gives SLURM_JOB_NAME
+#SBATCH -J "Temperature Comparison" # gives SLURM_JOB_NAME
 #SBATCH -n 1 # gives SLURM_NTASKS
-#SBATCH -t 9-00 
-#SBATCH --cpus-per-task=4
-#SBATCH --nodes=1
+#SBATCH -t 12-00 
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=16G 
-#SBATCH --array=1-10
+#SBATCH --array=1-4
 
 source ~/.bashrc
 conda_initialize
@@ -16,12 +15,13 @@ micromamba activate feature_weighted_mrs
 
 N_CV_REPEATS=10
 N_CV_SPLITS=5
-DROP=5
+
 CONFIG=temperature_comparison.config
 BIAS_FRACTION=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $CONFIG)
 SAMPLE_WEIGHTING_METHOD=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $3}' $CONFIG)
 DATASET=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $4}' $CONFIG)
 BIAS_TYPE=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}' $CONFIG)
+DROP=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $6}' $CONFIG)
 
 srun python ../src/weighting_experiment.py --dataset $DATASET  --sample_weighting_method $SAMPLE_WEIGHTING_METHOD  \
 --bias_type $BIAS_TYPE --n_cv_repeats $N_CV_REPEATS --n_cv_splits $N_CV_SPLITS \

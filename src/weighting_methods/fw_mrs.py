@@ -9,9 +9,12 @@ from sklearn.model_selection import (
     StratifiedKFold,
 )
 from utils.metrics import (
+    calculate_rbf_gamma,
     compute_feature_weights_with_temperature,
     train_pu_classifier,
+    weighted_maximum_mean_discrepancy,
 )
+from sklearn.metrics.pairwise import rbf_kernel
 
 # Used to draw radom states
 max_int = 2**32 - 1
@@ -30,7 +33,6 @@ def mrs_step(
     sample_weights=None,
     compute_feature_importance=False,
     hyperparameter=0.0,
-    stratify_R=False,
     *args,
     **attributes,
 ):
@@ -50,10 +52,7 @@ def mrs_step(
     all_predictions = np.zeros(len(dropped_N))
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    if stratify_R:
-        kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    else:
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(
         skf.split(dropped_N, dropped_N[target]), kf.split(R, R[target])
@@ -107,7 +106,6 @@ def feature_weighted_repeated_MRS(
     n_pu_splits=5,
     hyperparameter_list=[],
     return_metrics=False,
-    stratify_R=False,
     *args,
     **attributes,
 ):
@@ -169,6 +167,14 @@ def feature_weighted_repeated_MRS(
         mrs_step=mrs_step,
     )
 
+    if return_metrics:
+        for hyperparameter in hyperparameter_list:
+            # Compute and save mmd inputs to save time
+            gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
+            x_x_rbf_matrix = rbf_kernel(N[columns], N[columns], gamma=gamma)
+            x_y_rbf_matrix = rbf_kernel(N[columns], R[columns], gamma=gamma)
+            y_y_rbf_matrix = rbf_kernel(R[columns], R[columns], gamma=gamma)
+
     for i in trange(number_of_iterations):
         for temperature in budgets:
             for hyperparameter in hyperparameter_list:
@@ -189,7 +195,6 @@ def feature_weighted_repeated_MRS(
                     splitter=splitter,
                     sample_weights=sample_weights_dict[temperature][hyperparameter],
                     hyperparameter=hyperparameter,
-                    stratify_R=stratify_R,
                 )
 
                 if drop_ids is None:
@@ -200,6 +205,19 @@ def feature_weighted_repeated_MRS(
 
                 if return_metrics:
                     auroc_dict[temperature][hyperparameter].append(auroc)
+                    mmd = weighted_maximum_mean_discrepancy(
+                        dropped_N[columns],
+                        R[columns],
+                        sample_weights_dict[temperature][hyperparameter],
+                        feature_weights=feature_weights_dict[temperature][
+                            hyperparameter
+                        ],
+                        gamma=gamma,
+                        x_x_rbf_matrix=x_x_rbf_matrix,
+                        x_y_rbf_matrix=x_y_rbf_matrix,
+                        y_y_rbf_matrix=y_y_rbf_matrix,
+                    )
+                    mmd_dict[temperature][hyperparameter].append(mmd)
 
                 if (
                     (
@@ -240,6 +258,7 @@ def feature_weighted_repeated_MRS(
     if return_metrics:
         return (
             auroc_dict,
+            mmd_dict,
             best_sample_weights_dict,
             feature_weights_dict,
             abs_feature_importance_dict,
@@ -275,7 +294,6 @@ def initialize_dictionaries(
     auc_dict={},
     mmd_dict={},
     mrs_step=mrs_step,
-    stratify_R=False,
 ):
     for temperature in budgets:
         best_difference_dict[temperature] = {}
@@ -320,7 +338,6 @@ def initialize_dictionaries(
             sample_weights=np.ones(len(N)),
             compute_feature_importance=True,
             hyperparameter=hyperparameter,
-            stratify_R=stratify_R,
             class_weights="balanced",
         )
 

@@ -10,7 +10,10 @@ from utils.metrics import (
     calculate_rbf_gamma,
     compute_metrics,
 )
-from utils.visualization_fw_mrs import plot_temperature_comparison_auroc_mean, plot_temperature_comparison_mmd_mean
+from utils.visualization_fw_mrs import (
+    plot_temperature_comparison_auroc_mean,
+    plot_temperature_comparison_mmd_mean,
+)
 from sklearn.preprocessing import StandardScaler
 
 seed = 5
@@ -123,7 +126,6 @@ def temperature_comparison(
             N["label"] = 1
             R["label"] = 0
 
-        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
         if len(sample_weights_list) > i and load_previous_results:
             sample_weights = sample_weights_list[i]
             feature_weights = feature_weights_list[i]
@@ -194,6 +196,10 @@ def temperature_comparison(
                 if len(one_sample_weights) == 0:
                     continue
 
+                gamma = calculate_rbf_gamma(
+                    np.append(N[columns], R[columns], axis=0),
+                    one_feature_weights,
+                )
                 key = list(one_sample_weights.keys())[0]
                 feature_weighted_mmd, _, _ = compute_metrics(
                     N,
@@ -214,13 +220,10 @@ def temperature_comparison(
                     best_hyperparameter_temperature
                 ]
             )
-            optimised_feature_weighted_mmds[temperature] = (
-                iteration_mmd_dict[temperature][
-                    best_hyperparameter_temperature
-                ]
-            )
+            optimised_feature_weighted_mmds[temperature] = iteration_mmd_dict[
+                temperature
+            ][best_hyperparameter_temperature]
 
-            
             optimized_mmd_dict[temperature].append(best_mmd_temperature)
             fixed_feature_weighted_aurocs[temperature] = (
                 random_forest_feature_weighted_aurocs[temperature][fixed_hyperparameter]

@@ -151,8 +151,6 @@ def downstream_tasks_experiment(
         N["label"] = 1
         R["label"] = 0
 
-        gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
-
         if len(sample_weight_list) > i and load_previous_results:
             sample_weights = sample_weight_list[i]
             feature_weights = feature_weight_list[i]
@@ -221,6 +219,10 @@ def downstream_tasks_experiment(
             abs_feature_importance_list.append(abs_feature_importance.tolist())
             roc_curves_list.append(roc_curve_values)
 
+        gamma = calculate_rbf_gamma(
+            np.append(N[columns], R[columns], axis=0),
+            best_feature_weights,
+        )
         feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = (
             compute_metrics(
                 N,

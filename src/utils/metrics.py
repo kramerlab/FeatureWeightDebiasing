@@ -75,12 +75,17 @@ def compute_relative_bias(N, R, sample_weights):
     return relative_bias
 
 
-def calculate_rbf_gamma(aggregate_set):
+def calculate_rbf_gamma(aggregate_set, feature_weights=None):
     """Calculate the gamma for the RBF-kernel
 
     :param aggregate_set: Aggregated data set
     :return: Gamma
     """
+    if feature_weights:
+        feature_weights = (
+            feature_weights / np.sum(feature_weights) * len(feature_weights)
+        )
+        aggregate_set = aggregate_set * np.sqrt(feature_weights)
     all_distances = pdist(aggregate_set, "euclid")
     sigma = np.median(all_distances)
     return 1 / (2 * (sigma**2))

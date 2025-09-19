@@ -203,9 +203,10 @@ def mrs(
                     sample_weights=sample_weights_dict[hyperparameter],
                     hyperparameter=hyperparameter,
                 )
-                roc_dict[hyperparameter].append(
-                    [mean_ifpr_list.tolist(), mean_itpr_list.tolist(), i * drop]
-                )
+                if mean_ifpr_list:
+                    roc_dict[hyperparameter].append(
+                        [mean_ifpr_list.tolist(), mean_itpr_list.tolist(), i * drop]
+                    )
                 if drop_ids is None:
                     finished_dict[hyperparameter] = True
                     continue
@@ -325,6 +326,13 @@ def random_drops(
     itpr_list = []
 
     dropped_N = N[sample_weights != 0.0]
+    y = dropped_N[target]
+    target_sum = np.sum(y)
+    if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
+        if calculate_roc:
+            return None, None, None, None
+        else:
+            return None, None
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)

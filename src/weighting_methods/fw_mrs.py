@@ -140,6 +140,10 @@ def feature_weighted_repeated_MRS(
     switched_dict = {}
     auroc_dict = {}
     mmd_dict = {}
+    gamma_dict = {}
+    x_x_rbf_matrix_dict = {}
+    x_y_rbf_matrix_dict = {}
+    y_y_rbf_matrix_dict = {}
 
     initialize_dictionaries(
         N,
@@ -164,16 +168,38 @@ def feature_weighted_repeated_MRS(
         switched_dict,
         auroc_dict,
         mmd_dict,
+        gamma_dict=gamma_dict,
+        x_x_rbf_matrix_dict=x_x_rbf_matrix_dict,
+        x_y_rbf_matrix_dict=x_y_rbf_matrix_dict,
+        y_y_rbf_matrix_dict=y_y_rbf_matrix_dict,
         mrs_step=mrs_step,
     )
 
     if return_metrics:
-        for hyperparameter in hyperparameter_list:
-            # Compute and save mmd inputs to save time
-            gamma = calculate_rbf_gamma(np.append(N[columns], R[columns], axis=0))
-            x_x_rbf_matrix = rbf_kernel(N[columns], N[columns], gamma=gamma)
-            x_y_rbf_matrix = rbf_kernel(N[columns], R[columns], gamma=gamma)
-            y_y_rbf_matrix = rbf_kernel(R[columns], R[columns], gamma=gamma)
+        for temperature in budgets:
+            for hyperparameter in hyperparameter_list:
+                # Compute and save mmd inputs to save time
+                gamma = calculate_rbf_gamma(
+                    np.append(N[columns], R[columns], axis=0),
+                    feature_weights_dict[temperature][hyperparameter],
+                )
+                gamma_dict[temperature][hyperparameter] = gamma
+                scaled_feature_weights = (
+                    feature_weights_dict[temperature][hyperparameter]
+                    / np.sum(feature_weights_dict[temperature][hyperparameter])
+                    * len(feature_weights_dict[temperature][hyperparameter])
+                )
+                scaled_N = N[columns] * np.sqrt(scaled_feature_weights)
+                scaled_R = R[columns] * np.sqrt(scaled_feature_weights)
+                x_x_rbf_matrix_dict[temperature][hyperparameter] = rbf_kernel(
+                    scaled_N, scaled_N, gamma=gamma_dict[temperature][hyperparameter]
+                )
+                x_y_rbf_matrix_dict[temperature][hyperparameter] = rbf_kernel(
+                    scaled_N, scaled_R, gamma=gamma_dict[temperature][hyperparameter]
+                )
+                y_y_rbf_matrix_dict[temperature][hyperparameter] = rbf_kernel(
+                    scaled_R, scaled_R, gamma=gamma_dict[temperature][hyperparameter]
+                )
 
     for i in trange(number_of_iterations):
         for temperature in budgets:
@@ -212,10 +238,10 @@ def feature_weighted_repeated_MRS(
                         feature_weights=feature_weights_dict[temperature][
                             hyperparameter
                         ],
-                        gamma=gamma,
-                        x_x_rbf_matrix=x_x_rbf_matrix,
-                        x_y_rbf_matrix=x_y_rbf_matrix,
-                        y_y_rbf_matrix=y_y_rbf_matrix,
+                        gamma=gamma_dict[temperature][hyperparameter],
+                        x_x_rbf_matrix=x_x_rbf_matrix_dict[temperature][hyperparameter],
+                        x_y_rbf_matrix=x_y_rbf_matrix_dict[temperature][hyperparameter],
+                        y_y_rbf_matrix=y_y_rbf_matrix_dict[temperature][hyperparameter],
                     )
                     mmd_dict[temperature][hyperparameter].append(mmd)
 
@@ -293,6 +319,10 @@ def initialize_dictionaries(
     switched_dict={},
     auc_dict={},
     mmd_dict={},
+    gamma_dict={},
+    x_x_rbf_matrix_dict={},
+    x_y_rbf_matrix_dict={},
+    y_y_rbf_matrix_dict={},
     mrs_step=mrs_step,
 ):
     for temperature in budgets:
@@ -308,6 +338,10 @@ def initialize_dictionaries(
         switched_dict[temperature] = {}
         auc_dict[temperature] = {}
         mmd_dict[temperature] = {}
+        gamma_dict[temperature] = {}
+        x_x_rbf_matrix_dict[temperature] = {}
+        x_y_rbf_matrix_dict[temperature] = {}
+        y_y_rbf_matrix_dict[temperature] = {}
         for hyperparameter in hyperparameter_list:
             finished_dict[temperature][hyperparameter] = False
             switched_dict[temperature][hyperparameter] = False

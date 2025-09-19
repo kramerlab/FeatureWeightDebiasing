@@ -115,7 +115,7 @@ def analyse_mrs(
 
         number_of_samples = len(N)
 
-        if len(aucs_complete) <= i and not load_previous_results:
+        if len(aucs_complete) <= i and load_previous_results:
             (
                 auc_dict,
                 mmd_dict,

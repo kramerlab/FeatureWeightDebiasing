@@ -115,7 +115,13 @@ def analyse_mrs(
 
         number_of_samples = len(N)
 
-        if len(aucs_complete) <= i and load_previous_results:
+        if len(aucs_complete) > i and load_previous_results:
+            auc_dict = aucs_complete[i]
+            mmd_dict = mmds_complete[i]
+            relative_bias_dict = relative_bias_dict_list[i]
+            mrs_iteration_dict = mrs_iteration_dict_list[i]
+            wasserstein_dict = wassersteins_complete[i]
+        else:
             (
                 auc_dict,
                 mmd_dict,
@@ -152,7 +158,6 @@ def analyse_mrs(
             )
             save_results(wassersteins_save_path, wassersteins_complete, "wassersteins")
 
-
         plot_value_average(
             mmds_complete,
             drop,
@@ -185,7 +190,6 @@ def analyse_mrs(
             ylabel="Wasserstein Distance",
         )
 
-
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             plot_relative_bias(
                 relative_bias_dict_list,
@@ -196,7 +200,7 @@ def analyse_mrs(
             )
 
         meta_data_dict = {"n_dropped": drop, "number_of_samples": number_of_samples}
-        with open(result_path / 'metadata.json', 'w') as file:
+        with open(result_path / "metadata.json", "w") as file:
             json.dump(meta_data_dict, file)
 
 

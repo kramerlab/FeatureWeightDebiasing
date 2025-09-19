@@ -9,12 +9,11 @@ from weighting_methods import maximum_representative_subsampling
 from utils.command_line_arguments import parse_mrs_analysis_command_line_arguments
 from utils.data_loader import load_dataset, load_saved_results, save_results
 from utils.sampling import sample_N
-from utils.metrics import calculate_mean_rocs, scale_df
+from utils.metrics import scale_df
 from utils.visualization import (
     plot_auc_average,
     plot_relative_bias,
     plot_value_average,
-    plot_rocs_mrs,
 )
 
 seed = 5
@@ -74,14 +73,12 @@ def analyse_mrs(
     aurocs_save_path = result_path / "aurocs"
     mmds_save_path = result_path / "mmds"
     relative_bias_save_path = result_path / "relative_bias"
-    rocs_save_path = result_path / "rocs"
     mrs_iterations_save_path = result_path / "mrs_iterations"
     wassersteins_save_path = result_path / "wassersteins"
 
     aurocs_save_path.mkdir(exist_ok=True)
     mmds_save_path.mkdir(exist_ok=True)
     relative_bias_save_path.mkdir(exist_ok=True)
-    rocs_save_path.mkdir(exist_ok=True)
     mrs_iterations_save_path.mkdir(exist_ok=True)
     wassersteins_save_path.mkdir(exist_ok=True)
 
@@ -91,7 +88,6 @@ def analyse_mrs(
     mrs_iteration_dict_list = load_saved_results(
         mrs_iterations_save_path, "mrs_iterations"
     )
-    rocs_dict_list = load_saved_results(rocs_save_path, "rocs")
     relative_bias_dict_list = load_saved_results(
         relative_bias_save_path, "relative_biases"
     )
@@ -125,7 +121,6 @@ def analyse_mrs(
                 mmd_dict,
                 relative_bias_dict,
                 mrs_iteration_dict,
-                roc_list_dict,
                 wasserstein_dict,
             ) = maximum_representative_subsampling.mrs(
                 N,
@@ -146,21 +141,17 @@ def analyse_mrs(
             mmds_complete.append(mmd_dict)
             wassersteins_complete.append(wasserstein_dict)
             mrs_iteration_dict_list.append(mrs_iteration_dict)
-            rocs_dict_list.append(roc_list_dict)
             relative_bias_dict_list.append(relative_bias_dict)
 
-            save_results(aurocs_save_path, aucs_complete, "aurocs")
             save_results(mmds_save_path, mmds_complete, "mmds")
             save_results(
                 relative_bias_save_path, relative_bias_dict_list, "relative_biases"
             )
-            save_results(rocs_save_path, rocs_dict_list, "rocs")
             save_results(
                 mrs_iterations_save_path, mrs_iteration_dict_list, "mrs_iterations"
             )
             save_results(wassersteins_save_path, wassersteins_complete, "wassersteins")
 
-        mean_rocs = calculate_mean_rocs(rocs_dict_list)
 
         plot_value_average(
             mmds_complete,
@@ -194,7 +185,6 @@ def analyse_mrs(
             ylabel="Wasserstein Distance",
         )
 
-        plot_rocs_mrs(mean_rocs, result_path / "rocs")
 
         if data_set_name not in ("gbs_gesis", "gbs_allensbach"):
             plot_relative_bias(

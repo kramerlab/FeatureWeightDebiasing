@@ -12,10 +12,8 @@ from sklearn.model_selection import (
 from sklearn.metrics import roc_auc_score
 
 from utils.metrics import (
-    calculate_mean_roc,
     calculate_rbf_gamma,
     compute_relative_bias,
-    interpolate_roc,
     train_pu_classifier_mrs,
     wasserstein_distance,
     weighted_maximum_mean_discrepancy,
@@ -33,7 +31,6 @@ def mrs_step(
     n_drop: int = 1,
     n_splits=5,
     random_state=None,
-    calculate_roc=False,
     sample_weights=None,
     hyperparameter=0.0,
     *args,
@@ -50,18 +47,12 @@ def mrs_step(
     :return: _description_
     """
     auroc_list = []
-    ifpr_list = []
-    itpr_list = []
-
     dropped_N = N[sample_weights != 0.0]
 
     y = dropped_N[target]
     target_sum = np.sum(y)
     if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
-        if calculate_roc:
-            return None, None, None, None
-        else:
-            return None, None
+        return None, None
 
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -86,25 +77,9 @@ def mrs_step(
         all_predictions[test_indices_N] += predictions[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, predictions))
 
-        if calculate_roc:
-            interpolated_fpr, interpolated_tpr = interpolate_roc(
-                test_data.label, predictions
-            )
-            ifpr_list.append(interpolated_fpr)
-            itpr_list.append(interpolated_tpr)
-
     drop_ids = np.argpartition(all_predictions, -n_drop)[-n_drop:]
 
-    if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(ifpr_list, itpr_list)
-        return (
-            dropped_N.index[drop_ids],
-            np.mean(auroc_list),
-            mean_ifpr_list,
-            mean_itpr_list,
-        )
-    else:
-        return dropped_N.index[drop_ids], np.mean(auroc_list)
+    return dropped_N.index[drop_ids], np.mean(auroc_list)
 
 
 def mrs(
@@ -144,7 +119,6 @@ def mrs(
     auc_dict = {}
     relative_bias_dict = {}
     mmd_dict = {}
-    roc_dict = {}
     mrs_iteration_dict = {}
     sample_weights_dict = {}
     switched_dict = {}
@@ -159,7 +133,6 @@ def mrs(
         auc_dict[hyperparameter] = []
         relative_bias_dict[hyperparameter] = []
         mmd_dict[hyperparameter] = []
-        roc_dict[hyperparameter] = []
         mrs_iteration_dict[hyperparameter] = 0
         sample_weights_dict[hyperparameter] = np.ones(len(N))
         switched_dict[hyperparameter] = False
@@ -169,7 +142,6 @@ def mrs(
 
     number_of_iterations = ((len(N) - n_pu_splits) // drop) - 1
     dropped_N = N.copy().reset_index(drop=True)
-    roc_iteration = (len(N) // drop // 3.5) + 1
 
     # Compute and save mmd inputs to save time
     # Start values
@@ -185,47 +157,21 @@ def mrs(
         for hyperparameter in hyperparameter_list:
             if finished_dict[hyperparameter] and not return_metrics:
                 continue
-            if i % roc_iteration == 0 and return_metrics:
-                (
-                    drop_ids,
-                    auroc,
-                    mean_ifpr_list,
-                    mean_itpr_list,
-                ) = mrs_function(
-                    N=dropped_N,
-                    R=R,
-                    columns=columns,
-                    target=target,
-                    n_drop=drop,
-                    n_splits=n_pu_splits,
-                    random_state=int(random_generator.randint(max_int, dtype=np.int64)),
-                    calculate_roc=True,
-                    sample_weights=sample_weights_dict[hyperparameter],
-                    hyperparameter=hyperparameter,
-                )
-                if mean_ifpr_list:
-                    roc_dict[hyperparameter].append(
-                        [mean_ifpr_list.tolist(), mean_itpr_list.tolist(), i * drop]
-                    )
-                if drop_ids is None:
-                    finished_dict[hyperparameter] = True
-                    continue
-            else:
-                drop_ids, auroc = mrs_function(
-                    N=dropped_N,
-                    R=R,
-                    columns=columns,
-                    target=target,
-                    n_drop=drop,
-                    n_splits=n_pu_splits,
-                    random_state=int(random_generator.randint(max_int, dtype=np.int64)),
-                    sample_weights=sample_weights_dict[hyperparameter],
-                    hyperparameter=hyperparameter,
-                )
+            drop_ids, auroc = mrs_function(
+                N=dropped_N,
+                R=R,
+                columns=columns,
+                target=target,
+                n_drop=drop,
+                n_splits=n_pu_splits,
+                random_state=int(random_generator.randint(max_int, dtype=np.int64)),
+                sample_weights=sample_weights_dict[hyperparameter],
+                hyperparameter=hyperparameter,
+            )
 
-                if drop_ids is None:
-                    finished_dict[hyperparameter] = True
-                    continue
+            if drop_ids is None:
+                finished_dict[hyperparameter] = True
+                continue
 
             if compute_bias and target is not None:
                 relative_bias = compute_relative_bias(
@@ -293,7 +239,6 @@ def mrs(
             mmd_dict,
             relative_bias_dict,
             mrs_iteration_dict,
-            roc_dict,
             wasserstein_dict,
         )
     else:
@@ -308,7 +253,6 @@ def random_drops(
     n_drop: int = 1,
     n_splits=5,
     random_state=None,
-    calculate_roc=False,
     sample_weights=None,
     hyperparameter=0.0,
     *args,
@@ -322,17 +266,12 @@ def random_drops(
     """
 
     auroc_list = []
-    ifpr_list = []
-    itpr_list = []
 
     dropped_N = N[sample_weights != 0.0]
     y = dropped_N[target]
     target_sum = np.sum(y)
     if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
-        if calculate_roc:
-            return None, None, None, None
-        else:
-            return None, None
+        return None, None
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -357,22 +296,6 @@ def random_drops(
         all_predictions[test_indices_N] += predictions[: len(N_test)]
         auroc_list.append(roc_auc_score(test_data.label, predictions))
 
-        if calculate_roc:
-            interpolated_fpr, interpolated_tpr = interpolate_roc(
-                test_data.label, predictions
-            )
-            ifpr_list.append(interpolated_fpr)
-            itpr_list.append(interpolated_tpr)
-
     drop_ids = random.sample(range(0, len(dropped_N)), n_drop)
 
-    if calculate_roc:
-        mean_ifpr_list, mean_itpr_list, _ = calculate_mean_roc(ifpr_list, itpr_list)
-        return (
-            dropped_N.index[drop_ids],
-            np.mean(auroc_list),
-            mean_ifpr_list,
-            mean_itpr_list,
-        )
-    else:
-        return dropped_N.index[drop_ids], np.mean(auroc_list)
+    return dropped_N.index[drop_ids], np.mean(auroc_list)

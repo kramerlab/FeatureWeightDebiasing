@@ -219,35 +219,35 @@ def downstream_tasks_experiment(
             abs_feature_importance_list.append(abs_feature_importance.tolist())
             roc_curves_list.append(roc_curve_values)
 
-        gamma = calculate_rbf_gamma(
-            np.append(N[columns], R[columns], axis=0),
-            best_feature_weights,
-        )
-        feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = (
-            compute_metrics(
-                N,
-                R,
-                scaler,
-                columns,
-                target,
-                best_sample_weights,
+            gamma = calculate_rbf_gamma(
+                np.append(N[columns], R[columns], axis=0),
                 best_feature_weights,
-                gamma,
             )
-        )
+            feature_weighted_mmd_R, relative_bias_R, wasserstein_distances_R = (
+                compute_metrics(
+                    N,
+                    R,
+                    scaler,
+                    columns,
+                    target,
+                    best_sample_weights,
+                    best_feature_weights,
+                    gamma,
+                )
+            )
 
-        feature_weighted_mmd_T, relative_bias_T, wasserstein_distances_T = (
-            compute_metrics(
-                N,
-                T,
-                scaler,
-                columns,
-                target,
-                best_sample_weights,
-                best_feature_weights,
-                gamma,
+            feature_weighted_mmd_T, relative_bias_T, wasserstein_distances_T = (
+                compute_metrics(
+                    N,
+                    T,
+                    scaler,
+                    columns,
+                    target,
+                    best_sample_weights,
+                    best_feature_weights,
+                    gamma,
+                )
             )
-        )
 
         if method_name in (
             "fw-mrs-temperature",

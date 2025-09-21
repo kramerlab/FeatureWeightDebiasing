@@ -52,9 +52,9 @@ def mrs_step(
     y = dropped_N[target]
     target_sum = np.sum(y)
     if target_sum <= n_splits:
-        n_splits = target_sum
+        n_splits = int(target_sum)
     elif (len(dropped_N) - target_sum) <= n_splits:
-        n_splits = len(dropped_N) - target_sum
+        n_splits = int(len(dropped_N) - target_sum)
 
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -273,9 +273,9 @@ def random_drops(
     y = dropped_N[target]
     target_sum = np.sum(y)
     if target_sum <= n_splits:
-        n_splits = target_sum
+        n_splits = int(target_sum)
     elif (len(dropped_N) - target_sum) <= n_splits:
-        n_splits = len(dropped_N) - target_sum
+        n_splits = int(len(dropped_N) - target_sum)
 
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)

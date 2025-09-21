@@ -57,6 +57,9 @@ def mrs_step(
     elif (len(dropped_N) - target_sum) <= n_splits:
         n_splits = int(len(dropped_N) - target_sum)
 
+    if n_splits < 2:
+        return None, None, None
+
     skf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     for (train_indices_N, test_indices_N), (train_indices_R, test_indices_R) in zip(

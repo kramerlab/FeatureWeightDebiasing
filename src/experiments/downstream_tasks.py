@@ -281,7 +281,6 @@ def downstream_tasks_experiment(
                 method_name,
             )
 
-
         if method_name == "uniform" and bias_type in ("less_positive_class", "none"):
             (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(
                 R,
@@ -333,36 +332,38 @@ def downstream_tasks_experiment(
             result_columns = columns
         else:
             result_columns = N.drop(["label"], axis="columns").columns
-        result_dict_similarity_R = write_result_dict(
-            result_columns,
-            weighted_mmds_list_R,
-            biases_list_R,
-            wasserstein_distance_list_R,
-        )
 
-        result_dict_similarity_T = write_result_dict(
-            result_columns,
-            weighted_mmds_list_T,
-            biases_list_T,
-            wasserstein_distance_list_T,
-        )
+        if not method_name == "fw-mrs-temperature-comparison":
+            result_dict_similarity_R = write_result_dict(
+                result_columns,
+                weighted_mmds_list_R,
+                biases_list_R,
+                wasserstein_distance_list_R,
+            )
 
-        with open(result_path / "similarity_results_R.json", "w") as result_file:
-            result_file.write(json.dumps(result_dict_similarity_R))
+            result_dict_similarity_T = write_result_dict(
+                result_columns,
+                weighted_mmds_list_T,
+                biases_list_T,
+                wasserstein_distance_list_T,
+            )
 
-        with open(result_path / "similarity_results_T.json", "w") as result_file:
-            result_file.write(json.dumps(result_dict_similarity_T))
+            with open(result_path / "similarity_results_R.json", "w") as result_file:
+                result_file.write(json.dumps(result_dict_similarity_R))
 
-        result_dict_classification = {}
-        result_dict_classification = write_result_dict_test_set(
-            rf_auroc_list,
-            rf_auprc_list,
-            dropped_samples_list,
-            len(N),
-        )
+            with open(result_path / "similarity_results_T.json", "w") as result_file:
+                result_file.write(json.dumps(result_dict_similarity_T))
 
-        with open(result_path / "classification_results.json", "w") as result_file:
-            result_file.write(json.dumps(result_dict_classification))
+            result_dict_classification = {}
+            result_dict_classification = write_result_dict_test_set(
+                rf_auroc_list,
+                rf_auprc_list,
+                dropped_samples_list,
+                len(N),
+            )
+
+            with open(result_path / "classification_results.json", "w") as result_file:
+                result_file.write(json.dumps(result_dict_classification))
 
         if method_name in (
             "fw-mrs-temperature",

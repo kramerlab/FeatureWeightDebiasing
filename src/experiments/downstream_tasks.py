@@ -248,6 +248,13 @@ def downstream_tasks_experiment(
                     gamma,
                 )
             )
+            weighted_mmds_list_R.append(feature_weighted_mmd_R)
+            biases_list_R.append(relative_bias_R.astype(float))
+            wasserstein_distance_list_R.append(wasserstein_distances_R)
+
+            weighted_mmds_list_T.append(feature_weighted_mmd_T)
+            biases_list_T.append(relative_bias_T.astype(float))
+            wasserstein_distance_list_T.append(wasserstein_distances_T)
 
         if method_name in (
             "fw-mrs-temperature",
@@ -274,13 +281,6 @@ def downstream_tasks_experiment(
                 method_name,
             )
 
-        weighted_mmds_list_R.append(feature_weighted_mmd_R)
-        biases_list_R.append(relative_bias_R.astype(float))
-        wasserstein_distance_list_R.append(wasserstein_distances_R)
-
-        weighted_mmds_list_T.append(feature_weighted_mmd_T)
-        biases_list_T.append(relative_bias_T.astype(float))
-        wasserstein_distance_list_T.append(wasserstein_distances_T)
 
         if method_name == "uniform" and bias_type in ("less_positive_class", "none"):
             (R_auroc, R_auprc) = compute_classification_metrics_random_forest_perfect(

@@ -211,7 +211,7 @@ def mrs(
                     )
                 )
 
-            if drop_ids:
+            if drop_ids is None:
                 sample_weights_dict[hyperparameter][drop_ids] = 0.0
             remaining = dropped_N[sample_weights_dict[hyperparameter] != 0.0]
             if (

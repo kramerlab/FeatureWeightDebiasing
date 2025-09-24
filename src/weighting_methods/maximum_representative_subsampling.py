@@ -164,9 +164,9 @@ def mrs(
                 hyperparameter=hyperparameter,
             )
 
-            if drop_ids is None:
+            if auroc is None:
+                auroc = auc_dict[hyperparameter][-1]
                 finished_dict[hyperparameter] = True
-                continue
 
             if compute_bias and target is not None:
                 relative_bias = compute_relative_bias(
@@ -211,7 +211,8 @@ def mrs(
                     )
                 )
 
-            sample_weights_dict[hyperparameter][drop_ids] = 0.0
+            if drop_ids:
+                sample_weights_dict[hyperparameter][drop_ids] = 0.0
             remaining = dropped_N[sample_weights_dict[hyperparameter] != 0.0]
             if (
                 len(remaining) <= drop
@@ -263,6 +264,10 @@ def random_drops(
     auroc_list = []
 
     dropped_N = N[sample_weights != 0.0]
+    y = dropped_N[target]
+    target_sum = np.sum(y)
+    if (target_sum <= n_splits) or ((len(dropped_N) - target_sum) <= n_splits):
+        return None, None
 
     all_predictions = np.zeros(len(dropped_N))
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)

@@ -3,7 +3,6 @@ import pathlib
 
 import pandas as pd
 import numpy as np
-from fairlearn.datasets import fetch_adult
 
 from folktables import (
     ACSDataSource,

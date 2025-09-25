@@ -25,7 +25,6 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 from sklearn.svm import SVC, LinearSVC
-from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 
 min_weight_fractions_leaf_list = [
     0.0,
